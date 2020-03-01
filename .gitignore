@@ -1,0 +1,12 @@
+# Ignore everything
+*
+
+# But look in directories
+!*/
+
+# Whitelist gitignore, scripts, and figures
+!.gitignore
+!**.py
+!**.R
+!**.bsh
+!**.nim

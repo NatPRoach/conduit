@@ -1,0 +1,153 @@
+#!/bin/bash
+trap "exit" INT
+set -e
+source ~/miniconda2/etc/profile.d/conda.sh
+
+# ./trim_lengths.py
+# sed 's/U/T/g' pass_long_reads.fa > pass_long_reads.UtoT.fa
+# mkdir clusters/
+# ../RATTLE/./rattle cluster --rna -t 8 -o clusters/ -i pass_long_reads.UtoT.fa
+# mkdir clusters/fasta/
+# ../RATTLE/rattle extract_clusters -i pass_long_reads.UtoT.fa -c clusters/clusters.out -o clusters/fasta/ -m 5
+
+# cd clusters/fasta/
+# for FILE in *.fa
+# do
+# cd ../../
+# TRIM=${FILE::${#FILE}-3}
+# echo ${TRIM}
+# ../poaV2/poa -do_global -read_fasta clusters/fasta/${FILE} -po clusters/po/${TRIM}.po ../poaV2/myNUC3.4.4.mat
+# cd clusters/fasta
+# done
+# cd ../../
+
+# mkdir clusters/po/
+# mv clusters/fasta/*.po clusters/po/
+
+ITER=0
+# # cd clusters/consensi/${ITER}/
+# # for FILE in *.consensus.fa
+# # do
+# # TRIM=${FILE::${#FILE}-19}
+# # mv ${FILE} ${TRIM}.consensus.fa
+# # done
+# # cd clusters/po/${ITER}
+# # for FILE in *.fa.po
+# # do
+# # TRIM=${FILE::${#FILE}-6}
+# # mv ${FILE} ${TRIM}.po
+# # done
+
+# mkdir clusters/po/${ITER}/
+# mkdir clusters/consensi/${ITER}/
+
+# cd clusters/po/
+# for FILE in *.po
+# do
+# cd ../../
+# echo ${TRIM}
+# TRIM=${FILE::${#FILE}-3}
+# # # ./poParser trim_po clusters/po/${FILE} clusters/po/${ITER}/${FILE} clusters/consensi/${ITER}/${TRIM}.consensus.fa
+# ./poParser trim_po clusters/po/${FILE} clusters/consensi/${ITER}/${TRIM}.consensus.fa
+# ../poaV2/poa -do_global -read_fasta clusters/consensi/${ITER}/${TRIM}.consensus.fa -po clusters/po/${ITER}/${FILE} ../poaV2/myNUC3.4.4.mat 
+# cd clusters/po/
+# done
+# cd ../../
+
+
+# # mv clusters/po/*.consensus.fa clusters/consensi/
+# rm consensus_reads_iter${ITER}.fa
+# touch consensus_reads_iter${ITER}.fa
+# for FILE in clusters/consensi/${ITER}/*.consensus.fa
+# do
+# cat ${FILE} >> consensus_reads_iter${ITER}.fa
+# done
+
+# conda activate dRNAseq
+# minimap2 -ax splice -uf ../../NPR_Notebook/00_Data/references/ce11/ce11.fa consensus_reads_iter${ITER}.fa > consensus_reads_iter${ITER}.sam
+# samtools sort consensus_reads_iter${ITER}.sam > consensus_reads_iter${ITER}.bam
+# samtools index consensus_reads_iter${ITER}.bam
+# conda deactivate
+
+# for ITER in 1
+# for ITER in 2 3
+# for ITER in 3
+for ITER in 1 2 3
+do
+    # mkdir clusters/po/${ITER}/
+    # mkdir clusters/consensi/${ITER}/
+    PREV=$((${ITER} - 1))
+    conda activate nim
+    bowtie2-build --threads 8 consensus_reads_iter${PREV}.fa consensus_index
+    bowtie2 -p 8 --n-ceil L,0,0 --nofw --xeq --no-unal --very-sensitive-local -x consensus_index -1 N2_OP50_bio1.1.fastq -2 N2_OP50_bio1.2.fastq > test_illumina_to_nanopore.sam
+    conda deactivate
+
+    samtools sort test_illumina_to_nanopore.sam > test_illumina_to_nanopore.bam
+    samtools index test_illumina_to_nanopore.bam
+
+    # mkdir clusters/corrected/
+    cd clusters/po/${PREV}/
+    for FILE in *.po
+    do
+    cd ../../../
+    TRIM=${FILE::${#FILE}-3}
+    echo ${TRIM}
+    # pwd
+    # ./poParser illumina clusters/po/${PREV}/${FILE} test_illumina_to_nanopore.bam clusters/po/${ITER}/${FILE} clusters/consensi/${ITER}/${TRIM}.consensus.fa
+    ./poParser illumina clusters/po/${PREV}/${FILE} test_illumina_to_nanopore.bam clusters/consensi/${ITER}/${TRIM}.consensus.fa
+    ../poaV2/poa -do_global -read_fasta clusters/consensi/${ITER}/${TRIM}.consensus.fa -po clusters/po/${ITER}/${FILE} ../poaV2/myNUC3.4.4.mat 
+    cd clusters/po/${PREV}/
+    done
+    cd ../../../
+
+    # rm consensus_reads_iter${ITER}.fa
+    touch consensus_reads_iter${ITER}.fa
+    for FILE in clusters/consensi/${ITER}/*.consensus.fa
+    do
+    cat ${FILE} >> consensus_reads_iter${ITER}.fa
+    done
+
+    conda activate dRNAseq
+    minimap2 -ax splice -uf ../../NPR_Notebook/00_Data/references/ce11/ce11.fa consensus_reads_iter${ITER}.fa > consensus_reads_iter${ITER}.sam
+    samtools sort consensus_reads_iter${ITER}.sam > consensus_reads_iter${ITER}.bam
+    samtools index consensus_reads_iter${ITER}.bam
+    conda deactivate
+done
+
+# ITER=4
+# PREV=$((${ITER} - 1))
+
+# mkdir clusters/po/${ITER}/
+# mkdir clusters/consensi/${ITER}/
+# PREV=$((${ITER} - 1))
+# conda activate nim
+# bowtie2-build consensus_reads_iter${PREV}.fa consensus_index
+# bowtie2 -p 8 --nofw --xeq --no-unal --very-sensitive-local -x consensus_index -1 test.1.fastq -2 test.2.fastq > test_illumina_to_nanopore.sam
+# conda deactivate
+
+# samtools sort test_illumina_to_nanopore.sam > test_illumina_to_nanopore.bam
+# samtools index test_illumina_to_nanopore.bam
+
+# cd clusters/po/${PREV}/
+# for FILE in *.po
+# do
+# cd ../../../
+# TRIM=${FILE::${#FILE}-3}
+# echo ${TRIM}
+# # ./poParser illumina clusters/po/${PREV}/${FILE} test_illumina_to_nanopore.bam clusters/po/${ITER}/${FILE} clusters/consensi/${ITER}/${TRIM}.consensus.fa
+# ./poParser final_illumina clusters/po/${PREV}/${FILE} test_illumina_to_nanopore.bam clusters/consensi/${ITER}/${TRIM}.consensus.fa
+# ../poaV2/poa -do_global -read_fasta clusters/consensi/${ITER}/${TRIM}.consensus.fa -po clusters/po/${ITER}/${FILE} ../poaV2/myNUC3.4.4.mat 
+# cd clusters/po/${PREV}
+# done
+# cd ../../../
+
+# for FILE in clusters/consensi/${ITER}/*.consensus.fa
+# do
+# cat ${FILE} >> consensus_reads_iter${ITER}.fa
+# done
+
+# conda activate dRNAseq
+# minimap2 -ax splice -uf ../../NPR_Notebook/00_Data/references/ce11/ce11.fa consensus_reads_iter${ITER}.fa > consensus_reads_iter${ITER}.sam
+# samtools sort consensus_reads_iter${ITER}.sam > consensus_reads_iter${ITER}.bam
+# samtools index consensus_reads_iter${ITER}.bam
+# conda deactivate
