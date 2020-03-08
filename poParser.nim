@@ -25,7 +25,9 @@ type
   
   Node = object
     nts : string
-    supporting_reads : seq[uint32]
+    # supporting_reads : seq[uint32]
+    nanopore_support : uint32
+    illumina_support : uint32
     align_ring_partner : int32 #No partner if -1
     visited : bool
     indegree : uint16
@@ -49,7 +51,10 @@ type
     source_nodes : seq[uint32]
     end_nodes : seq[uint32]
     deleted_nodes : HashSet[uint32]
-    illumina_branches : HashSet[seq[uint32]]
+    illumina_branches : Table[seq[uint32],seq[uint32]]
+    nanopore_counts : Table[(uint32,uint32),uint32]
+    illumina_counts : Table[(uint32,uint32),uint32]
+
   
   StringtieLikeDataStructure = object
     nodes : seq[Node]
@@ -178,6 +183,10 @@ proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] 
       last_j_in_path_table = int(i)
   for i in 0..<po.nodes.len:
     let j = uint32(i)
+    if j in po.deleted_nodes:
+      continue
+    # if i < 17000 or i > 17300 and j notin highlight_path1 and j notin highlight_path2:
+    #   continue
     let node = po.nodes[po.node_indexes[('b',uint32(i))]]
     var line : seq[string]
     if collapse:
@@ -210,9 +219,17 @@ proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] 
   lines.add("var edges = [")
 
   var written_set : HashSet[(uint32,uint32)]
-  for i,node in po.nodes:
+  for i in 0..<po.nodes.len:
     let k = po.node_indexes[('f',uint32(i))]
+    if k in po.deleted_nodes:
+      continue
+    # if (k < 17000'u32 or k > 17300'u32) and k notin highlight_path1 and k notin highlight_path2:
+    #   continue 
     for edge in po.edges[k]:
+      if edge in po.deleted_nodes:
+        continue
+      # if (edge < 17000'u32 or edge > 17300'u32) and edge notin highlight_path1 and edge notin highlight_path2:
+      #   continue 
       var highlight : string
       if not((k,edge) in written_set):
         if (k,edge) in highlight_edges1:
@@ -226,6 +243,12 @@ proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] 
           highlight = ", color: \'black\'"
         lines.add(&"    {f}from: {k}, to: {edge}{highlight}, label: '{po.weights[(k,edge)]}',     font: {f}align: 'middle'{e}, value: {po.weights[(k,edge)]}, arrows:\'to\'{e},")
         written_set.incl((k,edge))
+    if po.nodes[i].align_ring_partner != -1:
+      # echo "FUCKING HERE999"
+      # echo k, " - ", po.nodes[i].align_ring_partner
+      # if (k,uint32(po.nodes[i].align_ring_partner)) notin written_set:
+        # written_set.incl((k,uint32(po.nodes[i].align_ring_partner)))
+      lines.add(&"    {f}from: {k}, to: {po.nodes[i].align_ring_partner},color: \'grey\'{e},")
   lines[^1] = lines[^1][0..^1]
   lines.add("];\n")
   return lines
@@ -286,7 +309,8 @@ proc initPOGraph( file : File) : POGraph =
                    align_ring_partner : a_pair,
                    visited : false,
                    end_node_flag : false,
-                   start_node_flag : false))
+                   start_node_flag : false,
+                   nanopore_support : 0'u32))
     let s_split = info.split('S')
     info = s_split[0]
     var seq_idxs : seq[uint32]
@@ -298,7 +322,8 @@ proc initPOGraph( file : File) : POGraph =
         source_node_indices.add(uint32(i))
       reads[seq_idx].path.add(uint32(i))
       reads[seq_idx].sequence.add(nt)
-      nodes[i].supporting_reads.add(seq_idx)
+      # nodes[i].supporting_reads.add(seq_idx)
+      nodes[i].nanopore_support += 1'u32
     if info != "":
       let l_split = info.split('L')
       for l in l_split[1..^1]:
@@ -504,12 +529,13 @@ proc constructNewGraph2( po : ptr TrimmedPOGraph ) : TrimmedPOGraph =
                         node_indexes : node_indexes2,
                         deleted_nodes : deleted_nodes)
 
-proc getStringtieLikeDataStructures( po : ptr POGraph,reads:seq[Read]) : StringtieLikeDataStructure =
+proc getStringtieLikeDataStructures( po : ptr POGraph) : StringtieLikeDataStructure =
+  var time1 = cpuTime()
   var fwd_edges,rev_edges : Table[uint32,seq[uint32]]
   var weights : Table[(uint32,uint32),seq[string]]
   var u_set,v_set : HashSet[uint32]
   var node_support_counts : CountTable[uint32]
-  for read in reads:
+  for read in po[].reads:
     for i in 0..<read.corrected_path.len-1:
       if (read.corrected_path[i],read.corrected_path[i+1]) in weights:
         weights[(read.corrected_path[i],read.corrected_path[i+1])].add(read.name)
@@ -529,27 +555,73 @@ proc getStringtieLikeDataStructures( po : ptr POGraph,reads:seq[Read]) : Stringt
         node_support_counts.inc(read.corrected_path[i])
       else:
         node_support_counts[read.corrected_path[i]] = 1
+    if read.corrected_path[^1] in node_support_counts:
+      node_support_counts.inc(read.corrected_path[^1])
+    else:
+      node_support_counts[read.corrected_path[^1]] = 1
+  echo "init dicts - ", (cpuTime() - time1)
+  time1 = cpuTime()
   let source_nodes = u_set - v_set
   let sink_nodes = v_set - u_set
   for sink_node in sink_nodes:
     fwd_edges[sink_node] = @[]
   for source_node in source_nodes:
     rev_edges[source_node] = @[]
-  var nodes : seq[Node]
+  # var nodes : seq[Node]
   let node_indexes = sorted(toSeq(u_set + v_set))
+  echo "node sorting - ", (cpuTime() - time1)
+  time1 = cpuTime()
   var node_indexes2 : Table[(char,uint32),uint32]
   var node_support_list : seq[uint32]
   for i,j in node_indexes:
-    nodes.add(po[].nodes[j])
+    # nodes.add(po[].nodes[j])
     node_indexes2[('f',uint32(i))] = j
     node_indexes2[('b',j)] = uint32(i)
     node_support_list.add(uint32(node_support_counts[j]))
-  return StringtieLikeDataStructure(nodes : nodes,
-                                node_indexes : node_indexes2,
-                                fwd_edges : fwd_edges,
-                                rev_edges : rev_edges,
-                                weights : weights,
-                                node_support_list: node_support_list)
+  echo "node_indexes - ", cpuTime() - time1
+  # return StringtieLikeDataStructure(nodes : nodes,
+  #                               node_indexes : node_indexes2,
+  #                               fwd_edges : fwd_edges,
+  #                               rev_edges : rev_edges,
+  #                               weights : weights,
+  #                               node_support_list: node_support_list)
+  return StringtieLikeDataStructure(node_indexes : node_indexes2,
+                                    fwd_edges : fwd_edges,
+                                    rev_edges : rev_edges,
+                                    weights : weights,
+                                    node_support_list: node_support_list)
+
+proc updateStringtieLikeDataStructures(st : ptr StringtieLikeDataStructure,removed_reads : ptr seq[Read]) = 
+  var removed_read_names : HashSet[string]
+  var visited_edges : HashSet[(uint32,uint32)]
+  for read in removed_reads[]:
+    removed_read_names.incl(read.name)
+  for read in removed_reads[]:
+    for i in 0..<read.corrected_path.len-1:
+      let u = read.corrected_path[i]
+      let v = read.corrected_path[i+1]
+      st[].node_support_list[st[].node_indexes[('b',u)]] -= 1'u32
+      if (u,v) in visited_edges:
+        continue
+      visited_edges.incl((u,v))
+      var new_read_names : seq[string]
+      for name in st[].weights[(u,v)]:
+        if name in removed_read_names:
+          continue
+        new_read_names.add(name)
+      if new_read_names.len != 0:
+        st[].weights[(u,v)] = new_read_names
+      else:
+        st[].weights.del((u,v))
+        for i,v2 in st[].fwd_edges[u]:
+          if v2 == v:
+            st[].fwd_edges[u].del(i)
+            break
+        for i,u2 in st[].rev_edges[v]:
+          if u2 == u:
+            st[].rev_edges[v].del(i)
+            break
+    st[].node_support_list[st[].node_indexes[('b',read.corrected_path[^1])]] -= 1'u32
 
 proc maxIdx[T]( s : seq[T]) : int = 
   var current_max = T.low
@@ -612,7 +684,7 @@ proc compareQopTuples( x,y:(char,int,int)) : int =
     return 1
   return 0
 
-proc correctPaths( q_path : var seq[uint32],
+proc correctPaths2( q_path : var seq[uint32],
                   r_path : seq[uint32],
                   nodes: ptr seq[Node],
                   node_indexes : Table[(char,uint32),uint32],
@@ -699,22 +771,123 @@ proc correctPaths( q_path : var seq[uint32],
     echo q_path.len
   return (diff_flag,q_path)
 
+proc correctPaths( q_path : var seq[uint32],
+                    r_path : seq[uint32],
+                    nodes: ptr seq[Node],
+                    node_indexes : Table[(char,uint32),uint32],
+                    psi:uint16,
+                    correct_ends : bool = false,
+                    detect_ends : bool = false,
+                    debug : bool = false) : (bool,seq[uint32]) =
+  ### Takes in two paths, a query path and a reference path, and a number psi that indicates the min indel size needed to retain that indel, indels in the query relative to the reference smaller than that number are 'corrected', to reflect the reference path. Also takes in a bool indicating whether or not to correct the ends of alignments, a reference to nodes, which get modified to reflect new start and end nodes based on correction.
+  for i in 0..<q_path.len - 1:
+    # echo q_path[i], " ", q_path[i+1]
+    assert q_path[i] < q_path[i+1]
+  for i in 0..<r_path.len - 1:
+    assert r_path[i] < r_path[i+1]
+  let alignment = alignPaths(q_path,r_path)
+  var q_idx = 0
+  var r_idx = 0
+  var continuous_ins = 0
+  var continuous_del = 0
+  var diff_flag = false
+  var end_diff_flag = false
+  var q_ops : seq[(char,int,int)]
+  var start_flag = true
+  var ignore_deletion_flag = false
+  for op in alignment:
+    if op == 0'u8:
+      if debug:
+        echo q_path[q_idx], "\t", r_path[r_idx]
+      if continuous_ins >= int(psi):
+        diff_flag = true
+        ignore_deletion_flag = true
+      elif continuous_ins > 0 and (correct_ends or not start_flag):
+        for i in q_idx - continuous_ins..<q_idx:
+          q_ops.add(('i',i,0))
+      if continuous_del >= int(psi):
+        diff_flag = true
+        end_diff_flag = true
+      elif continuous_del > 0 and not ignore_deletion_flag:
+        for i in r_idx - continuous_del..<r_idx:
+          q_ops.add(('d',q_idx-continuous_ins,i))
+      ignore_deletion_flag = false
+      start_flag = false
+      q_idx += 1
+      r_idx += 1
+      continuous_ins = 0
+      continuous_del = 0
+    elif op == 1'u8: # Insertion
+      if debug:
+        echo q_path[q_idx], "\t----"
+      if detect_ends or correct_ends or not start_flag:
+        continuous_ins += 1
+
+      q_idx += 1
+    else: #op == 2; Deletion
+      if debug:
+        echo "----\t", r_path[r_idx]
+      if not start_flag:
+        continuous_del += 1
+      r_idx += 1
+  if detect_ends:
+    if continuous_ins >= int(psi):
+      diff_flag = true
+  if correct_ends:
+    if continuous_ins >= int(psi):
+      diff_flag = true
+    elif continuous_ins > 0:
+      for i in q_idx - continuous_ins..<q_idx:
+        q_ops.add(('i',i,0))
+  
+  assert q_idx == q_path.len
+  assert r_idx == r_path.len
+  # let before = q_path
+  for (op,q_idx,r_idx) in sorted(q_ops,compareQopTuples,Descending):
+    if op == 'i':
+      if q_idx != len(q_path) - 1 and q_idx != 0:
+        assert q_path[q_idx - 1] < q_path[q_idx + 1]
+      q_path.delete(q_idx)
+    else: # op == 'd'
+      if q_idx != 0:
+        assert q_path[q_idx - 1] < r_path[r_idx] and r_path[r_idx] < q_path[q_idx]
+      q_path.insert(@[r_path[r_idx]],q_idx)
+  if debug:
+    echo q_path.len
+  return (diff_flag,q_path)
+
 proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] = 
   var representative_paths : seq[seq[uint32]]
   var remaining_reads = toSeq(0..<po[].reads.len)
   var total_st_time = 0.0
   var total_sort_time = 0.0
   var total_walk_time = 0.0
+  var total_search_time = 0.0
+  let time = cpuTime()
+  # var st = getStringtieLikeDataStructures(po,po[].reads)
+  var st = getStringtieLikeDataStructures(po)
+  total_st_time += (cpuTime() - time)
+  echo "ST init time - ", total_st_time
+  total_st_time = 0.0
+  # var iterations = 0 
+  var removed_reads : seq[Read]
   while remaining_reads.len != 0:
+    var time1 = cpuTime()
+    updateStringtieLikeDataStructures(addr st, addr removed_reads)
+    total_st_time += (cpuTime() - time1)
     # echo "here"
+    time1 = cpuTime()
     var reads : seq[Read] = @[]
     for i in remaining_reads:
       reads.add(po[].reads[i])
-    var time1 = cpuTime()
-    let st = getStringtieLikeDataStructures(po,reads)
-    total_st_time += (cpuTime() - time1)
+    # let st2 = getStringtieLikeDataStructures(po,reads)
+    # echo st2.node_support_list
+    # echo st.node_support_list
+    # assert st2.weights == st.weights
+    # assert st2.node_support_list == st.node_support_list
     let max_node_idx = maxIdx(st.node_support_list)
     let fwd_max_node_idx = st.node_indexes[('f',uint32(max_node_idx))]
+    # echo fwd_max_node_idx
     var start_idx,end_idx : int
     if st.fwd_edges[fwd_max_node_idx].len == 0:
       end_idx = -1
@@ -724,6 +897,7 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
       start_idx = -1
     else:
       start_idx = max_node_idx
+    
     
     var read_idxs = newSeqWith(po[].reads.len, [0,0])
     var excluded_reads : HashSet[string]
@@ -740,7 +914,12 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
       read_idxs[i] = [j,j] #If not found it'll be [-1,-1], else it'll be the index of the matched node
       if j == -1:
         excluded_reads.incl(read.name)
+      if j < psi:
+        rev_end_reads.incl(read.name)
+      if read.corrected_path.len - j < psi:
+        fwd_end_reads.incl(read.name)
     var representative_path = @[fwd_max_node_idx]
+    total_search_time += (cpuTime() - time1)
     time1 = cpuTime()
     while start_idx != -1 or end_idx != -1:
       # echo "here2"
@@ -784,8 +963,8 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
                 read_idxs[i][1] = -1
             else:
               read_idxs[i][1] = -1
-              if true:
-              # if reads[i].name notin fwd_end_reads:
+              # if true:
+              if reads[i].name notin fwd_end_reads:
                 excluded_reads.incl(reads[i].name)
           else:
             read_idxs[i][1] = -1
@@ -831,8 +1010,8 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
                 read_idxs[i][0] = -1
             else:
               read_idxs[i][0] = -1
-              if true:
-              # if reads[i].name notin rev_end_reads:
+              # if true:
+              if reads[i].name notin rev_end_reads:
                 excluded_reads.incl(reads[i].name)
           else:
             read_idxs[i][0] = -1
@@ -912,8 +1091,8 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
                   fwd_end_reads.incl(reads[i].name)
               else:
                 read_idxs[i][1] = -1
-                if true:
-                # if reads[i].name notin fwd_end_reads:
+                # if true:
+                if reads[i].name notin fwd_end_reads:
                   excluded_reads.incl(reads[i].name)
             else:
               read_idxs[i][1] = -1
@@ -934,8 +1113,8 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
                   rev_end_reads.incl(reads[i].name)
               else:
                 read_idxs[i][0] = -1
-                if true:
-                # if reads[i].name notin rev_end_reads:
+                # if true:
+                if reads[i].name notin rev_end_reads:
                   excluded_reads.incl(reads[i].name)
             else:
               read_idxs[i][0] = -1
@@ -950,37 +1129,95 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
     representative_paths.add(sorted(representative_path))
     total_sort_time += (cpuTime() - time1)
     var to_delete_reads : seq[int]
+    removed_reads = @[]
     for read_id in accounted_for_reads:
       to_delete_reads.add(read_id_to_idx[read_id])
+      removed_reads.add(po[].reads[remaining_reads[read_id_to_idx[read_id]]])
+      # echo read_id_to_idx[read_id]
+      # echo "here"
     for idx in sorted(to_delete_reads,order = SortOrder.Descending):
       remaining_reads.delete(idx)
-  echo "ST time - ", total_st_time
+  echo "ST update time - ", total_st_time
+  echo "Search time - ",total_search_time
   echo "Walk time - ", total_walk_time
   echo "sort time - ", total_sort_time
+
   return representative_paths
 
-proc updateGraph( rep_po : var TrimmedPOGraph, new_path,old_path : seq[uint32],weight:uint32 = 1'u32) : TrimmedPOGraph =
+proc updateGraph( rep_po : ptr TrimmedPOGraph, new_path,old_path : seq[uint32],weight:uint32 = 1'u32) =
+  ## NEW PATH
+  # var time1 = cpuTime()
+  rep_po.nodes[rep_po.node_indexes[('b',new_path[0])]].nanopore_support += 1'u32
   for i in 1..<new_path.len:
     let u = new_path[i-1]
     let v = new_path[i]
-    if (u,v) in rep_po.weights:
-      rep_po.weights[(u,v)] += weight
+    if (u,v) in rep_po[].weights:
+      rep_po[].weights[(u,v)] += weight
     else:
-      rep_po.weights[(u,v)] = weight
-      rep_po.edges[u].add(v)
+      rep_po[].weights[(u,v)] = weight
+      rep_po[].edges[u].add(v)
+    if (u,v) in rep_po.nanopore_counts:
+      rep_po.nanopore_counts[(u,v)] += 1'u32
+    else:
+      rep_po.nanopore_counts[(u,v)] = 1'u32
+    rep_po.nodes[rep_po.node_indexes[('b',v)]].nanopore_support += 1'u32
+  # echo "NEW PATH RESOLUTION - ", cpuTime() - time1
+  ## OLD PATH
+  # time1 = cpuTime()
+  rep_po.nodes[rep_po.node_indexes[('b',old_path[0])]].nanopore_support -= 1'u32
+  if rep_po.nodes[rep_po.node_indexes[('b',old_path[0])]].nanopore_support == 0'u32:
+    rep_po.deleted_nodes.incl(old_path[0])
   for i in 1..<old_path.len:
     let u = old_path[i-1]
     let v = old_path[i]
-    rep_po.weights[(u,v)] -= weight
-    if rep_po.weights[(u,v)] == 0'u32:
-      rep_po.weights.del((u,v))
-      for i,j in rep_po.edges[u]:
+    rep_po[].weights[(u,v)] -= weight
+    if rep_po[].weights[(u,v)] == 0'u32:
+      rep_po[].weights.del((u,v))
+      for i,j in rep_po[].edges[u]:
         if j == v:
-          rep_po.edges[u].delete(i,i)
+          rep_po[].edges[u].delete(i,i)
           break
-  return rep_po
+    rep_po.nanopore_counts[(u,v)] -= 1'u32
+    if rep_po.nanopore_counts[(u,v)] == 0'u32:
+      rep_po.nanopore_counts.del((u,v))
+      for j,v2 in rep_po.edges[u]:
+        if v == v2:
+          rep_po.edges[u].del(j)
+          break
+    rep_po.nodes[rep_po.node_indexes[('b',v)]].nanopore_support -= 1'u32
+    if rep_po.nodes[rep_po.node_indexes[('b',v)]].nanopore_support == 0'u32:
+      rep_po.deleted_nodes.incl(v)
+  # echo "OLD PATH RESOLUTION - ", cpuTime() - time1
 
-proc walkGreedyPaths(po : ptr TrimmedPOGraph) : seq[seq[uint32]] = 
+proc updateGraph2( rep_po : ptr TrimmedPOGraph, new_path,old_path : seq[uint32],weight:uint32 = 1'u32) =
+  rep_po.nodes[rep_po.node_indexes[('b',new_path[0])]].nanopore_support += 1'u32
+  for i in 1..<new_path.len:
+    let u = new_path[i-1]
+    let v = new_path[i]
+    if (u,v) in rep_po[].weights:
+      rep_po[].weights[(u,v)] += weight
+    else:
+      rep_po[].weights[(u,v)] = weight
+      rep_po[].edges[u].add(v)
+    rep_po.nodes[rep_po.node_indexes[('b',v)]].nanopore_support += 1'u32
+  rep_po.nodes[rep_po.node_indexes[('b',old_path[0])]].nanopore_support -= 1'u32
+  if rep_po.nodes[rep_po.node_indexes[('b',old_path[0])]].nanopore_support == 0'u32:
+    rep_po.deleted_nodes.incl(old_path[0])
+  for i in 1..<old_path.len:
+    let u = old_path[i-1]
+    let v = old_path[i]
+    rep_po[].weights[(u,v)] -= weight
+    if rep_po[].weights[(u,v)] == 0'u32:
+      rep_po[].weights.del((u,v))
+      for i,j in rep_po[].edges[u]:
+        if j == v:
+          rep_po[].edges[u].delete(i,i)
+          break
+    rep_po.nodes[rep_po.node_indexes[('b',v)]].nanopore_support -= 1'u32
+    if rep_po.nodes[rep_po.node_indexes[('b',v)]].nanopore_support == 0'u32:
+      rep_po.deleted_nodes.incl(v)
+
+proc walkGreedyPaths(po : ptr TrimmedPOGraph,psi : uint16 = 15'u16) : seq[seq[uint32]] = 
   var time1 = cpuTime()
   for i in 0..<po[].nodes.len:
     po[].nodes[i].visited = false
@@ -996,42 +1233,289 @@ proc walkGreedyPaths(po : ptr TrimmedPOGraph) : seq[seq[uint32]] =
     po[].nodes[bck_node_idx].visited = true
     var fwd_node_idx2 = fwd_node_idx
     while po[].edges[fwd_node_idx2].len != 0:
-      var weight_list : seq[uint32]
-      for j in po[].edges[fwd_node_idx2]:
-        weight_list.add(uint32(po[].weights[(fwd_node_idx2,uint32(j))]))
-      fwd_node_idx2 = po[].edges[fwd_node_idx2][maxIdx(weight_list)]
+      if po[].edges[fwd_node_idx2].len == 1:
+        fwd_node_idx2 = po[].edges[fwd_node_idx2][0]
+      else:
+        var weight_list : seq[uint32]
+        for j in po[].edges[fwd_node_idx2]:
+          weight_list.add(uint32(po[].weights[(fwd_node_idx2,uint32(j))]))
+        fwd_node_idx2 = po[].edges[fwd_node_idx2][maxIdx(weight_list)]
       path.add(fwd_node_idx2)
       let bck_node_idx2 = po[].node_indexes[('b',fwd_node_idx2)]
       if po[].nodes[bck_node_idx2].visited:
+        for _ in 0'u16..<psi:
+          if po[].edges[fwd_node_idx2].len > 1:
+            var weight_list : seq[uint32]
+            for j in po[].edges[fwd_node_idx2]:
+              weight_list.add(uint32(po[].weights[(fwd_node_idx2,uint32(j))]))
+            # if fwd_node_idx2 == 16939'u32:
+            #   echo weight_list
+            #   echo maxIdx(weight_list)
+            #   echo po[].edges[fwd_node_idx2]
+            #   echo po[].edges[fwd_node_idx2][maxIdx(weight_list)]
+            fwd_node_idx2 = po[].edges[fwd_node_idx2][maxIdx(weight_list)]
+          elif po[].edges[fwd_node_idx2].len == 1:
+            fwd_node_idx2 = po[].edges[fwd_node_idx2][0]
+          else:
+            break
+          path.add(fwd_node_idx2)
         break
       po[].nodes[bck_node_idx2].visited = true
     greedy_walks.add(path)
+    # echo "greedy1 - ", path
   for i in 0..<po[].nodes.len:
     po[].nodes[i].visited = false
   echo "walk greedy paths - ", cpuTime() - time1
   return greedy_walks
 
-proc getRepresentativePaths3( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : seq[seq[uint32]] =
+proc updateNodesAndEdges( po : ptr TrimmedPOGraph)  = 
+  var supported_nodes : HashSet[uint32]
+  var supported_edges : HashSet[(uint32,uint32)]
+
+  for read in po[].reads:
+    # echo read.corrected_path
+    supported_nodes.incl(read.corrected_path[0])
+    for i in 1..<read.corrected_path.len:
+      let u = read.corrected_path[i-1]
+      let v = read.corrected_path[i]
+      supported_nodes.incl(v)
+      supported_edges.incl((u,v))
+  for path in po[].illumina_branches.keys():
+    supported_nodes.incl(path[0])
+    for i in 1..<path.len:
+      let u = path[i-1]
+      let v = path[i]
+      supported_nodes.incl(v)
+      supported_edges.incl((u,v))
+  # for read in po[].reads:
+  #   for u in read.corrected_path:
+  #     supported_nodes.incl(u)
+  # for path in po[].illumina_reads.keys():
+  #   for u in path:
+  #     supported_nodes.incl(u)
+  for i in 0'u32..<uint32(po[].nodes.len):
+    let fwd_idx = po[].node_indexes[('f',i)] 
+    if fwd_idx notin supported_nodes:
+      if fwd_idx notin po[].deleted_nodes:
+        echo "Deleting node - ", fwd_idx
+        po[].deleted_nodes.incl(fwd_idx)
+  for u in po[].edges.keys():
+    var to_delete : seq[int]
+    for i,v in po[].edges[u]:
+      if (u,v) notin supported_edges:
+        echo "Deleting - ", u, " --> ", v
+        to_delete.add(i)
+        po[].weights.del((u,v))
+    for i in sorted(to_delete,Descending):
+      po.edges[u].del(i)
+
+proc searchForGreedyPath( po : ptr TrimmedPOGraph, minipath,greedy_path : seq[uint32], psi : uint16 = 15) : seq[uint32] = 
+  let start_node = minipath[0]
+  let end_node = minipath[^1]
+  var greedy_set : HashSet[uint32]
+  for node in greedy_path:
+    greedy_set.incl(node)
+  # let back_path = po[].nodes[po[].node_indexes[('b',start_node)]].path[^min(po[].nodes[po[].node_indexes[('b',start_node)]].path.len,int(psi))..^1]
+  # var back_dist = -1
+  # var rev_path : seq[uint32]
+  # for i in 1..back_path.len:
+  #   echo "getting to {i}"
+  #   if back_path[^i] in greedy_set:
+  #     back_dist = i - 1
+  #     if i > 1:
+  #       rev_path = back_path[^i..^2]
+  #     break
+  # if back_dist == -1:
+  #   echo "here1"
+  #   return @[]
+  var rev_path : seq[uint32]
+  if start_node in greedy_set:
+    rev_path = @[start_node]
+  else:
+    return @[]
+  var fwd_dist = -1
+  var fwd_node_idx = end_node
+  var fwd_path : seq[uint32]
+  for i in 0'u16..<psi:
+    echo fwd_node_idx
+    if fwd_node_idx in greedy_set:
+      fwd_dist = int(i)
+      break
+    if po.edges[fwd_node_idx].len == 0:
+      break
+    if po.edges[fwd_node_idx].len == 1:
+      fwd_node_idx = po.edges[fwd_node_idx][0]
+    else:
+      var weight_list : seq[uint32]
+      for j in po[].edges[fwd_node_idx]:
+        weight_list.add(uint32(po[].weights[(fwd_node_idx,j)]))
+      fwd_node_idx = po.edges[fwd_node_idx][maxIdx(weight_list)]
+    fwd_path.add(fwd_node_idx)
+  if fwd_dist == -1:
+    echo "here2"
+    return @[]
+  var new_path : seq[uint32]
+  new_path = rev_path & minipath & fwd_path
+  if new_path.len - 2 <= int(psi):
+    return new_path
+  else:
+    echo "here3"
+    return @[]
+
+proc detectMinipathDeltas( po : ptr TrimmedPOGraph, minipath,greedy_path : seq[uint32], psi : uint16 = 35) : bool =
+  var i = 0
+  var j = 0
+  var alignment : seq[uint8]
+  var align_idxs : seq[uint32]
+  var start_flag = false
+  var delta_flag = false
+  # let new_minipath = searchForGreedyPath(po,minipath,greedy_path,psi)
+  if minipath[0] in po.deleted_nodes or minipath[^1] in po.deleted_nodes:
+    for i in 1..<minipath.len:
+      let u = minipath[i-1]
+      let v = minipath[i]
+      if i != minipath.len - 1: #TODO: Test if all these comparisons are faster than just having two separate for loops
+        po[].nodes[po.node_indexes[('b',v)]].illumina_support -= 1'u32
+        if po[].nodes[po.node_indexes[('b',v)]].illumina_support == 0'u32 and po[].nodes[po.node_indexes[('b',v)]].nanopore_support == 0'u32:
+          po[].deleted_nodes.incl(v)
+      po[].illumina_counts[(u,v)] -= 1'u32
+      if (u,v) in po[].nanopore_counts:
+        if po[].illumina_counts[(u,v)] == 0'u32 and po[].nanopore_counts[(u,v)] == 0'u32:
+          po[].illumina_counts.del((u,v))
+          po[].nanopore_counts.del((u,v))
+          po[].weights.del((u,v))
+          for j,v2 in po[].edges[u]:
+            if v2 == v:
+              po[].edges[u].del(j)
+              break
+      else:
+        if po[].illumina_counts[(u,v)] == 0'u32:
+          po[].illumina_counts.del((u,v))
+          po[].weights.del((u,v))
+          for j,v2 in po[].edges[u]:
+            if v2 == v:
+              po[].edges[u].del(j)
+              break
+    return true
+  while true:
+    if i == minipath.len:
+      break
+    if j == greedy_path.len:
+      break
+    if minipath[i] == greedy_path[j]:
+      start_flag = true
+      alignment.add(0'u8)
+      align_idxs.add(uint32(j))
+      i += 1
+      j += 1
+    elif minipath[i] < greedy_path[j]:
+      i += 1
+      if start_flag:
+        alignment.add(1'u8)
+        delta_flag = true
+    else: # x[i] > y[j]
+      j += 1
+      if start_flag:
+        alignment.add(2'u8)
+        delta_flag = true
+  # if 242'u32 in minipath:
+  #   echo "mini - ", minipath
+  #   assert minipath[0] in po.deleted_nodes
+  #   # echo "new_mini - ", new_minipath
+  #   echo "greedy - ", greedy_path
+  #   echo alignment
+  # if alignment.len == 0:
+  #   return false
+  if alignment.len < minipath.len:
+    return false
+
+  if delta_flag:
+    # if searchForGreedyPath(po,minipath,greedy_path,psi)
+    if (alignment[0] == 0'u8 and alignment[^1] == 0'u8):
+      for i in 1..<minipath.len:
+        let u = minipath[i-1]
+        let v = minipath[i]
+        if i != minipath.len - 1: #TODO: Test if all these comparisons are faster than just having two separate for loops
+          po[].nodes[po.node_indexes[('b',v)]].illumina_support -= 1'u32
+          if po[].nodes[po.node_indexes[('b',v)]].illumina_support == 0'u32 and po[].nodes[po.node_indexes[('b',v)]].nanopore_support == 0'u32:
+            po[].deleted_nodes.incl(v)
+        po[].illumina_counts[(u,v)] -= 1'u32
+        if (u,v) in po[].nanopore_counts:
+          if po[].illumina_counts[(u,v)] == 0'u32 and po[].nanopore_counts[(u,v)] == 0'u32:
+            po[].illumina_counts.del((u,v))
+            po[].nanopore_counts.del((u,v))
+            po[].weights.del((u,v))
+            for j,v2 in po[].edges[u]:
+              if v2 == v:
+                po[].edges[u].del(j)
+                break
+        else:
+          if po[].illumina_counts[(u,v)] == 0'u32:
+            po[].illumina_counts.del((u,v))
+            po[].weights.del((u,v))
+            for j,v2 in po[].edges[u]:
+              if v2 == v:
+                po[].edges[u].del(j)
+                break
+      return true
+    # return true
+  else:
+    # echo "AHH1"
+    # if 17096'u32 in minipath:
+    #   echo "perfect_match - ", greedy_path
+    return true
+  # # echo "AHH4"
+  # ########################################################################
+  # ###---    Didn't hit the greedy path in one or both directions    ---###
+  # ###---    Try extending out by at max psi to see if we can        ---###
+  # ###---    make it to greedy path. If not, return false            ---###
+  # ########################################################################
+  return false
+
+proc trimMinipaths( rep_po : ptr TrimmedPOGraph,greedy_path : seq[uint32], psi : uint16 = 35) = 
+  # echo "before branches - ", rep_po.illumina_branches.len
+  var to_delete : seq[seq[uint32]] 
+  for minipath in rep_po.illumina_branches.keys:
+    if detectMinipathDeltas(rep_po,minipath,greedy_path,psi):
+      to_delete.add(minipath)
+  for minipath in to_delete:
+    rep_po.illumina_branches.del(minipath)
+  # echo "after branches - ", rep_po.illumina_branches.len
+
+proc getRepresentativePaths3( rep_po : ptr TrimmedPOGraph, psi : uint16 = 10,illumina_weight:uint32 = 10) : seq[seq[uint32]] =
   ########################################################################################
   ###------------------- Collect greedy walks from each source node -------------------###
   ########################################################################################
-  let greedy_walks = walkGreedyPaths(addr rep_po)
-
+  echo rep_po.reads.len
+  let greedy_walks = walkGreedyPaths(rep_po)
+  var outfile3 : File
+  discard open(outfile3,&"testing_repo2.html",fmWrite)
+  htmlOutput(rep_po[],outfile3,greedy_walks[0])
   ########################################################################################
   ###-------------------- Correct reads based on these greedy walks -------------------###
   ########################################################################################
   var time1 = cpuTime()
   var differed_reads : seq[int]
-  for i in 0..<rep_po.reads.len:
+  var before_paths : seq[seq[uint32]]
+  for i in 0..<rep_po[].reads.len:
     var flag = true
+    before_paths.add(rep_po[].reads[i].corrected_path)
     for j in 0..<greedy_walks.len:
+      # var before_path = rep_po[].reads[i].corrected_path
       var differed = false
-      let before_path = rep_po.reads[i].corrected_path
-      (differed,rep_po.reads[i].corrected_path) = correctPaths(rep_po.reads[i].corrected_path,greedy_walks[j],addr rep_po.nodes,rep_po.node_indexes,psi=psi,correct_ends = false)
-      rep_po = updateGraph(rep_po, rep_po.reads[i].corrected_path, before_path)
+      # echo ""
+      # echo "GREEDY: "
+      # echo greedy_walks[j]
+      # echo ""
+      (differed,rep_po[].reads[i].corrected_path) = correctPaths(rep_po[].reads[i].corrected_path,greedy_walks[j],addr rep_po[].nodes,rep_po[].node_indexes,psi=psi,correct_ends = false,detect_ends=true)
+      # updateGraph(rep_po, rep_po[].reads[i].corrected_path, before_path)
       flag = differed and flag
     if flag:
+    # if true:
       differed_reads.add(i)
+  for i in 0..<rep_po[].reads.len:
+    # echo rep_po.reads[i].corrected_path
+    updateGraph(rep_po,rep_po[].reads[i].corrected_path,before_paths[i])
   
   echo "correct paths - ", cpuTime() - time1
 
@@ -1039,40 +1523,23 @@ proc getRepresentativePaths3( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : 
   ###--------------- Trim mini Illumina only paths based on greedy walks --------------###
   ########################################################################################
   time1 = cpuTime()
-  for i in 0..<greedy_walks.len:
-    var to_remove : seq[seq[uint32]]
-    for minipath in rep_po.illumina_branches:
-      ###TODO: reduce the number of copying of minipath that needs to happen, redundant and slows us down.
-      var minipath2 = minipath
-      var (_,after_path) = correctPaths(minipath2, greedy_walks[i],addr rep_po.nodes, rep_po.node_indexes,psi = psi,correct_ends = false)
-      if after_path != minipath:
-        to_remove.add(minipath)
-      for j in 1..<minipath.len - 1:
-        rep_po.deleted_nodes.incl(minipath[j])
-        rep_po.weights.del((minipath[j-1],minipath[j]))
-        for l,k in rep_po.edges[minipath[j-1]]:
-          if k == minipath[j]:
-            rep_po.edges[minipath[j-1]].del(l)
-            break
-      rep_po.weights.del((minipath[^2],minipath[^1]))
-      for l,k in rep_po.edges[minipath[^2]]:
-        if k == minipath[^1]:
-          rep_po.edges[minipath[^2]].del(l)
-          break
-    for s in to_remove:
-      rep_po.illumina_branches.excl(s)
+  for j in 0..<greedy_walks.len:
+    trimMinipaths(rep_po,greedy_walks[j])
+  # updateNodesAndEdges(rep_po)
   echo "trim minipaths - ", cpuTime() - time1
-
+  # for read in rep_po.reads:
+  #   echo read.corrected_path
+  
   ########################################################################################
   ###---             Update log likelihoods based on illumina weights               ---###
   ########################################################################################
   time1 = cpuTime()
-  for u in rep_po.edges.keys():
+  for u in rep_po[].edges.keys():
     var total : float64
-    for v in rep_po.edges[u]:
-      total += float64(rep_po.weights[(u,v)])
-    for v in rep_po.edges[u]:
-      rep_po.log_likelihoods[(u,v)] = ln(float(rep_po.weights[(u,v)]) / total)
+    for v in rep_po[].edges[u]:
+      total += float64(rep_po[].weights[(u,v)])
+    for v in rep_po[].edges[u]:
+      rep_po[].log_likelihoods[(u,v)] = - ln(float(rep_po[].weights[(u,v)]) / total)
   echo "update ll - ", cpuTime() - time1
 
   ########################################################################################
@@ -1083,26 +1550,34 @@ proc getRepresentativePaths3( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : 
   var alt_paths : HeapQueue[(int, float64, uint32, uint32)]
   # var alt_paths : HeapQueue[(int, uint32, uint32)]
   var alt_path_set : HashSet[(uint32,uint32)]
-  for greedy_walk in greedy_walks:
+  # for i in differed_reads:
+    # let greedy_walk = greedy_walks[i]
+  for j,greedy_walk in greedy_walks:
     for i in 1..<greedy_walk.len:
       let u = greedy_walk[i-1]
       let bck_node_idx = rep_po.node_indexes[('b',u)]
-      if rep_po.nodes[bck_node_idx].visited:
+      if rep_po[].nodes[bck_node_idx].visited:
         break
       var first_node = 0
       if i - 1 > int(psi):
         first_node = int(i) - 1 - int(psi)
-      rep_po.nodes[bck_node_idx].path = greedy_walk[first_node..i-1]
-      rep_po.nodes[bck_node_idx].visited = true
+      rep_po[].nodes[bck_node_idx].path = greedy_walk[first_node..i-1]
+      rep_po[].nodes[bck_node_idx].visited = true
       let v1 = greedy_walk[i]
       alt_path_set.incl((u,v1))
       for v2 in rep_po.edges[u]:
         if (u,v2) notin alt_path_set:
           alt_paths.push((-int(rep_po.weights[(u,v2)]),-rep_po.log_likelihoods[(u,v2)], v2, u))
           alt_path_set.incl((u,v2))
+    var outfile3 : File
+    discard open(outfile3,&"testing_repo2_{j}.html",fmWrite)
+    htmlOutput(rep_po[],outfile3,greedy_walk)
     # assert rep_po.edges[greedy_walk[^1]].len == 0
   echo "Construct P. queue - ", cpuTime() - time1
-  
+  # echo alt_paths
+  # var outfile3 : File
+  # discard open(outfile3,&"testing_repo2.html",fmWrite)
+  # htmlOutput(rep_po[],outfile3,greedy_walks[0])
   ##########################################################################################################
   ###--- While the p. queue is not empty:                                                             ---###
   ###--- If the node has been deleted (meaning it was not part of a delta > psi in len), ignore it    ---###
@@ -1119,72 +1594,89 @@ proc getRepresentativePaths3( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : 
   while alt_paths.len != 0:
     iterations += 1 
     var (_,_,fwd_node_idx,node1) = alt_paths.pop()
+    # echo "NEW PATH TO TRAVEL:"
+    # echo node1, " --> ", fwd_node_idx
+    # echo ""
     if fwd_node_idx in rep_po.deleted_nodes or (node1,fwd_node_idx) notin rep_po.weights:
       continue
-    var path = rep_po.nodes[rep_po.node_indexes[('b',node1)]].path
-    path = path[^min(int(psi),path.len)..^1]  & @[fwd_node_idx]
+    # echo rep_po.weights[(node1,fwd_node_idx)]
+    var path = rep_po[].nodes[rep_po[].node_indexes[('b',node1)]].path
     var bck_node_idx = rep_po.node_indexes[('b',fwd_node_idx)]
-    while rep_po.edges[fwd_node_idx].len != 0 and not rep_po.nodes[bck_node_idx].visited:
+    rep_po.nodes[bck_node_idx].path = path[^min(int(psi),path.len)..^1] & @[fwd_node_idx]
+    path = path[^min(int(psi),path.len)..^1]  & @[fwd_node_idx]
+    # echo path
+    while rep_po[].edges[fwd_node_idx].len != 0 and not rep_po[].nodes[bck_node_idx].visited:
       var weight_list : seq[uint32]
-      for j in rep_po.edges[fwd_node_idx]:
-        weight_list.add(uint32(rep_po.weights[(fwd_node_idx,j)]))
+      for j in rep_po[].edges[fwd_node_idx]:
+        weight_list.add(uint32(rep_po[].weights[(fwd_node_idx,j)]))
       let last_fwd_node_idx = fwd_node_idx
       fwd_node_idx = rep_po.edges[fwd_node_idx][maxIdx(weight_list)]
-      for i,next_node in rep_po.edges[last_fwd_node_idx]:
+      for i,next_node in rep_po[].edges[last_fwd_node_idx]:
         if next_node == fwd_node_idx:
           alt_path_set.incl((next_node,
                              last_fwd_node_idx))
           continue
         if (next_node, last_fwd_node_idx) notin alt_path_set:
-          alt_paths.push((-int(rep_po.weights[(last_fwd_node_idx,next_node)]), - rep_po.log_likelihoods[(last_fwd_node_idx,next_node)], next_node, last_fwd_node_idx))
-          alt_path_set.incl((
-                             next_node,
-                             last_fwd_node_idx))
+          alt_paths.push((-int(rep_po[].weights[(last_fwd_node_idx,next_node)]), - rep_po[].log_likelihoods[(last_fwd_node_idx,next_node)], next_node, last_fwd_node_idx))
+          alt_path_set.incl((next_node, last_fwd_node_idx))
       rep_po.nodes[bck_node_idx].visited = true
-      bck_node_idx = rep_po.node_indexes[('b',fwd_node_idx)]
+      bck_node_idx = rep_po[].node_indexes[('b',fwd_node_idx)]
+      rep_po.nodes[bck_node_idx].path = path[^min(int(psi),path.len)..^1] & @[fwd_node_idx]
       path.add(fwd_node_idx)
-    if rep_po.nodes[bck_node_idx].visited:
+    if rep_po[].nodes[bck_node_idx].visited:
       for _ in 0..<int(psi):
-        if rep_po.edges[fwd_node_idx].len == 0:
+        if rep_po[].edges[fwd_node_idx].len == 0:
           break
         var weight_list : seq[uint32]
-        for j in rep_po.edges[fwd_node_idx]:
-          weight_list.add(uint32(rep_po.weights[(fwd_node_idx,j)]))
-        fwd_node_idx = rep_po.edges[fwd_node_idx][maxIdx(weight_list)]
-        bck_node_idx = rep_po.node_indexes[('b',fwd_node_idx)]
+        for j in rep_po[].edges[fwd_node_idx]:
+          weight_list.add(uint32(rep_po[].weights[(fwd_node_idx,j)]))
+        fwd_node_idx = rep_po[].edges[fwd_node_idx][maxIdx(weight_list)]
+        bck_node_idx = rep_po[].node_indexes[('b',fwd_node_idx)]
         path.add(fwd_node_idx)
-    
-    var reads : seq[Read]
+    # var reads : seq[Read]
+    # echo "path - ", path
+    # echo differed_reads
+    # var total1 = 0.0
+    # var total2 = 0.0
     for i in differed_reads:
+      # var time3 = cpuTime()
       var j : bool
-      let before_path = rep_po.reads[i].corrected_path
-      (j,rep_po.reads[i].corrected_path) = correctPaths(rep_po.reads[i].corrected_path,  path, addr rep_po.nodes, rep_po.node_indexes, psi, false)
-      rep_po = updateGraph(rep_po, rep_po.reads[i].corrected_path, before_path)
-      reads.add(rep_po.reads[i])
+      var before_path = rep_po.reads[i].corrected_path
+      (j,rep_po[].reads[i].corrected_path) = correctPaths(rep_po[].reads[i].corrected_path,  path, addr rep_po[].nodes, rep_po[].node_indexes, psi, false)
+      # total1 += cpuTime() - time3
+      # time3 = cpuTime()
+      # echo rep_po.reads[i].name
+      # echo rep_po.reads[i].name, " - ", before_path
+      # echo rep_po.reads[i].name, " - ", rep_po[].reads[i].corrected_path
+      updateGraph(rep_po, rep_po[].reads[i].corrected_path, before_path)
+      # total2 += cpuTime() - time3
+    # echo "Update1.1 - ", total1
+    # echo "Update1.2 - ", total2
+      # if iterations == 68:
+      #   if 17096'u32 in rep_po[].reads[i].corrected_path and 17088'u32 in rep_po[].reads[i].corrected_path:
+      #     var outfile4 : File
+      #     discard open(outfile4,&"testing_repo2_{iterations}_{i}_reads.html",fmWrite)
+      #     htmlOutput(rep_po[],outfile4,rep_po[].reads[i].corrected_path,path)
+    # if iterations == 68:
+    # # if true:
+    #   var j = 0
+    #   for minipath in rep_po.illumina_branches.keys:
+    #     if 17096'u32 in minipath:
+    #       var outfile4 : File
+    #       discard open(outfile4,&"testing_repo2_{iterations}_{j}_minipaths.html",fmWrite)
+    #       htmlOutput(rep_po[],outfile4,minipath,path)
+    #     j+=1
+    # var time2 = cpuTime()
+    trimMinipaths(rep_po,path)
+    # echo "Update2 - ", cpuTime() - time2
     
-    var to_remove : seq[seq[uint32]]
-    for minipath in rep_po.illumina_branches:
-      ###TODO: reduce the number of copying of minipath that needs to happen, redundant and slows us down.
-      var minipath2 = minipath
-      var (_,after_path) = correctPaths(minipath2, path,addr rep_po.nodes, rep_po.node_indexes,psi = psi,correct_ends = false)
-      if after_path != minipath:
-        to_remove.add(minipath)
-      for j in 1..<minipath.len - 1:
-        rep_po.deleted_nodes.incl(minipath[j])
-        rep_po.weights.del((minipath[j-1],minipath[j]))
-        for l,k in rep_po.edges[minipath[j-1]]:
-          if k == minipath[j]:
-            rep_po.edges[minipath[j-1]].del(l)
-            break
-      rep_po.weights.del((minipath[^2],minipath[^1]))
-      for l,k in rep_po.edges[minipath[^2]]:
-        if k == minipath[^1]:
-          rep_po.edges[minipath[^2]].del(l)
-          break
-    for s in to_remove:
-      rep_po.illumina_branches.excl(s)
+    # time2 = cpuTime()
+    # updateNodesAndEdges(rep_po)
+    # echo "Update2 - ", cpuTime() - time2
   echo "Navigate P. queue - ", cpuTime() - time1
-
+  # var outfile4 : File
+  # discard open(outfile4,"testing_repo3.html",fmWrite)
+  # htmlOutput(rep_po[],outfile4)
   ########################################################################################
   ###------ Run approach similar to Stringtie approach for resolving splice graph -----###
   ###--- i.e. start at highest coverage node, walk heaviest path based on reads     ---###
@@ -1192,16 +1684,16 @@ proc getRepresentativePaths3( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : 
   ###--- full walk, repeat.                                                         ---###
   ########################################################################################
   
-  var outfile3 : File
-  discard open(outfile3,"p_queue_trimmed.html",fmWrite)
-  htmlOutput(rep_po, outfile3)
+  # var outfile3 : File
+  # discard open(outfile3,"p_queue_trimmed.html",fmWrite)
+  # htmlOutput(rep_po, outfile3)
 
   # time1 = cpuTime()
   # let my_paths = walkHeaviestPaths( addr rep_po )
   # echo "Walk paths - ", cpuTime() - time1
   # return my_paths
 
-  return walkHeaviestPaths(addr rep_po, psi = int(psi))
+  return walkHeaviestPaths(rep_po, psi = int(psi))
 
 proc getRepresentativePaths2( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : seq[seq[uint32]] =
   var source_nodes : seq[uint32]
@@ -1235,7 +1727,7 @@ proc getRepresentativePaths2( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : 
       #     echo "What the actual living fuck2"
       let before_path = rep_po.reads[i].corrected_path
       (differed,rep_po.reads[i].corrected_path) = correctPaths(rep_po.reads[i].corrected_path,greedy_walks[j],addr rep_po.nodes,rep_po.node_indexes,psi=psi,correct_ends = false)
-      rep_po = updateGraph(rep_po, rep_po.reads[i].corrected_path, before_path)
+      updateGraph(addr rep_po, rep_po.reads[i].corrected_path, before_path)
       flag = differed and flag
       # for k in 1..<rep_po.reads[i].corrected_path.len:
       #   if rep_po.reads[i].corrected_path[k-1] == 15813'u32 and rep_po.reads[i].corrected_path[k] == 15834'u32:
@@ -1338,7 +1830,7 @@ proc getRepresentativePaths2( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : 
       var differed = false
       let before_path = rep_po.reads[i].corrected_path
       (differed,rep_po.reads[i].corrected_path) = correctPaths(rep_po.reads[i].corrected_path, new_path, addr rep_po.nodes, rep_po.node_indexes, psi=psi,correct_ends = false)
-      rep_po = updateGraph(rep_po, rep_po.reads[i].corrected_path, before_path)
+      updateGraph(addr rep_po, rep_po.reads[i].corrected_path, before_path)
       if differed:
         new_differed_reads.add(i)
     assert new_differed_reads != differed_reads
@@ -1353,20 +1845,31 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
   #[
   From a given Partial Order graph, fetches a set of representative paths for that graph, ie paths that capture the major variations between isoforms
   ]#
+  # var time1 = cpuTime()
   var reads : seq[Read]
   for i in 0..<po.reads.len:
     po.reads[i].corrected_path = po.reads[i].path
     reads.add(po.reads[i])
-  echo reads.len
+  # echo reads.len
   var rep_po = constructNewGraph(addr po,reads)
-  
+  # assert po.weights == rep_po.weights
+  # assert po.edges == rep_po.edges
+  # for key in po.edges.keys():
+  #   for val in po.edges[key]:
+  #     assert val in rep_po.edges[key]
+  # for key in rep_po.edges.keys():
+  #   for val in rep_po.edges[key]:
+  #     assert val in po.edges[key]
+  # echo "graph init - ", (cpuTime() - time1)
   ########################################################################################
   ###------------------- Collect greedy walks from each source node -------------------###
   ########################################################################################
   ### TODO? Wrap this in a function? More readable but might slow down excecution since we'd need to return rep_po since nim is making deep copies when passing to functions... Or just use pointers you dummy!
   ### Come back to this depending on what speed / memory usage looks like when we're done
-  
+  # time1 = cpuTime()
+  # let greedy_walks = walkGreedyPaths(addr rep_po)
   var greedy_walks : seq[seq[uint32]]
+  # echo rep_po.source_nodes
   for i,fwd_node_idx in sorted(rep_po.source_nodes):
     var path = @[fwd_node_idx]
     var bck_node_idx = rep_po.node_indexes[('b',fwd_node_idx)]
@@ -1383,9 +1886,12 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
       po.nodes[fwd_node_idx2].visited = true
       path.add(fwd_node_idx2)
     greedy_walks.add(path)
+    # echo path
+  # echo "greedy walks - ", (cpuTime() - time1)
   ########################################################################################
   ###-------------------- Correct reads based on these greedy walks -------------------###
   ########################################################################################
+  # time1 = cpuTime()
   var differed_reads : seq[int]
   for i in 0..<po.reads.len:
     var flag = true
@@ -1401,10 +1907,16 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
   reads = @[]
   for i in differed_reads:
     reads.add(po.reads[i])
+  # echo "correct paths - ", (cpuTime() - time1)
   ########################################################################################
   ###--- Reconstruct graph based on corrected walks, keeping track of deleted nodes ---###
   ########################################################################################
+  # time1 = cpuTime()
   rep_po = constructNewGraph(addr po,reads,rep_po.deleted_nodes)
+  var outfile3 : File
+  discard open(outfile3,"testing_repo.html",fmWrite)
+  htmlOutput(rep_po,outfile3)
+  # echo "new graph - ", (cpuTime() - time1)
   ########################################################################################
   ###--- Rewalk through the graph for each source node, constructing a p. queue of  ---###
   ###--- branches not walked. (NOTE: could do this above, but it would create a bu- ---###
@@ -1412,8 +1924,10 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
   ###--- faster this way. Need to test that theory during optimization;             ---###
   ####################################### TODO ###########################################
   ########################################################################################
+  # time1 = cpuTime()
   var alt_paths : HeapQueue[(int, float64, uint32, uint32)]
   var alt_path_set : HashSet[(uint32,uint32)]
+  # echo rep_po.source_nodes
   for i,fwd_node_idx in rep_po.source_nodes:
     let bck_node_idx = rep_po.node_indexes[('b',fwd_node_idx)]
     rep_po.nodes[bck_node_idx].path = @[fwd_node_idx]
@@ -1439,7 +1953,8 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
           alt_paths.push((-int(rep_po.weights[(last_fwd_node_idx,next_node)]), - rep_po.log_likelihoods[(last_fwd_node_idx,next_node)], next_node, last_fwd_node_idx))
           alt_path_set.incl((next_node,
                              last_fwd_node_idx))
-  
+  # echo "init P. queue - ", (cpuTime() - time1)
+  echo alt_paths
   ##########################################################################################################
   ###--- While the p. queue is not empty:                                                             ---###
   ###--- If the node has been deleted (meaning it was not part of a delta > psi in len), ignore it    ---###
@@ -1450,6 +1965,7 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
   ###---    ii - store new alternative paths to the priority queue                                    ---###
   ###---   iii - reconstruct the graph with the corrected paths, keeping track of the deleted nodes   ---###
   ##########################################################################################################
+  # time1 = cpuTime()
   var iterations = 0
   while alt_paths.len != 0:
     iterations += 1 
@@ -1502,14 +2018,14 @@ proc getRepresentativePaths(po : var POGraph, psi : uint16 = 10) : seq[seq[uint3
       #   reads.add(po.reads[i])
       reads.add(po.reads[i])
     rep_po = constructNewGraph(addr po, reads, rep_po.deleted_nodes)
-  
+  # echo "traverse P. queue - ", (cpuTime() - time1)
   ########################################################################################
   ###------ Run approach similar to Stringtie approach for resolving splice graph -----###
   ###--- i.e. start at highest coverage node, walk heaviest path based on reads     ---###
   ###--- compatible with the walk up to that point. Remove reads compatible with the---###
   ###--- full walk, repeat.                                                         ---###
   ########################################################################################
-  return walkHeaviestPaths(addr po)
+  return walkHeaviestPaths(addr po, psi = int(psi))
 
 proc scorePaths( x : seq[uint32],y : seq[uint32]) : int =
   var i,j = 0
@@ -1602,41 +2118,6 @@ proc reducePath( path : seq[uint32],nodes : seq[Node], node_indexes : Table[(cha
   # echo new_path
   return (new_path, seq_list.join(""))
 
-proc trimAndCollapsePOGraph2( po : var POGraph, psi:uint16 = 10) : seq[seq[uint32]] = 
-  let paths = getRepresentativePaths(po, psi = psi)
-  
-  var selected_paths : seq[seq[uint32]]
-  for read in po.reads:
-    selected_paths.add(read.corrected_path)
-  
-  var rep_po = constructGraphFromPaths(addr po, selected_paths)
-  return paths
-
-proc trimAndCollapsePOGraph( po : var POGraph, psi:uint16 = 10) : (TrimmedPOGraph, seq[seq[uint32]]) = 
-  let paths = getRepresentativePaths(po, psi = psi)
-  # getRepresentativePaths(po,psi=psi)
-  # let closest = assignReadsToPaths(po.reads,paths)
-  # var selected_paths : seq[seq[uint32]]
-  # for c in closest:
-  #   selected_paths.add(paths[c])
-  #   # for idx in paths[c]:
-  #   #   echo idx
-  var selected_paths : seq[seq[uint32]]
-  for read in po.reads:
-    selected_paths.add(read.corrected_path)
-  
-  var rep_po = constructGraphFromPaths(addr po, selected_paths)
-  # for idx in sorted(toSeq(rep_po.node_indexes.keys)):
-  #   echo "idx, ", idx, " ", rep_po.node_indexes[idx]
-  # for read in rep_po.reads:
-  #   rep_po.nodes[rep_po.node_indexes[('b',read.corrected_path[0])]].start_node_flag = true
-  #   rep_po.nodes[rep_po.node_indexes[('b',read.corrected_path[^1])]].end_node_flag = true
-    
-  # rep_po = collapseLinearStretches(rep_po)
-  # for idx in sorted(toSeq(rep_po.node_indexes.keys)):
-  #   echo "idx, ", idx, " ", rep_po.node_indexes[idx]
-  return (rep_po,selected_paths)
-
 proc insertBasesToRead( path : var seq[uint32],pos : uint32, inserts : seq[uint32]) : (seq[uint32],uint32,bool) = 
   var next : uint32
   var changed = false
@@ -1664,9 +2145,10 @@ proc mismatchBasesToGraph( po : ptr TrimmedPOGraph, pos : uint32, base : string)
 
   po[].nodes.add(new_node)
   new_node_index = node_number
-  # if new_node_index == 5614:
+  # if new_node_index == 517:
   #   echo "here1"
   #   echo base
+  #   echo pos
   po[].node_indexes[('f',uint32(node_index))] = uint32(node_number)
   po[].node_indexes[('b',uint32(node_number))] = uint32(node_index)
   po[].edges[new_node_index] = @[]
@@ -1702,7 +2184,7 @@ proc insertBasesToGraph( po : ptr TrimmedPOGraph, pos : uint32, insert : string)
 
     po[].nodes.add(new_node)
     new_node_indexes.add(node_number)
-    # if node_number == 5614:
+    # if node_number == 517:
     #   echo "here2"
     #   echo insert
     po[].node_indexes[('f',uint32(node_index))] = uint32(node_number)
@@ -1764,47 +2246,58 @@ proc topologicalSort( po : ptr TrimmedPOGraph) =
     for old_v in po[].edges[old_u]:
       let new_v = new_node_indexes[('f',po[].node_indexes[('b',old_v)])]
       new_edges[new_u].add(new_v)
+      # assert new_u < new_v
       # echo old_u, " - ", old_v
       new_weights[(new_u,new_v)] = po[].weights[(old_u,old_v)]
-
+  var new_nanopore_counts : Table[(uint32,uint32),uint32]
+  for (old_u,old_v) in po[].nanopore_counts.keys:
+    let new_u = new_node_indexes[('f',po[].node_indexes[('b',old_u)])]
+    let new_v = new_node_indexes[('f',po[].node_indexes[('b',old_v)])]
+    new_nanopore_counts[(new_u,new_v)] = po[].nanopore_counts[(old_u,old_v)]
+  for i in 0..<po[].nodes.len:
+    if po[].nodes[i].align_ring_partner != -1:
+      po[].nodes[i].align_ring_partner = int32(new_node_indexes[('f',po[].node_indexes[('b',uint32(po[].nodes[i].align_ring_partner))])])
   for i in 0..<po.reads.len:
     var new_path : seq[uint32]
     var print_flag = false
     for old_node in po[].reads[i].corrected_path:
       let new_node = new_node_indexes[('f',po[].node_indexes[('b',old_node)])]
-      if new_node == 15813'u32:
-        print_flag = true
       new_path.add(new_node)
-    # if print_flag:
-    #   echo "old - ", po.reads[i].corrected_path
-    #   echo "new - ", new_path
     po[].reads[i].corrected_path = new_path
-  var new_illumina_branches : HashSet[seq[uint32]]
-  for s in po[].illumina_branches:
+  var new_illumina_branches : Table[seq[uint32],seq[uint32]]
+  for s in po[].illumina_branches.keys():
     var new_path : seq[uint32]
     for u in s:
       new_path.add(new_node_indexes[('f',po[].node_indexes[('b',u)])])
-    new_illumina_branches.incl(new_path)
+    for i in 1..<new_path.len:
+      assert new_path[i-1] < new_path[i]
+    new_illumina_branches[new_path] = po[].illumina_branches[s]
+  
   po[].node_indexes = new_node_indexes
   po[].edges = new_edges
   po[].weights = new_weights
+  # po[].illumina_reads = new_illumina_reads
   po[].illumina_branches = new_illumina_branches
+  po[].nanopore_counts = new_nanopore_counts
 
 proc illuminaPolishPOGraph( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:uint32 = 10,debug=true)=
+  po[].nanopore_counts = po[].weights
   var read_id_to_idx : Table[string,uint32]
-  var read_paths : seq[seq[uint32]]
+  var existing_edges : HashSet[(uint32,uint32)]
   for i in 0..<po.nodes.len:
     po[].nodes[i].align_ring_partner = -1'i32
   for i,read in po.reads:
     read_id_to_idx[read.name] = uint32(i)
-    read_paths.add(read.corrected_path.deepCopy())
+    for j in 1..<read.corrected_path.len:
+      existing_edges.incl((read.corrected_path[j-1], read.corrected_path[j]))
   
   var inserts : Table[(uint32,string),seq[uint32]]
-  var deletes : HashSet[seq[uint32]]
-  var illumina_branches : HashSet[seq[uint32]]
+  # var illumina_reads : CountTable[seq[uint32]]
+  var illumina_branches : Table[seq[uint32],seq[uint32]]
+
   # var total_first_mapping_time = 0.0
   # var total_secondary_mapping_time = 0.0
-  for read in po.reads:
+  for k,read in po.reads:
     # echo read.name
     for record in bam.query(read.name):
       # let time1 = cpuTime()
@@ -1833,64 +2326,89 @@ proc illuminaPolishPOGraph( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:ui
       var delete_flag = false
       var ambiguous_flag = false
       var new_block_flag = false
+      var start_flag = true
       var new_block_start = -1
       var new_block_offset = 0
-      # var s : string
-      # record.sequence(s)
+      var s : string
+      record.sequence(s)
       # echo  s
       # echo ""
+      var last_match_op = cigar.len
+      var op_num = 0
+      for op in cigar:
+        if int(op.op) == 7:
+          last_match_op = op_num
+        op_num += 1
+      op_num = 0
       for op in cigar:
         case int(op.op):
           of 1: #Insert
-            if not new_block_flag:
-              new_block_start = que_index - 1 - new_block_offset
-              new_block_flag = true
-            var sequence : seq[string]
-            for i in 0..<op.len:
-              if record.base_at(que_index) == 'N':
-                ambiguous_flag = true
+            if not start_flag:
+              if op_num > last_match_op:
+                # echo "BREAKING1"
                 break
-              sequence.add($record.base_at(que_index))
-              que_index += 1
-            if ambiguous_flag:
-              break
-            var insert_walk : seq[uint32]
-            if not ((traveled_nodes[^1],sequence.join()) in inserts):
-              insert_walk = insertBasesToGraph(po,traveled_nodes[^1],sequence.join())
-              inserts[(traveled_nodes[^1],sequence.join())] = insert_walk
-              new_edges.add((traveled_nodes[^1],insert_walk[0]))
-              for i in 1..<insert_walk.len:
-                new_edges.add((insert_walk[i-1], insert_walk[i]))
+              if not new_block_flag:
+                new_block_start = que_index - 1 - new_block_offset
+                new_block_flag = true
+              var sequence : seq[string]
+              for i in 0..<op.len:
+                if record.base_at(que_index) == 'N':
+                  ambiguous_flag = true
+                  break
+                sequence.add($record.base_at(que_index))
+                que_index += 1
+              if ambiguous_flag:
+                break
+              var insert_walk : seq[uint32]
+              if not ((traveled_nodes[^1],sequence.join()) in inserts):
+                insert_walk = insertBasesToGraph(po,traveled_nodes[^1],sequence.join())
+                inserts[(traveled_nodes[^1],sequence.join())] = insert_walk
+                if not delete_flag:
+                  if not existing_edges.containsOrIncl((traveled_nodes[^1],insert_walk[0])):
+                    new_edges.add((traveled_nodes[^1],insert_walk[0]))
+                    # echo "insert1 adding - ", traveled_nodes[^1], " ", insert_walk[0]
+                for i in 1..<insert_walk.len:
+                  if not existing_edges.containsOrIncl((insert_walk[i-1], insert_walk[i])):
+                    new_edges.add((insert_walk[i-1], insert_walk[i]))
+                    # echo "insert1 adding - ", insert_walk[i-1], " ", insert_walk[i]
+                # new_edge_flag = true
+              else:
+                insert_walk = inserts[(traveled_nodes[^1],sequence.join())]
+              if delete_flag:
+                if not existing_edges.containsOrIncl((traveled_nodes[^1],insert_walk[0])):
+                  new_edges.add((traveled_nodes[^1],insert_walk[0]))
+                  # echo "insert2 adding - ", traveled_nodes[^1], " ", insert_walk[0]
+                delete_flag = false
+              for node in insert_walk:
+                traveled_nodes.add(node)
+                # illumina_walk.add(true)
               new_edge_flag = true
             else:
-              insert_walk = inserts[(traveled_nodes[^1],sequence.join())]
-            if delete_flag:
-              let delete_path = @[traveled_nodes[^1],insert_walk[0]]
-              if delete_path notin deletes:
-                deletes.incl(delete_path)
-                new_edges.add((traveled_nodes[^1],insert_walk[0]))
-              delete_flag = false
-            for node in insert_walk:
-              traveled_nodes.add(node)
-              # illumina_walk.add(true)
-          
+              que_index += op.len
+              new_block_offset += op.len
           of 2: #Delete
-            if not new_block_flag:
-              new_block_flag = true
-              new_block_start = que_index - 1 - new_block_offset
-            # let start_path = traveled_nodes[^1]
-            ref_index += op.len
-            delete_flag = true
-            # let end_path = path[uint32(ref_index + 1)]
-            
-            # if new_edge_flag:
-            #   new_edges.add((traveled_nodes[^1],path[ref_index]))
-            #   new_edge_flag = false
+            if not start_flag:
+              if op_num > last_match_op:
+                # echo "BREAKING2"
+                break
+              if not new_block_flag:
+                new_block_flag = true
+                new_block_start = que_index - 1 - new_block_offset
+              # let start_path = traveled_nodes[^1]
+              ref_index += op.len
+              delete_flag = true
+              new_edge_flag = false              
+              # if new_edge_flag:
+              #   new_edges.add((traveled_nodes[^1],path[ref_index]))
+              #   new_edge_flag = false
 
-            # let delete_path = @[start_path,end_path]
-            # if delete_path notin deletes:
-            #   new_edge_flag = true
-            #   deletes.incl(delete_path)
+              # let delete_path = @[start_path,end_path]
+              # if delete_path notin deletes:
+              #   new_edge_flag = true
+              #   deletes.incl(delete_path)
+            else:
+              ref_index += op.len
+
           
           # of 3: #Intron # Shouldn't be possible for us
 
@@ -1906,17 +2424,22 @@ proc illuminaPolishPOGraph( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:ui
           of 7: #Equal
             # if debug:
             #   echo "Equal"
+            start_flag = false
             if new_block_flag:
               illumina_walks.add((uint16(new_block_start),uint16(que_index - new_block_offset)))
               new_block_start = -1
               new_block_flag = false
             if delete_flag:
-              let delete_path = @[traveled_nodes[^1],path[ref_index]]
-              if delete_path notin deletes:
-                deletes.incl(delete_path)
+              if not existing_edges.containsOrIncl((traveled_nodes[^1],path[ref_index])):
                 new_edges.add((traveled_nodes[^1],path[ref_index]))
-            if new_edge_flag:
-              new_edges.add((traveled_nodes[^1], path[ref_index]))
+                # echo "match1 adding - ", traveled_nodes[^1], " ", path[ref_index]
+              new_edge_flag = false
+              delete_flag = false
+            elif new_edge_flag:
+              # if (traveled_nodes[^1],path[ref_index]) == ()
+              if not existing_edges.containsOrIncl((traveled_nodes[^1],path[ref_index])):
+                new_edges.add((traveled_nodes[^1], path[ref_index]))
+                # echo "match2 adding - ", traveled_nodes[^1], " ", path[ref_index]
               new_edge_flag = false
             for i in 0..<op.len:
               if debug:
@@ -1931,67 +2454,104 @@ proc illuminaPolishPOGraph( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:ui
           of 8: #Diff
             # if debug:
             #   echo "Diff"
-            if not new_block_flag:
-              new_block_start = que_index - 1 - new_block_offset
-              new_block_flag = true
-            for i in 0..<op.len:
-              if record.base_at(que_index) == 'N':
-                ambiguous_flag = true
+            if not start_flag:
+              if op_num > last_match_op:
+                # echo cigar
+                # echo op_num, " ", last_match_op
+                # echo traveled_nodes.len
+                # echo traveled_nodes
+                # echo "BREAKING3"
                 break
-              # if test.nodes[path[ref_index]].nts != $record.base_at(que_index):
-              if debug:
-                # echo "Mismatch!"
-                # echo po.nodes[po.node_indexes[('b',path[ref_index])]].nts
-                # echo $record.base_at(que_index)
-                # if path[ref_index] == 3017:
-                #   echo "here7"
-                #   echo po.nodes[po.node_indexes[('b',path[ref_index])]].nts
-                #   echo $record.base_at(que_index)
-                assert po[].nodes[po[].node_indexes[('b',path[ref_index])]].nts != $record.base_at(que_index)
-                # echo "Diff - Mismatch! - ", po.nodes[po.node_indexes[('b',path[ref_index])]].nts, $record.base_at(que_index)
-                # test.nodes[path[ref_index]].nts = $record.base_at(que_index)
-                # po.nodes[po.node_indexes[('b',path[ref_index])]].nts = $record.base_at(que_index)
-              var next_node = po[].node_indexes[('b',path[ref_index])]
-              var correct_node = -1
-              for i in 0..<3:
-                if po[].nodes[next_node].align_ring_partner == -1'i32:
+              if not new_block_flag:
+                new_block_start = que_index - 1 - new_block_offset
+                new_block_flag = true
+              for i in 0..<op.len:
+                if record.base_at(que_index) == 'N':
+                  ambiguous_flag = true
                   break
-                if po[].nodes[next_node].align_ring_partner == int32(path[ref_index]):
-                  break
-                if po[].nodes[po[].node_indexes[('b',uint32(po[].nodes[next_node].align_ring_partner))]].nts == $record.base_at(que_index):
-                  correct_node = po[].nodes[next_node].align_ring_partner
-                  break
-                else:
-                  next_node = po[].node_indexes[('b',uint32(po[].nodes[next_node].align_ring_partner))]
-              if correct_node == -1:
-                correct_node = mismatchBasesToGraph(po,path[ref_index],$record.base_at(que_index))
-                if traveled_nodes.len > 0:
-                  new_edges.add((traveled_nodes[^1],uint32(correct_node)))
+                # if test.nodes[path[ref_index]].nts != $record.base_at(que_index):
+                if debug:
+                  # echo "Mismatch!"
+                  # echo po.nodes[po.node_indexes[('b',path[ref_index])]].nts
+                  # echo $record.base_at(que_index)
+                  # if path[ref_index] == 3017:
+                  #   echo "here7"
+                  #   echo po.nodes[po.node_indexes[('b',path[ref_index])]].nts
+                  #   echo $record.base_at(que_index)
+                  assert po[].nodes[po[].node_indexes[('b',path[ref_index])]].nts != $record.base_at(que_index)
+                  # echo "Diff - Mismatch! - ", po.nodes[po.node_indexes[('b',path[ref_index])]].nts, $record.base_at(que_index)
+                  # test.nodes[path[ref_index]].nts = $record.base_at(que_index)
+                  # po.nodes[po.node_indexes[('b',path[ref_index])]].nts = $record.base_at(que_index)
+                var next_node = po[].node_indexes[('b',path[ref_index])]
+                var correct_node = -1
+                for i in 0..<3:
+                  if po[].nodes[next_node].align_ring_partner == -1'i32:
+                    break
+                  if po[].nodes[next_node].align_ring_partner == int32(path[ref_index]):
+                    break
+                  if po[].nodes[po[].node_indexes[('b',uint32(po[].nodes[next_node].align_ring_partner))]].nts == $record.base_at(que_index):
+                    correct_node = po[].nodes[next_node].align_ring_partner
+                    var flag = false
+                    for v in po[].edges[traveled_nodes[^1]]:
+                      flag = flag or v == uint32(correct_node)
+                    if not flag:
+                      new_edge_flag = true
+                    break
+                  else:
+                    next_node = po[].node_indexes[('b',uint32(po[].nodes[next_node].align_ring_partner))]
+                if correct_node == -1:
+                  correct_node = mismatchBasesToGraph(po,path[ref_index],$record.base_at(que_index))
+                  if traveled_nodes.len > 0 and not delete_flag:
+                    if not existing_edges.containsOrIncl((traveled_nodes[^1],uint32(correct_node))):
+                      new_edges.add((traveled_nodes[^1],uint32(correct_node)))
+                      # echo "mismatch1 adding - ", traveled_nodes[^1], " ", correct_node
+                  # new_edge_flag = true
+                elif new_edge_flag and not delete_flag:
+                  if not existing_edges.containsOrIncl((traveled_nodes[^1],uint32(correct_node))):
+                    new_edges.add((traveled_nodes[^1],uint32(correct_node)))
+                    # echo "mismatch2 adding - ", traveled_nodes[^1], " ", correct_node
+                if delete_flag:
+                  if not existing_edges.containsOrIncl((traveled_nodes[^1],uint32(correct_node))):
+                    new_edges.add((traveled_nodes[^1],uint32(correct_node)))
+                    # echo "mismatch3 adding - ", traveled_nodes[^1], " ", correct_node
+                  delete_flag = false
+                traveled_nodes.add(uint32(correct_node))
+                ref_index += 1
+                que_index += 1
                 new_edge_flag = true
-              elif new_edge_flag:
-                new_edges.add((traveled_nodes[^1],uint32(correct_node)))
-              if delete_flag:
-                let delete_path = @[traveled_nodes[^1],uint32(correct_node)]
-                if delete_path notin deletes:
-                  deletes.incl(delete_path)
-                  new_edges.add((traveled_nodes[^1],uint32(correct_node)))
-              traveled_nodes.add(uint32(correct_node))
-              ref_index += 1
-              que_index += 1
-            if ambiguous_flag:
-              break
+              if ambiguous_flag:
+                break
+            else:
+              que_index += op.len
+              ref_index += op.len
+              new_block_offset += op.len
           # of 9: #Back # Shouldn't be possible for us
           else:
             echo "Something went wrong"
-      
+        op_num += 1
       if ambiguous_flag:
         continue
       var block_count = 0
       # echo record.cigar
       # echo traveled_nodes
       for (s,e) in illumina_walks:
-        illumina_branches.incl(traveled_nodes[s..e])
+        # echo s, " ", e
+        # echo "traveled - ",traveled_nodes[s..e]
+        # illumina_branches.incl(traveled_nodes[s..e])
+        if traveled_nodes[s..e] in illumina_branches:
+          if illumina_branches[traveled_nodes[s..e]][^1] != uint32(k):
+            illumina_branches[traveled_nodes[s..e]].add(uint32(k))
+        else:
+          illumina_branches[traveled_nodes[s..e]] = @[uint32(k)]
+
+        # if 21829'u32 in traveled_nodes[s..e]:
+        #   echo cigar
+        #   echo traveled_nodes
+        #   echo new_edges
+      # illumina_reads.inc(traveled_nodes)
       for (u,v) in new_edges:
+        # echo "adding - ", u, " ", v
+        # assert u in po[].edges
         if u in po[].edges:
           po[].edges[u].add(v)
       for i in 1..<traveled_nodes.len:
@@ -2047,25 +2607,52 @@ proc illuminaPolishPOGraph( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:ui
   # echo "Primary alignments - ", total_first_mapping_time
   # echo "Secondary alignments - ", total_secondary_mapping_time
   # var outfile3 : File
-  # discard open(outfile3,"illumina_weighted.html",fmWrite)
-  # htmlOutput(po, outfile3)
+  # discard open(outfile3,"illumina_weighted1.html",fmWrite)
+  # htmlOutput(po[], outfile3)
   # echo po.weights
+  # po.illumina_reads = illumina_reads
   po.illumina_branches = illumina_branches
-  topologicalSort(po)
-  # for read in po.reads:
-  #   if 15813 in read.corrected_path:
-  #     echo read.corrected_path
-
   # echo "EDGES:"
   # for u in sorted(toSeq(po.edges.keys())):
   #   echo u, " - ", po.edges[u]
   # echo "WEIGHTS:"
   # for (u,v) in sorted(toSeq(po.weights.keys())):
   #   echo u, " - ", v
+  
+  for u in sorted(toSeq(po.edges.keys())):
+    po.edges[u] = sorted(po.edges[u])
+    for i in 1..<po.edges[u].len:
+      assert po.edges[u][i-1] != po.edges[u][i]
+  # for branch in po.illumina_branches:
+  #   for i in 1..<branch.len:
+  #     # echo branch[i-1], " - ", branch[i]
+  #     assert branch[i] in po.edges[branch[i-1]]
+  topologicalSort(po)
+  # for read in po.reads:
+  #   if 15813 in read.corrected_path:
+  #     echo read.corrected_path
   # echo po.weights
-  var outfile3 : File
-  discard open(outfile3,"illumina_weighted.html",fmWrite)
-  htmlOutput(po[], outfile3)
+  # assert po[].weights != po[].nanopore_counts
+  
+  var illumina_counts : Table[(uint32,uint32),uint32]
+  for branch in po.illumina_branches.keys:
+    # if branch == @[21987'u32, 21990'u32, 21998'u32]:
+      # echo "got here"
+    for i in 1..<branch.len:
+      let u = branch[i-1]
+      let v = branch[i]
+      if (u,v) in illumina_counts:
+        illumina_counts[(u,v)] += 1'u32
+      else:
+        illumina_counts[(u,v)] = 1'u32
+      if i != branch.len - 1:
+        po.nodes[po.node_indexes[('b',v)]].illumina_support += 1'u32
+  po.illumina_counts = illumina_counts
+
+
+  var outfile4 : File
+  discard open(outfile4,"illumina_weighted2.html",fmWrite)
+  htmlOutput(po[], outfile4)
 
 proc convertPOGraphtoTrimmedPOGraph( po : var POGraph) : TrimmedPOGraph = 
   var log_likelihoods : Table[(uint32,uint32),float64]
@@ -2168,7 +2755,7 @@ proc getTrimmedGraphFromFastaRecord(record : FastaRecord) : TrimmedPOGraph =
   var node_indexes : Table[(char,uint32), uint32]
   for i,base in record.sequence:
     nodes.add(Node( nts : $base,
-                    supporting_reads : @[0'u32],
+                    # supporting_reads : @[0'u32],
                     align_ring_partner : -1'i32))
     path.add(uint32(i))
     let v = uint32(i)
@@ -2218,7 +2805,10 @@ if paramStr(1) == "trim_po":
   echo "POGraph Initial Assembly:    ", time2 - time1
 
   time1 = cpuTime()
-  var representative_paths = trimAndCollapsePOGraph2(test,psi = 15)
+  var test2 = convertPOGraphtoTrimmedPOGraph(test)
+  # var representative_paths = getRepresentativePaths(test,psi = 15)
+  var representative_paths = getRepresentativePaths3( addr test2,psi = 15)
+  # var representative_paths = trimAndCollapsePOGraph2(test,psi = 15)
   time2 = cpuTime()
   echo "POGraph Trimming & Collapsing:    ", time2 - time1
   echo representative_paths.len
@@ -2236,9 +2826,9 @@ elif paramStr(1) == "illumina":
   var test =  initPOGraph(infile)
   var time2 = cpuTime()
   var trim = convertPOGraphtoTrimmedPOGraph(test)
-  var outfile2 : File
-  discard open(outfile2,"testing_repo.html",fmWrite)
-  htmlOutput(trim,outfile2)
+  # var outfile2 : File
+  # discard open(outfile2,"testing_repo.html",fmWrite)
+  # htmlOutput(trim,outfile2)
   # trim = topologicalSort(trim)
   echo "POGraph Initial Assembly:    ", time2 - time1
 
@@ -2252,19 +2842,20 @@ elif paramStr(1) == "illumina":
   # discard open(outfile3,"testing_repo2.html",fmWrite)
   # htmlOutput(trim2,outfile3)
   time1 = cpuTime()
-  var representative_paths =  getRepresentativePaths3(trim,psi = 35)
+  # var representative_paths =  getRepresentativePaths2(trim,psi = 35)
+  var representative_paths =  getRepresentativePaths3(addr trim,psi = 35)
   echo representative_paths.len
   time2 = cpuTime()
   echo "Representative Paths:          ", time2 - time1
-  var outfile1 : File
-  discard open(outfile1,paramStr(4),fmWrite)
-  writeCorrectedReads(trim,outfile1)
+  # var outfile1 : File
+  # discard open(outfile1,paramStr(4),fmWrite)
+  # writeCorrectedReads(trim,outfile1)
 
   let label = paramStr(2).split(sep=os.DirSep)[^1].split(sep='.')[0]
   # let consensus_po = buildConsensusPO(addr trim,representative_paths,label)
   let records = getFastaRecordsFromTrimmedPOGraph(addr trim,representative_paths,label)
   var outfile3 : File
-  discard open(outfile3,paramStr(5),fmWrite)
+  discard open(outfile3,paramStr(4),fmWrite)
   writeCorrectedReads(records,outfile3)
   # writeCorrectedReads(consensus_po,outfile3)
 
@@ -2282,7 +2873,7 @@ elif paramStr(1) == "final_illumina":
     var trim = getTrimmedGraphFromFastaRecord(read)
     topologicalSort(addr trim)
     illuminaPolishPOGraph( addr trim, bam, debug=true)
-    var representative_paths = getRepresentativePaths2(trim,psi = 35)
+    var representative_paths = getRepresentativePaths3(addr trim,psi = 35)
     corrected.add(FastaRecord(read_id : read.read_id, sequence : getSequenceFromPath(trim,trim.reads[0].corrected_path)))
   var outfile1 : File
   discard open(outfile1,paramStr(4),fmWrite)

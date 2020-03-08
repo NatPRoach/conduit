@@ -39,7 +39,172 @@ const NT_TO_IDX = [
 4'u8, 4'u8, 4'u8, 4'u8,  4'u8, 4'u8, 4'u8, 4'u8,  4'u8, 4'u8, 4'u8, 4'u8,  4'u8, 4'u8, 4'u8, 4'u8,
 4'u8, 4'u8, 4'u8, 4'u8,  4'u8, 4'u8, 4'u8, 4'u8,  4'u8, 4'u8, 4'u8, 4'u8,  4'u8, 4'u8, 4'u8, 4'u8
 ]
+
+
+  # for i in 0..<greedy_walks.len:
+  #   var to_remove : seq[seq[uint32]]
+  #   for minipath in rep_po[].illumina_branches:
+  #     var print_flag = false
+  #     # if 17278 in minipath:
+  #     #   echo "greedy!!! - ", greedy_walks[i]
+  #     #   echo ""
+  #     #   echo "mini!!! - ", minipath
+  #     #   echo ""
+  #     #   print_flag = true
+  #     ###TODO: reduce the number of copying of minipath that needs to happen, redundant and slows us down.
+  #     var minipath2 = rep_po.nodes[rep_po.node_indexes[('b',minipath[0])]].path[^min(rep_po.nodes[rep_po.node_indexes[('b',minipath[0])]].path.len,int(psi))..^1] & minipath[1..^1]
+  #     var fwd_node_idx2 = minipath[^1]
+  #     for _ in 0'u16..<psi:
+  #       if rep_po[].edges[fwd_node_idx2].len > 1:
+  #         var weight_list : seq[uint32]
+  #         for j in rep_po[].edges[fwd_node_idx2]:
+  #           weight_list.add(uint32(rep_po[].weights[(fwd_node_idx2,uint32(j))]))
+  #         fwd_node_idx2 = rep_po[].edges[fwd_node_idx2][maxIdx(weight_list)]
+  #       elif rep_po[].edges[fwd_node_idx2].len == 1:
+  #         fwd_node_idx2 = rep_po[].edges[fwd_node_idx2][0]
+  #       else:
+  #         break
+  #       minipath2.add(fwd_node_idx2)
+  #     var minipath3 = minipath2
+  #     var (_,after_path) = correctPaths(minipath2, greedy_walks[i],addr rep_po[].nodes, rep_po[].node_indexes,psi = psi,correct_ends = false)
+  #     let align = alignPaths(minipath3, after_path)
+  #     var delete_flag = false
+  #     var idx = 0
+  #     var diff_flag = false
+  #     for op in align:
+  #       case op:
+  #         of 0'u8:
+  #           if diff_flag:
+  #             if (minipath3[idx-1],minipath3[idx]) == (17197'u32,17204'u32):
+  #               echo "THIS IS BAD1"
+  #             if print_flag:
+  #               echo "deleting1 - ", minipath[idx-1], " -> ", minipath[idx]
+  #             rep_po[].deleted_nodes.incl(minipath3[idx])
+  #             rep_po[].weights.del((minipath3[idx-1],minipath3[idx]))
+  #             for l,k in rep_po[].edges[minipath3[idx-1]]:
+  #               if k == minipath3[idx]:
+  #                 rep_po[].edges[minipath3[idx-1]].del(l)
+  #                 break
+  #           diff_flag = false
+  #           idx += 1
+  #         of 1'u8: #ins in OG path; del in after
+  #           diff_flag = true
+  #           rep_po[].deleted_nodes.incl(minipath3[idx])
+  #           rep_po[].weights.del((minipath3[idx-1],minipath3[idx]))
+  #           if (minipath3[idx-1],minipath3[idx]) == (17197'u32,17204'u32):
+  #             echo "THIS IS BAD2"
+  #           for l,k in rep_po[].edges[minipath3[idx-1]]:
+  #             if k == minipath3[idx]:
+  #               rep_po[].edges[minipath3[idx-1]].del(l)
+  #               if print_flag:
+  #                 echo "deleting2 - ", minipath[idx-1], " -> ", minipath[idx]
+  #               break
+  #           idx += 1
+  #           delete_flag = true
+  #         else: #2'u8 del in OG path; ins in after
+  #           diff_flag = true
+  #           delete_flag = true
+  #     if delete_flag:
+  #       to_remove.add(minipath)
+  #   for s in to_remove:
+  #     rep_po[].illumina_branches.excl(s)
+
+
+    # var to_remove : seq[seq[uint32]]
+    # for minipath in rep_po.illumina_branches:
+    #   ###TODO: reduce the number of copying of minipath that needs to happen, redundant and slows us down.
+    #   # var minipath2 = minipath
+    #   var minipath2 = rep_po.nodes[rep_po.node_indexes[('b',minipath[0])]].path[^min(rep_po.nodes[rep_po.node_indexes[('b',minipath[0])]].path.len,int(psi))..^1] & minipath[1..^1]
+    #   var fwd_node_idx2 = minipath[^1]
+    #   for _ in 0'u16..<psi:
+    #     if rep_po[].edges[fwd_node_idx2].len > 1:
+    #       var weight_list : seq[uint32]
+    #       for j in rep_po[].edges[fwd_node_idx2]:
+    #         weight_list.add(uint32(rep_po[].weights[(fwd_node_idx2,uint32(j))]))
+    #       fwd_node_idx2 = rep_po[].edges[fwd_node_idx2][maxIdx(weight_list)]
+    #     elif rep_po[].edges[fwd_node_idx2].len == 1:
+    #       fwd_node_idx2 = rep_po[].edges[fwd_node_idx2][0]
+    #     else:
+    #       break
+    #     minipath2.add(fwd_node_idx2)
+    #   var minipath3 = minipath2
+    #   var (_,after_path) = correctPaths(minipath2, path,addr rep_po[].nodes, rep_po[].node_indexes,psi = psi,correct_ends = false)
+    #   let align = alignPaths(minipath3, after_path)
+    #   var delete_flag = false
+    #   var idx = 0
+    #   var diff_flag = false
+    #   var print_flag = false
+    #   # if 17278 in minipath:
+    #   #   echo "path - ", path
+    #   #   echo ""
+    #   #   echo "mini - ", minipath
+    #   #   echo ""
+    #   #   print_flag = true
+
+    #   for op in align:
+    #     case op:
+    #       of 0'u8:
+    #         if diff_flag:
+    #           rep_po[].deleted_nodes.incl(minipath3[idx])
+    #           if (minipath3[idx-1],minipath3[idx]) == (17197'u32,17204'u32):
+    #             echo "THIS IS BAD3"
+    #           rep_po[].weights.del((minipath3[idx-1],minipath3[idx]))
+    #           if print_flag:
+    #             echo "deleting1 - ", minipath3[idx-1], " -> ", minipath3[idx]
+    #           for l,k in rep_po[].edges[minipath3[idx-1]]:
+    #             if k == minipath3[idx]:
+    #               rep_po[].edges[minipath3[idx-1]].del(l)
+    #               break
+    #         diff_flag = false
+    #         idx += 1
+    #       of 1'u8: #ins in OG path; del in after
+    #         diff_flag = true
+    #         rep_po[].deleted_nodes.incl(minipath3[idx])
+    #         rep_po[].weights.del((minipath3[idx-1],minipath3[idx]))
+    #         if (minipath3[idx-1],minipath3[idx]) == (17197'u32,17204'u32):
+    #           echo "THIS IS BAD4"
+    #           print_flag = true
+    #         if print_flag:
+    #           echo "deleting2 - ", minipath3[idx-1], " -> ", minipath3[idx]
+    #         for l,k in rep_po[].edges[minipath3[idx-1]]:
+    #           if k == minipath3[idx]:
+    #             rep_po[].edges[minipath3[idx-1]].del(l)
+    #             break
+    #         idx += 1
+    #         delete_flag = true
+    #       else: #2'u8 del in OG path; ins in after
+    #         diff_flag = true
+    #         delete_flag = true
+    #   if delete_flag:
+    #     to_remove.add(minipath)
+
 const IDX_TO_NT = ['A','G','C','T']
+
+proc trimAndCollapsePOGraph( po : var POGraph, psi:uint16 = 10) : (TrimmedPOGraph, seq[seq[uint32]]) = 
+  let paths = getRepresentativePaths(po, psi = psi)
+  # getRepresentativePaths(po,psi=psi)
+  # let closest = assignReadsToPaths(po.reads,paths)
+  # var selected_paths : seq[seq[uint32]]
+  # for c in closest:
+  #   selected_paths.add(paths[c])
+  #   # for idx in paths[c]:
+  #   #   echo idx
+  var selected_paths : seq[seq[uint32]]
+  for read in po.reads:
+    selected_paths.add(read.corrected_path)
+  
+  var rep_po = constructGraphFromPaths(addr po, selected_paths)
+  # for idx in sorted(toSeq(rep_po.node_indexes.keys)):
+  #   echo "idx, ", idx, " ", rep_po.node_indexes[idx]
+  # for read in rep_po.reads:
+  #   rep_po.nodes[rep_po.node_indexes[('b',read.corrected_path[0])]].start_node_flag = true
+  #   rep_po.nodes[rep_po.node_indexes[('b',read.corrected_path[^1])]].end_node_flag = true
+    
+  # rep_po = collapseLinearStretches(rep_po)
+  # for idx in sorted(toSeq(rep_po.node_indexes.keys)):
+  #   echo "idx, ", idx, " ", rep_po.node_indexes[idx]
+  return (rep_po,selected_paths)
+
 
 proc assignReadsToPaths( reads : seq[Read], paths : seq[seq[uint32]]) : seq[int] = 
   var closest_paths : seq[int]
