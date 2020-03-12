@@ -7,6 +7,25 @@ import poParser
 import tables
 import hts
 
+type
+  ConduitOptions = object
+    run_flag : bool
+    final_polish : bool
+    intermediates : bool
+    mode : string
+    nanopore_format : string
+    bowtie_strand_constraint : string
+    bowtie_alignment_mode : string
+    bowtie_read_inputs : string
+    output_dir : string
+    tmp_dir : string
+    files : seq[string]
+    isoform_delta : uint64
+    ends_delta : uint64
+    illumina_weight : uint64
+    thread_num : uint64
+    max_iterations : uint64
+
 
 proc conduitVersion() : string =
   return "CONDUIT Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -112,6 +131,8 @@ proc writeHybridHelp() =
   echo "        Maximum number of iterations to align to and correct scaffolds. Does not include optional final polshing step"
   echo "        Note: Providing a value of 0 will not perform any graph based illumina correction"
 #  echo "        Note: Providing a value of -1 will correct until all corrections converge (NOT RECCOMMENDED, TAKES EXTREMELY LONG)" #TODO
+  echo "    -w, --illumina-weight (10)"
+  echo "        Weight of illumina reads relative to nanopore reads when generating consensus"
   echo "    --final-polish (default)"
   echo "        Include a final correction of individual isoforms, not in a splice graph"
   echo "    --no-final-polish"
@@ -138,8 +159,31 @@ proc writeHybridHelp() =
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
   echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
+  # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." #TODO
+  # echo "              If CPU number cannot be detected, the default of 4 threads will be used. #TODO
 
 # proc runPOAandCollapsePOGraph(infilepath, outdir, format : string, isoform_delta,ends_delta : uint16) = 
+
+proc convertFASTQtoFASTA(infilepath,outfilepath:string) = 
+  var infile,outfile : File
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  while true:
+    try:
+      let line1 = infile.readLine()
+      try:
+        assert line1[0] == '@'
+      except AssertionError:
+        echo "File not in FASTQ format"
+        raise
+      outfile.write(&">{line1[1..^1]}")
+      outfile.write(infile.readLine())
+      discard infile.readLine()
+      discard infile.readLine()
+    except EOFError:
+      break
+  infile.close()
+  outfile.close()
 
 #TODO: There's a lot of redundancy and unused variables in these functions as I was debugging. Need to fix that.
 proc runPOAandCollapsePOGraph(intuple : (string,string,string,uint16,uint16)) =
@@ -149,14 +193,12 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,uint16,uint16)) =
   if format == "fasta":
     file2 = infilepath
   elif format == "fastq":
-    discard execProcess(&"seqtk seq {infilepath} > {outdir}{trim}.tmp.fa",options={poEvalCommand,poUsePath})
-    #TODO: do the above samtools sort > file in a safer way, using nim directly instead of using execProcess (C bindings for seqtk for nim?)
     file2 = &"{outdir}{trim}.tmp.fa"
-    #POA requires FASTA format - convert
+    convertFASTQtoFASTA(infilepath,file2)
   let out_po1 = &"{outdir}po/{trim}.tmp.po"
   discard execProcess("../poaV2/poa", args =["-do_global", "-read_fasta", file2, "-po", out_po1, "../poaV2/myNUC3.4.4.mat"],options={})
   if format == "fastq":
-    discard execProcess("rm",args=[ &"{outdir}{trim}.tmp.fa" ],options = {poUsePath})
+    removeFile(file2)
   
   var inPOfile : File
   discard open(inPOfile,out_po1)
@@ -279,6 +321,9 @@ proc parseOptions() : (bool,
 
   var max_iterations = 5'u64
   var max_iterations_flag = false
+
+  var illumina_weight = 10'u64
+  var illumina_weight_flag = false
 
   var final_polish = true
   var final_polish_flag = false
@@ -475,7 +520,17 @@ proc parseOptions() : (bool,
                   run_flag = false
                   echo "ERROR - Max iterations specified multiple times"
                   break
-                continue
+              of "w", "illumina-weight":
+                if not illumina_weight_flag:
+                  illumina_weight_flag = true
+                  if val != "":
+                    illumina_weight = parseUInt(val)
+                  else:
+                    last = "illumina-weight"
+                else:
+                  run_flag = false
+                  echo "ERROR - Multiple Illumina weights specified"
+                  break
               of "final-polish":
                 if not final_polish_flag:
                   final_polish_flag = true
@@ -588,6 +643,8 @@ proc parseOptions() : (bool,
                 ends_delta = parseUInt(key)
               of "max-iterations":
                 max_iterations = parseUInt(key)
+              of "illumina-weight":
+                illumina_weight = parseUInt(key)
               of "output-dir":
                 output_dir = key
               of "threads":
@@ -694,6 +751,28 @@ proc parseOptions() : (bool,
     if thread_num < 1'u64:
       echo "ERROR - Must run at least 1 thread"
       run_flag = false
+    if illumina_weight == 0'u64:
+      echo "ERROR - Illumina weight must be greater than 0"
+      run_flag = false
+    elif illumina_weight < 5'u64:
+      echo "WARNING - We reccomend weighing Illumina reads by at least 5x their long-read counterparts"
+  let options =   ConduitOptions(run_flag : run_flag,
+                                 final_polish : final_polish,
+                                 intermediates : intermediates,
+                                 mode : mode,
+                                 nanopore_format : nanopore_format,
+                                 bowtie_strand_constraint : bowtie_strand_constraint,
+                                 bowtie_alignment_mode : bowtie_alignment_mode,
+                                 bowtie_read_inputs : bowtie_read_inputs,
+                                 output_dir : output_dir,
+                                 tmp_dir : tmp_dir,
+                                 files : files,
+                                 isoform_delta : isoform_delta,
+                                 ends_delta : ends_delta,
+                                 max_iterations : max_iterations,
+                                 illumina_weight : illumina_weight,
+                                 thread_num : thread_num ) 
+
   return (run_flag,
           mode,
           nanopore_format,
