@@ -5,6 +5,7 @@ import header
 import ../poParser
 import tables
 import sequtils
+# import strformat
 
 ###########################################################
 ###------  Import Relevant Functions from poaV2   ------###
@@ -24,7 +25,8 @@ proc matrix_scoring_function*(i: cint;
                               m: ptr ResidueScoreMatrix_T): LPOScore_T {.importc: "matrix_scoring_function".}
 
 proc free_lpo_sequence(sequence : ptr LPOSequence_T, please_free_holder : cint) {.importc: "free_lpo_sequence".}
-proc free_residue_matrix(lpo_matrix : ptr ResidueScoreMatrix_T) {.importc: "free_residue_matrix".}
+proc free_return_result(lpo_result : LPOReturnResult_T ) {.importc: "free_return_result".}
+# proc free_residue_matrix(lpo_matrix : ptr ResidueScoreMatrix_T) {.importc: "free_residue_matrix".}
 # proc read_fasta*(seq_file: PFile;
 #                  sequences: ptr ptr Sequence_T;
 #                  do_switch_case: cint;
@@ -111,10 +113,13 @@ proc convertPOFormats*(lpo_return_result : LPOReturnResult_T) : POGraph = #TODO
   # for (u,v) in  weights.keys:
   #   assert u in edges
   #   assert v in edges[u]
-  for i in 1..<num_reads:
-    free_lpo_sequence(addr seqs[num_reads - i],cint(0))
-  free_lpo_sequence(addr seqs[0],cint(1))
-  free_residue_matrix(lpo_return_result.matrix)
+  free_return_result(lpo_return_result)
+  # for i in 1..<num_reads:
+  #   # echo &"freeing1 {(cast[int](addr seqs[num_reads - i])):#x}"
+  #   free_lpo_sequence(addr seqs[num_reads - i],cint(0))
+  # # echo &"freeing2 {(cast[int](addr seqs[0])):#x}"
+  # free_lpo_sequence(addr seqs[0],cint(1))
+  # free_residue_matrix(lpo_return_result.matrix)
   for i in 0..<num_reads:
     # echo paths[i]
     reads[i].path = paths[i]

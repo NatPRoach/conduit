@@ -234,6 +234,11 @@ type
 
 type
   LPOReturnResult_S* {.bycopy.} = object
-    lpo_seqs* : ptr LPOSequence_T 
+    sequence : ptr LPOSequence_T
+    lpo_seqs* : ptr LPOSequence_T
+    input_seqs : ptr ptr LPOSequence_T
     matrix* : ptr ResidueScoreMatrix_T
+    n_input_seqs : cint
+    nseq : cint
+
   LPOReturnResult_T*{.bycopy.} = LPOReturnResult_S

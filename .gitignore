@@ -6,7 +6,10 @@
 
 # Whitelist gitignore, scripts, and figures
 !.gitignore
+!CONDUIT.png
 !**.py
 !**.R
 !**.bsh
 !**.nim
+!**.md
+!**.c
