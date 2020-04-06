@@ -5,12 +5,14 @@ import strutils
 import strformat
 import poParser
 import tables
-import threadpool
-import math
+import threadpool_simple as tps
+# import threadpool
+# import math
 import hts
 import poaV2/header
 import poaV2/poa
 {.experimental.}
+
 type
   ConduitOptions = object
     run_flag : bool
@@ -21,6 +23,7 @@ type
     bowtie_strand_constraint : string
     bowtie_alignment_mode : string
     bowtie_read_inputs : string
+    score_matrix_path : string
     output_dir : string
     tmp_dir : string
     files : seq[string]
@@ -86,6 +89,7 @@ proc writeHybridHelp() =
   echo "Usage:"
   echo "  ./conduit hybrid [options] <clusters_directory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}"
   echo "  <clusters_directory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
+  echo "                         NOTE: .gz support coming for nanopore scaffold data, but is not an option at this time" #TODO
   echo ""
   echo "  Illumina data is aligned with Bowtie2, therefore Illumina data is provided in the same format as Bowtie2, namely:"
   echo ""
@@ -128,6 +132,8 @@ proc writeHybridHelp() =
   echo "    --ifa"
   echo "        Illumina reads are in FASTA format; Mutually exclusive with --ifq"
   echo "  Consensus Collapsing:"
+  echo "    -m, --score-matrix <path>"
+  echo "        Provide an alternative scoring matrix to use in partial order alignment"
   echo "    -d, --isoform-delta (35)"
   echo "        Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 0 and 255"
   echo "    -e, --ends-delta (35)"
@@ -189,9 +195,8 @@ proc convertFASTQtoFASTA(infilepath,outfilepath:string) =
   infile.close()
   outfile.close()
 
-proc runPOAandCollapsePOGraph(intuple : (string,string,string,uint16,uint16)) {.thread.} =
-  # echo getThreadID()
-  let (infilepath,outdir,format,isoform_delta,ends_delta) = intuple 
+proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16)) {.thread.} =
+  let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta) = intuple 
   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
   var fasta_file : string
   if format == "fasta":
@@ -199,17 +204,12 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,uint16,uint16)) {.
   elif format == "fastq":
     fasta_file = &"{outdir}{trim}.tmp.fa"
     convertFASTQtoFASTA(infilepath,fasta_file)
-  # let out_po1 = &"{outdir}po/{trim}.tmp.po"
   var seq_file : PFile = fopen(cstring(fasta_file), "r")
-  let matrix_filepath : cstring = "../poaV2/myNUC3.4.4.mat"
+  # let matrix_filepath : cstring = "../poaV2/myNUC3.4.4.mat"
   var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function)
-  # discard execProcess("../poaV2/poa", args =["-do_global", "-read_fasta", fasta_file, "-po", out_po1, "../poaV2/myNUC3.4.4.mat"],options={})
   if format == "fastq":
     removeFile(fasta_file)
   
-  # var inPOfile : File
-  # discard open(inPOfile,out_po1)
-  # var po = poParser.initPOGraph(inPOfile)
   var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
   var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta) #TODO - modify to accept ends_delta as well
   let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,trim)
@@ -218,13 +218,9 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,uint16,uint16)) {.
   discard open(outFASTAfile,outFASTAfilepath,fmWrite)
   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
   outFASTAfile.close()
-  # removeFile(out_po1)
-  # let out_po2 = &"{outdir}po/{trim}.po"
-  # let output = execProcess("../poaV2/poa", args =["-do_global", "-read_fasta", outFASTAfilepath, "-po", out_po2, "../poaV2/myNUC3.4.4.mat"],options={})
-  return
 
-proc runGraphBasedIlluminaCorrection(intuple : (string,string,uint64,uint16,uint16)) {.thread.} = 
-  let (tmp_dir, trim, iter,isoform_delta,ends_delta) = intuple
+proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) {.thread.} = 
+  let (tmp_dir, trim, matrix_filepath, iter,isoform_delta,ends_delta) = intuple
   let last_fasta_dir = &"{tmp_dir}{iter-1}/fasta/"
   let last_po_dir = &"{tmp_dir}{iter-1}/po/"
   let this_fasta_dir = &"{tmp_dir}{iter}/fasta/"
@@ -232,7 +228,7 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,uint64,uint16,uint
   
   let last_fasta_filepath : cstring = &"{last_fasta_dir}{trim}.consensus.fa"
   var seq_file : PFile = fopen(cstring(last_fasta_filepath), "r")
-  let matrix_filepath : string = "../poaV2/myNUC3.4.4.mat"
+  # let matrix_filepath : string = "../poaV2/myNUC3.4.4.mat"
   var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function)
 
   let this_fasta_filepath = &"{this_fasta_dir}{trim}.consensus.fa"
@@ -253,10 +249,6 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,uint64,uint16,uint
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(records,outfile)
   outfile.close()
-  # let this_po_filepath = &"{this_po_dir}{trim}.po"
-  # let out_po = &"{this_po_dir}{trim}.po"
-  # let output = execProcess("../poaV2/poa", args =["-do_global", "-read_fasta", this_fasta_filepath, "-po", out_po, "../poaV2/myNUC3.4.4.mat"],options={})
-  return
 
 proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint16)) {.thread.} = 
   let (tmp_dir, trim, iter,isoform_delta) = intuple
@@ -283,13 +275,12 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint16)) {
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(corrected,outfile)
   outfile.close()
-  return
 
-proc doNothingToKillThreads(k:int): float {.thread.} =
-  # echo "foo"
-  for i in 0..<10_000:
-    result += sin(i.float)
-  result -= k.float
+# proc doNothingToKillThreads(k:int): float {.thread.} =
+#   # echo "foo"
+#   for i in 0..<10_000:
+#     result += sin(i.float)
+#   result -= k.float
 
 proc removeFiles(files : openArray[string]) =
   for file in files:
@@ -315,6 +306,24 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
     outfile.write(file.readAll)
   outfile.close()
 
+proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string) : seq[string] = 
+  # echo execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
+  var arguments : seq[string]
+  arguments.add("--xeq")
+  arguments.add("--no-unal")
+  arguments.add("-p")
+  arguments.add(&"{opt.thread_num}")
+  arguments.add(opt.bowtie_strand_constraint)
+  arguments.add(opt.bowtie_alignment_mode)
+  arguments.add("--n-ceil")
+  arguments.add("L,0,0")
+  arguments.add("-x")
+  arguments.add(index_prefix)
+  for arg in opt.bowtie_read_inputs.split(" "):
+    arguments.add(arg)
+  arguments.add("-S")
+  arguments.add(sam)
+  return arguments
 
 proc parseOptions() : ConduitOptions = 
   var clusters_directory = ""
@@ -340,6 +349,9 @@ proc parseOptions() : ConduitOptions =
 
   var nanopore_format="fastq"
   var nanopore_format_flag = false
+
+  var score_matrix_path = ""
+  var score_matrix_path_flag = false
 
   var isoform_delta = 35'u64
   var isoform_delta_flag = false
@@ -470,6 +482,17 @@ proc parseOptions() : ConduitOptions =
                   run_flag = false
                   echo "ERROR - Multiple scaffold format input, choose one of FASTA (--sfa) or FASTQ (--sfq)"
                   help_flag = true
+                  break
+              of "m", "score-matrix":
+                if not score_matrix_path_flag:
+                  score_matrix_path_flag = true
+                  if val != "":
+                    score_matrix_path = val
+                  else:
+                    last = "score-matrix"
+                else:
+                  run_flag = false
+                  echo "ERROR - Multiple score matrices provided"
                   break
               of "u", "unstranded":
                 if not illumina_strand_flag:
@@ -666,6 +689,8 @@ proc parseOptions() : ConduitOptions =
                 interleaved.add(key)
               of "b":
                 bams.add(key)
+              of "score-matrix":
+                score_matrix_path = key
               of "isoform-delta":
                 isoform_delta = parseUInt(key)
               of "ends-delta":
@@ -691,8 +716,11 @@ proc parseOptions() : ConduitOptions =
                 else:
                   run_flag = false
                   echo "ERROR - Argument provided without associated option; please provide one <clusters_directory> only"
+                  break
               else:
                 echo &"ERROR - unknown option {last} provided"
+                run_flag = false
+                break
             last = ""
       else:
         help_flag = true
@@ -796,6 +824,7 @@ proc parseOptions() : ConduitOptions =
                         bowtie_strand_constraint : bowtie_strand_constraint,
                         bowtie_alignment_mode : bowtie_alignment_mode,
                         bowtie_read_inputs : bowtie_read_inputs,
+                        score_matrix_path : score_matrix_path,
                         output_dir : output_dir,
                         tmp_dir : tmp_dir,
                         files : files,
@@ -809,12 +838,12 @@ proc parseOptions() : ConduitOptions =
 proc main() =
   let opt = parseOptions()
   if opt.mode == "hybrid" and opt.run_flag:
-    setMaxPoolSize(opt.thread_num)
+    # setMaxPoolSize(opt.thread_num)
 
-    var responses = newSeq[FlowVar[float]](MaxThreadPoolSize)
-    for i in 0..<MaxThreadPoolSize:
-      responses[i] = spawn doNothingToKillThreads(i)
-    sync()
+    # var responses = newSeq[FlowVar[float]](MaxThreadPoolSize)
+    # for i in 0..<MaxThreadPoolSize:
+    #   responses[i] = spawn doNothingToKillThreads(i)
+    # sync()
 
     if not existsDir(opt.output_dir):
       createDir(opt.output_dir)
@@ -827,10 +856,13 @@ proc main() =
     let directory_number = opt.max_iterations + uint64(opt.final_polish)
     for i in 0..directory_number:
       createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/po/", &"{opt.tmp_dir}{i}/fasta/"])
-    
+    # for file in opt.files:
+    #   spawn runPOAandCollapsePOGraph((file,&"{opt.tmp_dir}0/",opt.score_matrix_path,opt.nanopore_format,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+    # sync()
+    let p = tps.newThreadPool(int(opt.thread_num))
     for file in opt.files:
-      spawn runPOAandCollapsePOGraph((file,&"{opt.tmp_dir}0/",opt.nanopore_format,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
-    sync()
+      p.spawn runPOAandCollapsePOGraph((file,&"{opt.tmp_dir}0/",opt.score_matrix_path,opt.nanopore_format,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+    p.sync()
 
     var last_correction : Table[int,int]
     for iter in 1..opt.max_iterations:
@@ -853,10 +885,12 @@ proc main() =
       discard execProcess("bowtie2-build", args =["--threads",&"{opt.thread_num}", last_consensus, index_prefix],options={poUsePath})
       
       if not opt.intermediates:
-        echo execProcess("rm",args = [last_consensus],options={poUsePath})
+        removeFile(last_consensus)
       
       let sam = &"{last_dir}alignments.sam"
-      discard execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
+      let arguments = getBowtie2options(opt,index_prefix,sam)
+      discard execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
+      # discard execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
       
       let bam = &"{last_dir}alignments.bam"
       discard execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath,poStdErrToStdOut})
@@ -864,11 +898,18 @@ proc main() =
       
       removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
       
+      # for i,trim in opt.trims:
+      #   # if i in last_correction:
+      #   #   continue
+      #   spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,opt.score_matrix_path,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+      # sync()
+
+      let p = tps.newThreadPool(int(opt.thread_num))
       for i,trim in opt.trims:
         # if i in last_correction:
         #   continue
-        spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
-      sync()
+        p.spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,opt.score_matrix_path,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+      p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
       removeDir(last_fasta_dir)
@@ -892,17 +933,24 @@ proc main() =
         removeFile(last_consensus)
 
       let sam = &"{last_dir}alignments.sam"
-      echo execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
+      let arguments = getBowtie2options(opt,index_prefix,sam)
+      # echo execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
+      discard execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
       let bam = &"{last_dir}alignments.bam"
       discard execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath})
       discard execProcess("samtools", args=["index", bam],options={poUsePath})
       
       removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
-      
+
+      # for trim in opt.trims:
+      #   spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,iter,uint16(opt.isoform_delta)))
+      # sync()
+
+      let p = tps.newThreadPool(int(opt.thread_num))
       for trim in opt.trims:
-        spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,iter,uint16(opt.isoform_delta)))
-      sync()
+        p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,iter,uint16(opt.isoform_delta)))
+      p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
       removeDir(last_fasta_dir)

@@ -23,19 +23,19 @@ type
     corrected_path* : seq[uint32]
     sequence* : string
   
-  Node = object
-    nts : string
+  Node* = object
+    nts* : string
     # supporting_reads : seq[uint32]
-    nanopore_support : uint32
-    illumina_support : uint32
-    align_ring_partner : int32 #No partner if -1
-    visited : bool
-    indegree : uint16
-    log_likelihood : float
-    path : seq[uint32]
-    corrected_path : seq[uint32]
-    start_node_flag : bool
-    end_node_flag : bool
+    nanopore_support* : uint32
+    illumina_support* : uint32
+    align_ring_partner* : int32 #No partner if -1
+    visited* : bool
+    indegree* : uint16
+    log_likelihood* : float
+    path* : seq[uint32]
+    corrected_path* : seq[uint32]
+    start_node_flag* : bool
+    end_node_flag* : bool
   
   POGraph* = object of RootObj
     nodes* : seq[Node]

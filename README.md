@@ -1,3 +1,5 @@
+<!---GNU James Taylor--->
+
 ![image](CONDUIT.png)
 
 # CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly
