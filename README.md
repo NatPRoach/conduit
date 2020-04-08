@@ -12,9 +12,9 @@ CONDUIT Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatP
 Usage:
   ./conduit hybrid [options] <clusters_directory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}
   <clusters_directory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster
+                         NOTE: .gz support coming for nanopore scaffold data, but is not an option at this time
 
   Illumina data is aligned with Bowtie2, therefore Illumina data is provided in the same format as Bowtie2, namely:
-
     <m1>                   Files with #1 mates, paired with files in <m2>
                            Could be gzip'ed (extension: .gz) or bzip2'ed (extension: .bz2).
     <m2>                   Files with #2 mates, paired with files in <m1>
@@ -54,12 +54,17 @@ Options (defaults in parentheses):
     --ifa
         Illumina reads are in FASTA format; Mutually exclusive with --ifq
   Consensus Collapsing:
+    -m, --score-matrix <path>
+        Provide an alternative scoring matrix to use in partial order alignment
     -d, --isoform-delta (35)
         Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 0 and 255
     -e, --ends-delta (35)
         Maximum size at the ends of isoforms to 'correct' before splitting. Must be between 0 and 255
     -i, --max-iterations (5)
         Maximum number of iterations to align to and correct scaffolds. Does not include optional final polshing step
+        Note: Providing a value of 0 will not perform any graph based illumina correction
+    -w, --illumina-weight (10)
+        Weight of illumina reads relative to nanopore reads when generating consensus
     --final-polish (default)
         Include a final correction of individual isoforms, not in a splice graph
     --no-final-polish

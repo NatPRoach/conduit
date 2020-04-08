@@ -42,7 +42,7 @@ proc writeDefaultHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
-  echo "\t./conduit <nano | hybrid>"
+  echo "  ./conduit <nano | hybrid>"
 
 proc writeNanoHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -81,7 +81,7 @@ proc writeNanoHelp() =
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
   echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
-  #echo "    --cdna" #Not supported yet
+  #echo "    --cdna" #Not supported yet #TODO
 
 proc writeHybridHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -307,7 +307,6 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
   outfile.close()
 
 proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string) : seq[string] = 
-  # echo execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
   var arguments : seq[string]
   arguments.add("--xeq")
   arguments.add("--no-unal")

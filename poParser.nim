@@ -40,7 +40,6 @@ type
   POGraph* = object of RootObj
     nodes* : seq[Node]
     reads* : seq[Read]
-    # edges : Table[uint32,HashSet[uint32]]
     edges* : Table[uint32,seq[uint32]]
     weights* : Table[(uint32,uint32),uint32]
     og_nodes* : uint32
@@ -56,7 +55,7 @@ type
     illumina_counts* : Table[(uint32,uint32),uint32]
 
   
-  StringtieLikeDataStructure = object
+  IsoformExtractionDataStructure = object
     nodes : seq[Node]
     node_indexes : Table[(char,uint32), uint32]
     fwd_edges : Table[uint32,seq[uint32]]
@@ -427,8 +426,6 @@ proc constructNewGraph( po : ptr POGraph,reads:seq[Read],previously_deleted_node
           edges[read.corrected_path[i]] = @[read.corrected_path[i+1]]
         u_set.incl(read.corrected_path[i])
         v_set.incl(read.corrected_path[i+1])
-    # for i in 0..<read.corrected_path.len:
-    #   echo read.corrected_path[i]
   let source_nodes = u_set - v_set
   let sink_nodes = v_set - u_set
   for sink_node in sink_nodes:
@@ -457,11 +454,6 @@ proc constructNewGraph( po : ptr POGraph,reads:seq[Read],previously_deleted_node
   for j in edges.keys:
     for k in edges[j]:
       nodes[node_indexes2[('b',k)]].indegree += 1'u16
-  # for j in sorted(toSeq(edges.keys)):
-  #   for k in sorted(toSeq(edges[j])):
-  #     echo j, " ", k, " ", weights[(j,k)]
-  # for key in sorted(toSeq(node_indexes2.keys)):
-  #   echo "idx: ", key, " ", node_indexes2[key]
   return TrimmedPOGraph(nodes : nodes,
                         reads : reads,
                         edges : edges,
@@ -521,11 +513,7 @@ proc constructNewGraph2( po : ptr TrimmedPOGraph ) : TrimmedPOGraph =
   for j in edges.keys:
     for k in edges[j]:
       nodes[node_indexes2[('b',k)]].indegree += 1'u16
-  # for j in sorted(toSeq(edges.keys)):
-  #   for k in sorted(toSeq(edges[j])):
-  #     echo j, " ", k, " ", weights[(j,k)]
-  # for key in sorted(toSeq(node_indexes2.keys)):
-  #   echo "idx: ", key, " ", node_indexes2[key]
+
   return TrimmedPOGraph(nodes : nodes,
                         reads : reads,
                         edges : edges,
@@ -537,8 +525,8 @@ proc constructNewGraph2( po : ptr TrimmedPOGraph ) : TrimmedPOGraph =
                         node_indexes : node_indexes2,
                         deleted_nodes : deleted_nodes)
 
-proc getStringtieLikeDataStructures( po : ptr POGraph) : StringtieLikeDataStructure =
-  var time1 = cpuTime()
+proc getIsoformExtractionDataStructures( po : ptr POGraph) : IsoformExtractionDataStructure =
+  # var time1 = cpuTime()
   var fwd_edges,rev_edges : Table[uint32,seq[uint32]]
   var weights : Table[(uint32,uint32),seq[string]]
   var u_set,v_set : HashSet[uint32]
@@ -567,8 +555,8 @@ proc getStringtieLikeDataStructures( po : ptr POGraph) : StringtieLikeDataStruct
       node_support_counts.inc(read.corrected_path[^1])
     else:
       node_support_counts[read.corrected_path[^1]] = 1
-  echo "init dicts - ", (cpuTime() - time1)
-  time1 = cpuTime()
+  # echo "init dicts - ", (cpuTime() - time1)
+  # time1 = cpuTime()
   let source_nodes = u_set - v_set
   let sink_nodes = v_set - u_set
   for sink_node in sink_nodes:
@@ -577,8 +565,8 @@ proc getStringtieLikeDataStructures( po : ptr POGraph) : StringtieLikeDataStruct
     rev_edges[source_node] = @[]
   # var nodes : seq[Node]
   let node_indexes = sorted(toSeq(u_set + v_set))
-  echo "node sorting - ", (cpuTime() - time1)
-  time1 = cpuTime()
+  # echo "node sorting - ", (cpuTime() - time1)
+  # time1 = cpuTime()
   var node_indexes2 : Table[(char,uint32),uint32]
   var node_support_list : seq[uint32]
   for i,j in node_indexes:
@@ -586,20 +574,15 @@ proc getStringtieLikeDataStructures( po : ptr POGraph) : StringtieLikeDataStruct
     node_indexes2[('f',uint32(i))] = j
     node_indexes2[('b',j)] = uint32(i)
     node_support_list.add(uint32(node_support_counts[j]))
-  echo "node_indexes - ", cpuTime() - time1
-  # return StringtieLikeDataStructure(nodes : nodes,
-  #                               node_indexes : node_indexes2,
-  #                               fwd_edges : fwd_edges,
-  #                               rev_edges : rev_edges,
-  #                               weights : weights,
-  #                               node_support_list: node_support_list)
-  return StringtieLikeDataStructure(node_indexes : node_indexes2,
+  # echo "node_indexes - ", cpuTime() - time1
+
+  return IsoformExtractionDataStructure(node_indexes : node_indexes2,
                                     fwd_edges : fwd_edges,
                                     rev_edges : rev_edges,
                                     weights : weights,
                                     node_support_list: node_support_list)
 
-proc updateStringtieLikeDataStructures(st : ptr StringtieLikeDataStructure,removed_reads : ptr seq[Read]) = 
+proc updateIsoformExtractionDataStructures(ie : ptr IsoformExtractionDataStructure,removed_reads : ptr seq[Read]) = 
   var removed_read_names : HashSet[string]
   var visited_edges : HashSet[(uint32,uint32)]
   for read in removed_reads[]:
@@ -608,28 +591,28 @@ proc updateStringtieLikeDataStructures(st : ptr StringtieLikeDataStructure,remov
     for i in 0..<read.corrected_path.len-1:
       let u = read.corrected_path[i]
       let v = read.corrected_path[i+1]
-      st[].node_support_list[st[].node_indexes[('b',u)]] -= 1'u32
+      ie[].node_support_list[st[].node_indexes[('b',u)]] -= 1'u32
       if (u,v) in visited_edges:
         continue
       visited_edges.incl((u,v))
       var new_read_names : seq[string]
-      for name in st[].weights[(u,v)]:
+      for name in ie[].weights[(u,v)]:
         if name in removed_read_names:
           continue
         new_read_names.add(name)
       if new_read_names.len != 0:
-        st[].weights[(u,v)] = new_read_names
+        ie[].weights[(u,v)] = new_read_names
       else:
-        st[].weights.del((u,v))
-        for i,v2 in st[].fwd_edges[u]:
+        ie[].weights.del((u,v))
+        for i,v2 in ie[].fwd_edges[u]:
           if v2 == v:
-            st[].fwd_edges[u].del(i)
+            ie[].fwd_edges[u].del(i)
             break
-        for i,u2 in st[].rev_edges[v]:
+        for i,u2 in ie[].rev_edges[v]:
           if u2 == u:
-            st[].rev_edges[v].del(i)
+            ie[].rev_edges[v].del(i)
             break
-    st[].node_support_list[st[].node_indexes[('b',read.corrected_path[^1])]] -= 1'u32
+    ie[].node_support_list[ie[].node_indexes[('b',read.corrected_path[^1])]] -= 1'u32
 
 proc maxIdx[T]( s : seq[T]) : int = 
   var current_max = T.low
@@ -872,8 +855,8 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
   var total_walk_time = 0.0
   var total_search_time = 0.0
   let time = cpuTime()
-  # var st = getStringtieLikeDataStructures(po,po[].reads)
-  var st = getStringtieLikeDataStructures(po)
+  # var st = getIsoformExtractionDataStructures(po,po[].reads)
+  var st = getIsoformExtractionDataStructures(po)
   total_st_time += (cpuTime() - time)
   echo "ST init time - ", total_st_time
   total_st_time = 0.0
@@ -881,14 +864,14 @@ proc walkHeaviestPaths( po : ptr POGraph,psi = 15) : seq[seq[uint32]] =
   var removed_reads : seq[Read]
   while remaining_reads.len != 0:
     var time1 = cpuTime()
-    updateStringtieLikeDataStructures(addr st, addr removed_reads)
+    updateIsoformExtractionDataStructures(addr st, addr removed_reads)
     total_st_time += (cpuTime() - time1)
     # echo "here"
     time1 = cpuTime()
     var reads : seq[Read] = @[]
     for i in remaining_reads:
       reads.add(po[].reads[i])
-    # let st2 = getStringtieLikeDataStructures(po,reads)
+    # let st2 = getIsoformExtractionDataStructures(po,reads)
     # echo st2.node_support_list
     # echo st.node_support_list
     # assert st2.weights == st.weights
@@ -1305,13 +1288,13 @@ proc updateNodesAndEdges( po : ptr TrimmedPOGraph)  =
     let fwd_idx = po[].node_indexes[('f',i)] 
     if fwd_idx notin supported_nodes:
       if fwd_idx notin po[].deleted_nodes:
-        echo "Deleting node - ", fwd_idx
+        # echo "Deleting node - ", fwd_idx
         po[].deleted_nodes.incl(fwd_idx)
   for u in po[].edges.keys():
     var to_delete : seq[int]
     for i,v in po[].edges[u]:
       if (u,v) notin supported_edges:
-        echo "Deleting - ", u, " --> ", v
+        # echo "Deleting - ", u, " --> ", v
         to_delete.add(i)
         po[].weights.del((u,v))
     for i in sorted(to_delete,Descending):
@@ -1360,14 +1343,14 @@ proc searchForGreedyPath( po : ptr TrimmedPOGraph, minipath,greedy_path : seq[ui
       fwd_node_idx = po.edges[fwd_node_idx][maxIdx(weight_list)]
     fwd_path.add(fwd_node_idx)
   if fwd_dist == -1:
-    echo "here2"
+    # echo "here2"
     return @[]
   var new_path : seq[uint32]
   new_path = rev_path & minipath & fwd_path
   if new_path.len - 2 <= int(psi):
     return new_path
   else:
-    echo "here3"
+    # echo "here3"
     return @[]
 
 proc detectMinipathDeltas( po : ptr TrimmedPOGraph, minipath,greedy_path : seq[uint32], psi : uint16 = 35) : bool =
