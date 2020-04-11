@@ -585,7 +585,12 @@ LPOReturnResult_T build_lpo_from_fasta(FILE *seq_ifile,
     int i = 0, j = 0 ;
     nseq = read_fasta(seq_ifile,&seq,0,&comment);
     fclose(seq_ifile);
-    read_score_matrix(score_matrix_filepath,score_matrix);
+    if (score_matrix_filepath == ""){
+      default_score_matrix(score_matrix);
+    }
+    else{
+      read_score_matrix(score_matrix_filepath,score_matrix);
+    }
     if (nseq == 0) {
       WARN_MSG(USERR,(ERRTXT,"Error reading sequence file %s.\nExiting",
 		      seq_filename),"$Revision: 1.2.2.9 $");

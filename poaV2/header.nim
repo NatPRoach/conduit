@@ -3,16 +3,6 @@ type
   PFile* {.importc: "FILE*", header: "<stdio.h>".} = distinct pointer
     # import C's FILE* type; Nim will treat it as a new pointer type
 
-when not defined(TRUNCATE_GAP_LENGTH):
-  const
-    TRUNCATE_GAP_LENGTH = 16
-
-## * LENGTH OVER WHICH GAP PENALTY DECAYS IN align_lpo
-##     (DEFAULT VALUE)
-when not defined(DECAY_GAP_LENGTH):
-  const
-    DECAY_GAP_LENGTH = 0
-
 const
   REV_COMP_STRING* : cstring = "/rev_comp"
 

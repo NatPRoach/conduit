@@ -6,8 +6,6 @@ import strformat
 import poParser
 import tables
 import threadpool_simple as tps
-# import threadpool
-# import math
 import hts
 import poaV2/header
 import poaV2/poa
@@ -172,7 +170,9 @@ proc writeHybridHelp() =
   # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." #TODO
   # echo "              If CPU number cannot be detected, the default of 4 threads will be used. #TODO
 
-# proc runPOAandCollapsePOGraph(infilepath, outdir, format : string, isoform_delta,ends_delta : uint16) = 
+proc returnFalse() : bool {.thread.} = 
+  return false
+
 
 proc convertFASTQtoFASTA(infilepath,outfilepath:string) = 
   var infile,outfile : File
@@ -211,7 +211,7 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     removeFile(fasta_file)
   
   var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
-  var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta) #TODO - modify to accept ends_delta as well
+  var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta) #TODO - modify to accept ends_delta as well
   let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,trim)
   let outFASTAfilepath = &"{outdir}fasta/{trim}.consensus.fa"
   var outFASTAfile : File
@@ -219,40 +219,35 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
   outFASTAfile.close()
 
-proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) {.thread.} = 
+proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} = #TODO convert from passing tuple back to passing vars individually; relic of older threading approach 
   let (tmp_dir, trim, matrix_filepath, iter,isoform_delta,ends_delta) = intuple
   let last_fasta_dir = &"{tmp_dir}{iter-1}/fasta/"
-  let last_po_dir = &"{tmp_dir}{iter-1}/po/"
   let this_fasta_dir = &"{tmp_dir}{iter}/fasta/"
-  let this_po_dir = &"{tmp_dir}{iter}/po/"
-  
+
   let last_fasta_filepath : cstring = &"{last_fasta_dir}{trim}.consensus.fa"
-  var seq_file : PFile = fopen(cstring(last_fasta_filepath), "r")
-  # let matrix_filepath : string = "../poaV2/myNUC3.4.4.mat"
+  var seq_file : PFile = fopen(last_fasta_filepath, "r")
   var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function)
 
   let this_fasta_filepath = &"{this_fasta_dir}{trim}.consensus.fa"
-  let last_po_filepath = &"{last_po_dir}{trim}.po"
 
   let bamfilepath = &"{tmp_dir}{iter-1}/alignments.bam"
 
-  # var infile : File
   var bam : Bam
-  # discard open(infile,last_po_filepath)
-  # var po = initPOGraph(infile)
   var trim_po = convertPOGraphtoTrimmedPOGraph(po)
   discard open(bam,bamfilepath,index=true)
   illuminaPolishPOGraph(addr trim_po, bam)
-  var representative_paths = getRepresentativePaths3(addr trim_po, psi = isoform_delta)
-  var records = getFastaRecordsFromTrimmedPOGraph(addr trim_po,representative_paths,trim)
+  var representative_paths = getRepresentativePaths3(addr trim_po, psi = isoform_delta,ends_delta = ends_delta)
+  var records = getFastaRecordsFromTrimmedPOGraph(addr trim_po, representative_paths, trim)
   var outfile : File
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(records,outfile)
   outfile.close()
+  result = sameFileContent(cast[string](last_fasta_filepath),this_fasta_filepath)
+  removeFile(cast[string](last_fasta_filepath))
 
-proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint16)) {.thread.} = 
-  let (tmp_dir, trim, iter,isoform_delta) = intuple
-  let last_fasta_dir = &"{tmp_dir}{iter-1}/fasta/"
+proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uint16)) {.thread.} = 
+  let (tmp_dir, trim, converged_iter, iter,isoform_delta) = intuple
+  let last_fasta_dir = &"{tmp_dir}{converged_iter}/fasta/"
   let this_fasta_dir = &"{tmp_dir}{iter}/fasta/"
 
   let last_fasta_filepath = &"{last_fasta_dir}{trim}.consensus.fa"
@@ -276,12 +271,6 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint16)) {
   writeCorrectedReads(corrected,outfile)
   outfile.close()
 
-# proc doNothingToKillThreads(k:int): float {.thread.} =
-#   # echo "foo"
-#   for i in 0..<10_000:
-#     result += sin(i.float)
-#   result -= k.float
-
 proc removeFiles(files : openArray[string]) =
   for file in files:
     removeFile(file)
@@ -290,16 +279,36 @@ proc createDirs(dirs : openArray[string]) =
   for dir in dirs:
     createDir(dir)
 
-proc removeDirs(dirs : openArray[string]) =
-  for dir in dirs:
-    removeDir(dir)
-
 proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath : string) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
-    # if i in last_correction:
-    #   continue
+    let filepath = &"{indirectory}{trim}.consensus.fa"
+    var file : File
+    discard open(file,filepath,fmRead)
+    outfile.write(file.readAll)
+  outfile.close()
+
+proc combineFilesIntermediate(indirectory : string, intrims : openArray[string], outfilepath : string, last_correction : Table[int,int]) = 
+  var outfile : File
+  discard open(outfile,outfilepath,fmWrite)
+  for i,trim in intrims:
+    if i in last_correction:
+      continue
+    let filepath = &"{indirectory}{trim}.consensus.fa"
+    var file : File
+    discard open(file,filepath,fmRead)
+    outfile.write(file.readAll)
+  outfile.close()
+
+proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openArray[string], outfilepath : string, last_correction : Table[int,int]) = 
+  var outfile : File
+  discard open(outfile,outfilepath,fmWrite)
+  for i,trim in intrims:
+    var last = last_num
+    if i in last_correction:
+      last = uint64(last_correction[i]) #TODO convert last_correction to uint64 types.
+    let indirectory = &"{tmp_directory}{last}/fasta/"
     let filepath = &"{indirectory}{trim}.consensus.fa"
     var file : File
     discard open(file,filepath,fmRead)
@@ -834,16 +843,9 @@ proc parseOptions() : ConduitOptions =
                         illumina_weight : illumina_weight,
                         thread_num : thread_num ) 
 
-proc main() =
+proc main() = #TODO - Add output indicating completion percentage for each iteration.
   let opt = parseOptions()
   if opt.mode == "hybrid" and opt.run_flag:
-    # setMaxPoolSize(opt.thread_num)
-
-    # var responses = newSeq[FlowVar[float]](MaxThreadPoolSize)
-    # for i in 0..<MaxThreadPoolSize:
-    #   responses[i] = spawn doNothingToKillThreads(i)
-    # sync()
-
     if not existsDir(opt.output_dir):
       createDir(opt.output_dir)
 
@@ -854,10 +856,8 @@ proc main() =
 
     let directory_number = opt.max_iterations + uint64(opt.final_polish)
     for i in 0..directory_number:
-      createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/po/", &"{opt.tmp_dir}{i}/fasta/"])
-    # for file in opt.files:
-    #   spawn runPOAandCollapsePOGraph((file,&"{opt.tmp_dir}0/",opt.score_matrix_path,opt.nanopore_format,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
-    # sync()
+      createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/fasta/"]) #TODO get rid of fasta subdirectory, no longer needed.
+
     let p = tps.newThreadPool(int(opt.thread_num))
     for file in opt.files:
       p.spawn runPOAandCollapsePOGraph((file,&"{opt.tmp_dir}0/",opt.score_matrix_path,opt.nanopore_format,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
@@ -867,9 +867,8 @@ proc main() =
     for iter in 1..opt.max_iterations:
       let last_dir = &"{opt.tmp_dir}{iter-1}/"
       let last_fasta_dir = &"{last_dir}fasta/"
-      
-      let cur_dir = &"{opt.tmp_dir}{iter}/"
-      let po_dir = &"{cur_dir}po/"
+
+      # let cur_dir = &"{opt.tmp_dir}{iter}/"
 
       var last_consensus : string
       if opt.intermediates:
@@ -878,7 +877,7 @@ proc main() =
         last_consensus = &"{opt.tmp_dir}conduit_consensuses_iter{iter-1}.fa"
 
       removeFile(last_consensus)
-      combineFiles(last_fasta_dir,opt.trims,last_consensus)
+      combineFilesIntermediate(last_fasta_dir,opt.trims,last_consensus,last_correction)
 
       let index_prefix = &"{last_dir}bowtie2_index"
       discard execProcess("bowtie2-build", args =["--threads",&"{opt.thread_num}", last_consensus, index_prefix],options={poUsePath})
@@ -889,29 +888,27 @@ proc main() =
       let sam = &"{last_dir}alignments.sam"
       let arguments = getBowtie2options(opt,index_prefix,sam)
       discard execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
-      # discard execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
       
       let bam = &"{last_dir}alignments.bam"
       discard execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath,poStdErrToStdOut})
       discard execProcess("samtools", args=["index", bam],options={poUsePath})
       
       removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
-      
-      # for i,trim in opt.trims:
-      #   # if i in last_correction:
-      #   #   continue
-      #   spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,opt.score_matrix_path,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
-      # sync()
 
       let p = tps.newThreadPool(int(opt.thread_num))
+      var converged = newSeq[tps.FlowVar[bool]](opt.trims.len)
       for i,trim in opt.trims:
-        # if i in last_correction:
-        #   continue
-        p.spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,opt.score_matrix_path,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+        if i in last_correction:
+          converged[i] = p.spawn returnFalse()
+          continue
+        converged[i] = p.spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,opt.score_matrix_path,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
       p.sync()
 
+      for i,converge in converged:
+        if converge.read():
+          last_correction[i] = int(iter)
+
       removeFiles([bam, &"{bam}.bai"])
-      removeDir(last_fasta_dir)
     if opt.final_polish:
       let iter = opt.max_iterations + 1
       let last_dir = &"{opt.tmp_dir}{iter-1}/"
@@ -923,7 +920,7 @@ proc main() =
       else:
         last_consensus = &"{opt.tmp_dir}conduit_consensuses_iter{iter-1}.fa"
       removeFile(last_consensus)
-      combineFiles(last_fasta_dir,opt.trims,last_consensus)
+      combineFilesFinal(opt.tmp_dir, iter-1, opt.trims, last_consensus, last_correction)
 
       let index_prefix = &"{last_dir}bowtie2_index"
       discard execProcess("bowtie2-build", args =["--threads",&"{opt.thread_num}", last_consensus, index_prefix],options={poUsePath})
@@ -933,7 +930,6 @@ proc main() =
 
       let sam = &"{last_dir}alignments.sam"
       let arguments = getBowtie2options(opt,index_prefix,sam)
-      # echo execProcess(&"bowtie2 --xeq --no-unal -p {opt.thread_num} {opt.bowtie_strand_constraint} {opt.bowtie_alignment_mode} --n-ceil  L,0,0 -x {index_prefix} {opt.bowtie_read_inputs} -S {sam}", options={poUsePath,poStdErrToStdOut,poEvalCommand})
       discard execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
       let bam = &"{last_dir}alignments.bam"
@@ -942,13 +938,12 @@ proc main() =
       
       removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
 
-      # for trim in opt.trims:
-      #   spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,iter,uint16(opt.isoform_delta)))
-      # sync()
-
       let p = tps.newThreadPool(int(opt.thread_num))
-      for trim in opt.trims:
-        p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,iter,uint16(opt.isoform_delta)))
+      for i,trim in opt.trims:
+        var converged_iter = iter - 1
+        if i in last_correction:
+          converged_iter = uint64(last_correction[i])
+        p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,converged_iter,iter,uint16(opt.isoform_delta)))
       p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
