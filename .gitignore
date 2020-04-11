@@ -15,6 +15,7 @@
 !**.c
 !**.rst
 !**.html
+!Makefile
 !poaV2/Makefile
 !LICENSE
 !poaV2/LICENSE
