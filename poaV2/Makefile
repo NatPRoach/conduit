@@ -33,8 +33,11 @@ CFLAGS= -g -O2 -DUSE_WEIGHTED_LINKS -DUSE_PROJECT_HEADER -I.
 # -DREPORT_MAX_ALLOC
 
 # NB: LIBRARY MUST FOLLOW OBJECTS OR LINK FAILS WITH UNRESOLVED REFERENCES!!
-poa: $(OBJECTS) liblpo.a
-	$(CC) -o $@ $(OBJECTS) -lm liblpo.a
+align_score.o: align_score.c liblpo.a
+	$(CC) -c align_score.c -o $@
+
+# poa: $(OBJECTS) liblpo.a
+# 	$(CC) -o $@ $(OBJECTS) -lm liblpo.a
 
 clean:
 	rm -f $(OBJECTS) $(LIBOBJECTS) $(TARGETS)
@@ -44,7 +47,8 @@ liblpo.a: $(LIBOBJECTS)
 	$(AR) $@ $(LIBOBJECTS)
 	ranlib $@
 
-
+# clean2:
+# 	rm -f $(LIBOBJECTS) poa poa_doc libbflag.a
 
 what:
 	@echo poa: partial-order based sequence alignment program
