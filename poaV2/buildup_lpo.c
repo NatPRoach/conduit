@@ -430,7 +430,6 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
   CALLOC(seq_id_in_cluster,nseq,int);  /* INDEXES SEQS (or CLUSTERS) WITHIN EACH CLUSTER */
   CALLOC(cluster_size,nseq,int);  /* COUNTS SEQS IN SAME CLUSTER (updated w/ merges) */
   CALLOC(initial_nseq,nseq,int);  /* COUNTS SEQS INITIALLY IN EACH CLUSTER (not updated w/ merges) */
-
   for (i=nseq_tot=0;i<nseq;i++) {
     seq_cluster[i] = i;  /* CREATE TRIVIAL MAPPING, EACH SEQ ITS OWN CLUSTER */
     seq_id_in_cluster[i] = 0;
@@ -450,7 +449,6 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
     ifile = NULL;
   }
 
-
   score = read_seqpair_scorefile(nseq,all_seqs,score_matrix,scoring_function,use_global_alignment,
 				 do_progressive,ifile,&nscore);
   if (score==NULL) {
@@ -460,7 +458,7 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
   }
   if (ifile)
     fclose (ifile);
-
+  
   for (iscore=0;iscore<nscore;iscore++) {
 
     /* NB: NEW CLUSTER ID WILL BE MINIMUM OF INPUT IDs,
@@ -507,7 +505,6 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
     cluster_size[cluster_i] += cluster_size[cluster_j];
     cluster_size[cluster_j] = 0;
   }
-
   if (preserve_sequence_order) {  /* PUT SEQUENCES WITHIN LPO BACK IN THEIR ORIGINAL ORDER: */
     int *perm;
     CALLOC (perm, nseq_tot, int);
@@ -529,7 +526,6 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
   FREE (cluster_size);
   FREE (seq_id_in_cluster);
   FREE (score);
-
   return new_seq; /* RETURN THE FINAL MASTER CLUSTER... */
 }
 
@@ -602,8 +598,8 @@ LPOReturnResult_T build_lpo_from_fasta(FILE *seq_ifile,
       input_seqs[n_input_seqs++] = &(seq[i]);
       initialize_seqs_as_lpo(1,&(seq[i]),score_matrix);
       if (n_input_seqs == max_input_seqs) {
-	max_input_seqs *= 2;
-	REALLOC (input_seqs, max_input_seqs, LPOSequence_T *);
+	      max_input_seqs *= 2;
+	      REALLOC (input_seqs, max_input_seqs, LPOSequence_T *);
       }
     }
     if (n_input_seqs == 0) { /* HMM.. NO DATA. */
@@ -621,15 +617,6 @@ LPOReturnResult_T build_lpo_from_fasta(FILE *seq_ifile,
                                      use_global_alignment,
                                      0);
     }
-    // for (i=0;i<n_input_seqs;i++) {
-    //   for (j=0;j<nseq;j++) {
-    //     if (input_seqs[i]==&(seq[j]))
-	  //       break;
-    //   }
-    //   free_lpo_sequence(input_seqs[i],(j==nseq));
-    // }
-    // FREE (input_seqs);
-    // if (nseq>0) FREE (seq);
     return (LPOReturnResult_T) {seq,lpo_out,input_seqs,score_matrix,n_input_seqs,nseq};
   }
 void free_residue_matrix(ResidueScoreMatrix_T *lpo_matrix){

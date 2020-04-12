@@ -34,7 +34,7 @@ proc build_lpo_from_fasta(seq_file : Pfile;
 ###---------  Utility functions to interface   ---------###
 ###########################################################
 
-proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph = #TODO
+proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
   let lpo = lpo_return_result.lpo_seqs
   let matrix = lpo_return_result.matrix
   let num_reads = lpo.nsource_seq
@@ -101,7 +101,7 @@ proc getPOGraphFromFasta*(seq_file : Pfile;
                          use_global_alignment : cint;
                          scoring_function : proc (a1 : cint; a2 : cint; a3 : ptr LPOLetter_T; a4 : ptr LPOLetter_T; a5 : ptr ResidueScoreMatrix_T) : LPOScore_T) : POGraph =
   let lpo_return_result = build_lpo_from_fasta(seq_file,
-                                                score_matrix_filepath,
-                                                use_global_alignment,
-                                                scoring_function)
+                                               score_matrix_filepath,
+                                               use_global_alignment,
+                                               scoring_function)
   return convertPOFormats(lpo_return_result)

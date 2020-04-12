@@ -71,14 +71,13 @@ const
 
 type
   LPOLetter_S* {.bycopy.} = object
-    left*: LPOLetterLink_T     ## * ADJACENT LETTER(S) TO THE LEFT
-    ## * ADJACENT LETTER(S) TO THE RIGHT
-    right*: LPOLetterLink_T    ## * SOURCE SEQ POSITION(S)
-    source*: LPOLetterSource_T ## * CIRCULAR LIST OF ALIGNED POSITIONS
-    align_ring*: LPOLetterRef_T ## * MINIMUM INDEX OF ALL POSITIONS ON THE RING
-    ring_id*: LPOLetterRef_T   ## * SCORE FOR BALANCING PARTIAL ORDER EFFECTS ON MATRIX NEUTRALITY
-    score*: cfloat             ## * THE ACTUAL RESIDUE CODE!
-    letter*: char
+    left*: LPOLetterLink_T      ## * ADJACENT LETTER(S) TO THE LEFT
+    right*: LPOLetterLink_T     ## * ADJACENT LETTER(S) TO THE RIGHT
+    source*: LPOLetterSource_T  ## * SOURCE SEQ POSITION(S)
+    align_ring*: LPOLetterRef_T ## * CIRCULAR LIST OF ALIGNED POSITIONS
+    ring_id*: LPOLetterRef_T    ## * MINIMUM INDEX OF ALL POSITIONS ON THE RING
+    score*: cfloat              ## * SCORE FOR BALANCING PARTIAL ORDER EFFECTS ON MATRIX NEUTRALITY
+    letter*: char               ## * THE ACTUAL RESIDUE CODE!
 
   LPOLetter_T* = LPOLetter_S
 

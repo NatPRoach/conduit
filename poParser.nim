@@ -1208,7 +1208,7 @@ proc updateGraph( rep_po : ptr TrimmedPOGraph, new_path,old_path : seq[uint32],w
 #       rep_po.deleted_nodes.incl(v)
 
 proc walkGreedyPaths(po : ptr TrimmedPOGraph,psi : uint16 = 15'u16) : seq[seq[uint32]] = 
-  var time1 = cpuTime()
+  # var time1 = cpuTime()
   for i in 0..<po[].nodes.len:
     po[].nodes[i].visited = false
   var source_nodes : seq[uint32]
@@ -1255,7 +1255,7 @@ proc walkGreedyPaths(po : ptr TrimmedPOGraph,psi : uint16 = 15'u16) : seq[seq[ui
     # echo "greedy1 - ", path
   for i in 0..<po[].nodes.len:
     po[].nodes[i].visited = false
-  echo "walk greedy paths - ", cpuTime() - time1
+  # echo "walk greedy paths - ", cpuTime() - time1
   return greedy_walks
 
 # proc updateNodesAndEdges( po : ptr TrimmedPOGraph)  = 
@@ -1663,9 +1663,9 @@ proc getRepresentativePaths3*( rep_po : ptr TrimmedPOGraph, psi : uint16 = 10, e
     # updateNodesAndEdges(rep_po)
     # echo "Update2 - ", cpuTime() - time2
   # echo "Navigate P. queue - ", cpuTime() - time1
-  var outfile4 : File
-  discard open(outfile4,"testing_repo3.html",fmWrite)
-  htmlOutput(rep_po[],outfile4)
+  # var outfile4 : File
+  # discard open(outfile4,"testing_repo3.html",fmWrite)
+  # htmlOutput(rep_po[],outfile4)
   ########################################################################################
   ###------ Run approach similar to Stringtie approach for resolving splice graph -----###
   ###--- i.e. start at highest coverage node, walk heaviest path based on reads     ---###
@@ -1681,9 +1681,9 @@ proc getRepresentativePaths3*( rep_po : ptr TrimmedPOGraph, psi : uint16 = 10, e
   # let my_paths = walkHeaviestPaths( addr rep_po )
   # echo "Walk paths - ", cpuTime() - time1
   # return my_paths
-  for i,node in rep_po.nodes:
-    # echo rep_po.node_indexes[('f',uint32(i))]
-    assert node.visited or rep_po.node_indexes[('f',uint32(i))] in rep_po.deleted_nodes
+  # for i,node in rep_po.nodes:
+  #   # echo rep_po.node_indexes[('f',uint32(i))]
+  #   assert node.visited or rep_po.node_indexes[('f',uint32(i))] in rep_po.deleted_nodes
   return walkHeaviestPaths(rep_po, ends_delta = int(ends_delta))
 
 # proc getRepresentativePaths2( rep_po : var TrimmedPOGraph, psi : uint16 = 10) : seq[seq[uint32]] =

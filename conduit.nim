@@ -173,7 +173,6 @@ proc writeHybridHelp() =
 proc returnFalse() : bool {.thread.} = 
   return false
 
-
 proc convertFASTQtoFASTA(infilepath,outfilepath:string) = 
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
@@ -860,7 +859,7 @@ proc main() = #TODO - Add output indicating completion percentage for each itera
 
     let p = tps.newThreadPool(int(opt.thread_num))
     for file in opt.files:
-      p.spawn runPOAandCollapsePOGraph((file,&"{opt.tmp_dir}0/",opt.score_matrix_path,opt.nanopore_format,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
     p.sync()
 
     var last_correction : Table[int,int]
