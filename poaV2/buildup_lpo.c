@@ -581,7 +581,7 @@ LPOReturnResult_T build_lpo_from_fasta(FILE *seq_ifile,
     int i = 0, j = 0 ;
     nseq = read_fasta(seq_ifile,&seq,0,&comment);
     fclose(seq_ifile);
-    if (score_matrix_filepath == "" || score_matrix_filepath == "\0"){
+    if (! strcmp(score_matrix_filepath, "")){
       default_score_matrix(score_matrix);
     }
     else{
