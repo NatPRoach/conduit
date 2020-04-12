@@ -204,8 +204,8 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     fasta_file = &"{outdir}{trim}.tmp.fa"
     convertFASTQtoFASTA(infilepath,fasta_file)
   var seq_file : PFile = fopen(cstring(fasta_file), "r")
-  echo matrix_filepath
-  echo cstring(matrix_filepath)
+  # echo matrix_filepath
+  # echo cstring(matrix_filepath)
   # let matrix_filepath : cstring = "../poaV2/myNUC3.4.4.mat"
   var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
   if format == "fastq":

@@ -1470,7 +1470,7 @@ proc getRepresentativePaths3*( rep_po : ptr TrimmedPOGraph, psi : uint16 = 10, e
   ########################################################################################
   ###------------------- Collect greedy walks from each source node -------------------###
   ########################################################################################
-  echo rep_po.reads.len
+  # echo rep_po.reads.len
   let greedy_walks = walkGreedyPaths(rep_po)
   # echo greedy_walks
   # var outfile3 : File
