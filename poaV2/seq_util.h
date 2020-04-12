@@ -69,6 +69,8 @@ void index_symbols(int nseq,char seq[],char out[],
 
 int read_score_matrix(char filename[],ResidueScoreMatrix_T *m);
 
+void default_score_matrix(ResidueScoreMatrix_T *m);
+
 void print_score_matrix(FILE *ifile,ResidueScoreMatrix_T *m,char subset[]);
 
 int limit_residues(char seq[],char symbol[]);
@@ -76,8 +78,6 @@ int limit_residues(char seq[],char symbol[]);
 int create_seq(int nseq,Sequence_T **seq,char seq_name[],char seq_title[],char tmp_seq[],int do_switch_case);
 
 char *reverse_complement(char seq[]);
-
-
 
 /******************************************************* fasta_format.c */
 int read_fasta(FILE *seq_file,Sequence_T **sequences,
