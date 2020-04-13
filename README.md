@@ -5,7 +5,38 @@
 # CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly
 #### Builds a transcriptome independent of a reference genome using Oxford Nanopore Technologies and optionally Illumina RNA-seq data (recommended)
 
-Usage statement for hybrid (ONT + Illumina) assembly:
+### Building CONDUIT:
+CONDUIT is built in Nim (A statically typed, compiled systems programming language with python-like syntax).
+
+CONDUIT therefore requires a Nim installation. Easy Nim installation instructions can be found here: https://nim-lang.org/install.html
+
+CONDUIT also uses the following libraries:
+*    poaV2 (https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), which is distributed in the CONDUIT GitHub and need not be downloaded separately.
+*    nim-hts (https://github.com/brentp/hts-nim), which wraps htslib in nim.
+*    htslib (https://github.com/samtools/htslib), a C library for interfacing with common bioinformatics file formats.
+*    threadpools (https://github.com/yglukhov/threadpools), which provides instance threadpools in nim.
+
+
+#### Installing threadpools:
+Threadpools is the only library listed above without listed installation instructions, they are therefore provided here.
+Once you've installed nim, installing threadpools is quite simple:
+```
+git clone https://github.com/yglukhov/threadpools
+cd threadpools
+nimble install -y threadpools
+```
+
+Once all the required libraries are installed, building CONDUIT can be done in the following manner:
+```
+git clone https://github.com/NatPRoach/conduit.git
+cd conduit
+make
+```
+This should result in a `conduit` binary file which can then be used.
+
+A Conda recipe is coming ASAP, which should ease installation significantly.
+
+### Usage statement for hybrid (ONT + Illumina) assembly:
 ```
 CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:
 CONDUIT Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )
@@ -56,6 +87,7 @@ Options (defaults in parentheses):
   Consensus Collapsing:
     -m, --score-matrix <path>
         Provide an alternative scoring matrix to use in partial order alignment
+        Example formatting for the score matrix can be found at poaV2/myNUC3.4.4.mat
     -d, --isoform-delta (35)
         Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 0 and 255
     -e, --ends-delta (35)
@@ -68,7 +100,7 @@ Options (defaults in parentheses):
     --final-polish (default)
         Include a final correction of individual isoforms, not in a splice graph
     --no-final-polish
-        Do not do a final correction of individual isoforms not in a splice graph
+        Do not do a final correction of individual isoforms, not in a splice graph
   Ouput:
     -o, --output-dir <path> (conduit/)
         <path> where corrected clusters will be written

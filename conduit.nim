@@ -32,6 +32,10 @@ type
     thread_num : uint64
     max_iterations : uint64
 
+#TODO - Add output indicating completion percentage for each iteration.
+#TODO - Add mode that continues polishing where a previous run left off
+#TODO convert from passing tuple back to passing vars individually; relic of older threading approach
+#TODO get rid of fasta subdirectory, no longer needed
 
 proc conduitVersion() : string =
   return "CONDUIT Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -145,7 +149,7 @@ proc writeHybridHelp() =
   echo "    --final-polish (default)"
   echo "        Include a final correction of individual isoforms, not in a splice graph"
   echo "    --no-final-polish"
-  echo "        Do not do a final correction of individual isoforms not in a splice graph" 
+  echo "        Do not do a final correction of individual isoforms, not in a splice graph" 
   echo "  Ouput:"
   echo "    -o, --output-dir <path> (conduit/)"
   echo "        <path> where corrected clusters will be written"
@@ -213,7 +217,7 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     removeFile(fasta_file)
   
   var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
-  var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta) #TODO - modify to accept ends_delta as well
+  var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
   let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,trim)
   let outFASTAfilepath = &"{outdir}fasta/{trim}.consensus.fa"
   var outFASTAfile : File
@@ -221,7 +225,7 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
   outFASTAfile.close()
 
-proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} = #TODO convert from passing tuple back to passing vars individually; relic of older threading approach 
+proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} =
   let (tmp_dir, trim, matrix_filepath, iter,isoform_delta,ends_delta) = intuple
   let last_fasta_dir = &"{tmp_dir}{iter-1}/fasta/"
   let this_fasta_dir = &"{tmp_dir}{iter}/fasta/"
@@ -845,7 +849,7 @@ proc parseOptions() : ConduitOptions =
                         illumina_weight : illumina_weight,
                         thread_num : thread_num ) 
 
-proc main() = #TODO - Add output indicating completion percentage for each iteration.
+proc main() =
   let opt = parseOptions()
   if opt.mode == "hybrid" and opt.run_flag:
     if not existsDir(opt.output_dir):
@@ -858,7 +862,7 @@ proc main() = #TODO - Add output indicating completion percentage for each itera
 
     let directory_number = opt.max_iterations + uint64(opt.final_polish)
     for i in 0..directory_number:
-      createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/fasta/"]) #TODO get rid of fasta subdirectory, no longer needed.
+      createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/fasta/"])
 
     let p = tps.newThreadPool(int(opt.thread_num))
     for file in opt.files:
