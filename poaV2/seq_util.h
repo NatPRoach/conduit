@@ -69,6 +69,9 @@ void index_symbols(int nseq,char seq[],char out[],
 
 int read_score_matrix(char filename[],ResidueScoreMatrix_T *m);
 
+/*
+New function default_score_matrix below written by Nathan Roach 03 / 2020;
+*/
 void default_score_matrix(ResidueScoreMatrix_T *m);
 
 void print_score_matrix(FILE *ifile,ResidueScoreMatrix_T *m,char subset[]);

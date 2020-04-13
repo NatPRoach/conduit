@@ -113,12 +113,19 @@ LPOSequence_T *buildup_pairwise_lpo(LPOSequence_T seq1[],LPOSequence_T seq2[],
 				    (int,int,LPOLetter_T [],LPOLetter_T [],
 				     ResidueScoreMatrix_T *),
                                     int use_global_alignment);
-
+/*
+New functions build_lpo_from_fasta, free_residue_matrix, and free_return_result below written by Nathan Roach 03 / 2020;
+Labeled as new code in accordance with the GPLv2 license in which poaV2 is distributed
+*/
 LPOReturnResult_T build_lpo_from_fasta(FILE *seq_ifile,
 						 char score_matrix_filepath[],
 						 int use_global_alignment,
 						 LPOScore_T (*scoring_function)
 						 (int,int,LPOLetter_T [],LPOLetter_T [],ResidueScoreMatrix_T *));
+
+void free_residue_matrix(ResidueScoreMatrix_T *lpo_matrix);
+
+void free_return_result(LPOReturnResult_T lpo_result);
 
 /**************************************************** lpo_format.c */
 void write_lpo(FILE *ifile,LPOSequence_T *seq,

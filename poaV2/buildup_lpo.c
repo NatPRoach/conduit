@@ -559,12 +559,17 @@ LPOSequence_T *buildup_pairwise_lpo(LPOSequence_T seq1[],LPOSequence_T seq2[],
   return seq1; /* RETURN THE FINAL LPO */
 }
 
+/*
+New functions below written by Nathan Roach 03 / 2020;
+Labeled as new code in accordance with the GPLv2 license in which poaV2 is distributed
+*/
 LPOReturnResult_T build_lpo_from_fasta(FILE *seq_ifile,
              char score_matrix_filepath[],
              int use_global_alignment,
 						 LPOScore_T (*scoring_function)
 						 (int,int,LPOLetter_T [],LPOLetter_T [],ResidueScoreMatrix_T *))
   {
+    // Modified slightly from the main function in main.c and bound in nim
     int nseq=0;
     FILE *errfile=stderr;
     int exit_code=0;

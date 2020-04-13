@@ -216,6 +216,11 @@ int read_score_matrix(char filename[],ResidueScoreMatrix_T *m)
   return nsymb;
 }
 
+
+/*
+New function default_score_matrix below written by Nathan Roach 03 / 2020;
+Labeled as new code in accordance with the GPLv2 license in which poaV2 is distributed
+*/
 void default_score_matrix(ResidueScoreMatrix_T *m){
   int i;
   m->symbol[ 0] = 'A';
