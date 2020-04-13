@@ -132,6 +132,7 @@ proc writeHybridHelp() =
   echo "  Consensus Collapsing:"
   echo "    -m, --score-matrix <path>"
   echo "        Provide an alternative scoring matrix to use in partial order alignment"
+  echo "        Example formatting for the score matrix can be found at poaV2/myNUC3.4.4.mat"
   echo "    -d, --isoform-delta (35)"
   echo "        Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 0 and 255"
   echo "    -e, --ends-delta (35)"
