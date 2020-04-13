@@ -16,6 +16,9 @@ CONDUIT also uses the following libraries:
 *    htslib (https://github.com/samtools/htslib), a C library for interfacing with common bioinformatics file formats.
 *    threadpools (https://github.com/yglukhov/threadpools), which provides instance threadpools in nim.
 
+And the following tools must be installed:
+*   samtools (https://github.com/samtools/samtools)
+*   bowtie2 (https://github.com/BenLangmead/bowtie2)
 
 #### Installing threadpools:
 Threadpools is the only library listed above without listed installation instructions, they are therefore provided here.
@@ -26,7 +29,7 @@ cd threadpools
 nimble install -y
 ```
 
-Once all the required libraries are installed, building CONDUIT can be done in the following manner:
+Once all the required libraries and tools are installed, building CONDUIT can be done in the following manner:
 ```
 git clone https://github.com/NatPRoach/conduit.git
 cd conduit

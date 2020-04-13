@@ -63,6 +63,8 @@ type
     node_support_list : seq[uint32]
 
 #TODO: clean up redundancies, remove dead code blocks
+#TODO: break up this into several .nim files, each with a more descriptive / accurate name
+#TODO: remove unused functions
 
 proc collapseLinearStretches( po2 : TrimmedPOGraph) : TrimmedPOGraph =
   var po = po2

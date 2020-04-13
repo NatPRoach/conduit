@@ -290,9 +290,12 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
     let filepath = &"{indirectory}{trim}.consensus.fa"
-    var file : File
-    discard open(file,filepath,fmRead)
-    outfile.write(file.readAll)
+    if existsFile(filepath):
+      var file : File
+      discard open(file,filepath,fmRead)
+      outfile.write(file.readAll)
+    else:
+      echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster"
   outfile.close()
 
 proc combineFilesIntermediate(indirectory : string, intrims : openArray[string], outfilepath : string, last_correction : Table[int,int]) = 
@@ -302,9 +305,12 @@ proc combineFilesIntermediate(indirectory : string, intrims : openArray[string],
     if i in last_correction:
       continue
     let filepath = &"{indirectory}{trim}.consensus.fa"
-    var file : File
-    discard open(file,filepath,fmRead)
-    outfile.write(file.readAll)
+    if existsFile(filepath):
+      var file : File
+      discard open(file,filepath,fmRead)
+      outfile.write(file.readAll)
+    else:
+      echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
 proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openArray[string], outfilepath : string, last_correction : Table[int,int]) = 
@@ -316,9 +322,12 @@ proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openA
       last = uint64(last_correction[i]) #TODO convert last_correction to uint64 types.
     let indirectory = &"{tmp_directory}{last}/fasta/"
     let filepath = &"{indirectory}{trim}.consensus.fa"
-    var file : File
-    discard open(file,filepath,fmRead)
-    outfile.write(file.readAll)
+    if existsFile(filepath):
+      var file : File
+      discard open(file,filepath,fmRead)
+      outfile.write(file.readAll)
+    else:
+      echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
 proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string) : seq[string] = 
@@ -864,10 +873,10 @@ proc main() =
     for i in 0..directory_number:
       createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/fasta/"])
 
-    let p = tps.newThreadPool(int(opt.thread_num))
-    for file in opt.files:
-      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
-    p.sync()
+    #let p = tps.newThreadPool(int(opt.thread_num))
+    #for file in opt.files:
+    #  p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
+    #p.sync()
 
     var last_correction : Table[int,int]
     for iter in 1..opt.max_iterations:
