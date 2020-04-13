@@ -879,10 +879,10 @@ proc main() =
     for i in 0..directory_number:
       createDirs([&"{opt.tmp_dir}{i}/", &"{opt.tmp_dir}{i}/fasta/"])
 
-    #let p = tps.newThreadPool(int(opt.thread_num))
-    #for file in opt.files:
-    #  p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
-    #p.sync()
+    let p = tps.newThreadPool(int(opt.thread_num))
+    for file in opt.files:
+      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
+    p.sync()
 
     var last_correction : Table[int,int]
     for iter in 1..opt.max_iterations:
