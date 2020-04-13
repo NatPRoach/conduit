@@ -292,8 +292,10 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if existsFile(filepath):
       var file : File
+      echo &"appending {filepath}"
       discard open(file,filepath,fmRead)
       outfile.write(file.readAll)
+      file.close()
     else:
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster"
   outfile.close()
@@ -307,8 +309,10 @@ proc combineFilesIntermediate(indirectory : string, intrims : openArray[string],
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if existsFile(filepath):
       var file : File
+      echo &"appending {filepath}"
       discard open(file,filepath,fmRead)
       outfile.write(file.readAll)
+      file.close()
     else:
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
@@ -324,8 +328,10 @@ proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openA
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if existsFile(filepath):
       var file : File
+      echo &"appending {filepath}"
       discard open(file,filepath,fmRead)
       outfile.write(file.readAll)
+      file.close()
     else:
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
