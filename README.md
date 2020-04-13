@@ -23,7 +23,7 @@ Once you've installed nim, installing threadpools is quite simple:
 ```
 git clone https://github.com/yglukhov/threadpools
 cd threadpools
-nimble install -y threadpools
+nimble install -y
 ```
 
 Once all the required libraries are installed, building CONDUIT can be done in the following manner:
