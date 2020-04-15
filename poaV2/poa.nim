@@ -5,6 +5,7 @@ import header
 import ../poParser
 import tables
 import sequtils
+import strutils
 # import strformat
 
 ###########################################################
@@ -51,7 +52,7 @@ proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
   for i in 0..<num_reads:
     let name = source_seqs[i].name
     let length = source_seqs[i].length
-    reads.add(Read(name:toString(toSeq(name)),length : uint32(length)))
+    reads.add(Read(name:(toString(toSeq(name)).strip(chars = {'\0'} )),length : uint32(length)))
     paths.add(@[])
   for i in 0..<num_nodes:
     # echo matrix.symbol
