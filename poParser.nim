@@ -415,9 +415,11 @@ proc writePOGraph*( po : TrimmedPOGraph, outfile : File,graphname : string ="def
 proc stringencyCheck*(po : ptr TrimmedPOGraph, path : seq[uint32], stringent_tolerance : int = 100) : bool = 
   result = true
   for i in stringent_tolerance..<path.len-stringent_tolerance:
+    let u = path[i-1]
+    let v = path[i]
     let bck_node_idx = po[].node_indexes[('b',path[i])]
-    result = po[].nodes[bck_node_idx].illumina_support > 0'u32
-
+    result = result and (po[].nodes[bck_node_idx].illumina_support > 0'u32) and ((u,v) in po[].illumina_counts)
+  result = result and ((path[^(stringent_tolerance - 2)],path[^(stringent_tolerance - 1)]) in po[].illumina_counts)
 
 # proc constructNewGraph( po : ptr POGraph,reads:seq[Read],previously_deleted_nodes:HashSet[uint32] = initHashSet[uint32]() ) : TrimmedPOGraph = 
 #   var edges : Table[uint32,seq[uint32]]

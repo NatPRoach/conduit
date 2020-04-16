@@ -41,8 +41,6 @@ type
 #Major TODOs (Future release versions?):
 #TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
 #TODO - Add mode that continues polishing where a previous run left off
-#TODO - Stringent mode - Write code to enforce that every base / edge in graph is supported by at least 1 Illumina read, with tolerance at 5' & 3' ends set by the user 
-#TODO - Write code to grab the largest clusters first so we don't have this problem of running on few threads at the end of the first iteration
 #TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage to the rewrite is it makes doing clever things with the poa easier down the line. (Unless we did SIMD poa, which would require learning nim SIMD, and probably step on Eyras Lab's toes)
 #TODO - Example of clever thing we can do with poa - Write code to break huge clusters into smaller clusters at poaV2 step - max of 320(?) reads per sub-cluster recording number of reads supporting each extracted isoform, then poa the extracted isoforms, build new graph with extracted weights.
 #TODO - get rid of fasta subdirectory in tmp-dir, no longer needed
@@ -981,6 +979,12 @@ proc parseOptions() : ConduitOptions =
       run_flag = false
     elif illumina_weight < 5'u64:
       echo "WARNING - We reccomend weighing Illumina reads by at least 5x their long-read counterparts"
+    if stringent_tolerance < 3:
+      echo "ERROR - Stringent tolerance cannot be less than 3"
+      run_flag = false
+    elif stringent_tolerance < 25:
+      echo "WARNING - Reads map poorly to the ends of long read scaffolds, we reccomend a stringency tolerance of at least 25"
+    
   var trims = newSeq[string](files.len)
   for i,infilepath in files:
     trims[i] = infilepath.split(os.DirSep)[^1].split(".")[0]
