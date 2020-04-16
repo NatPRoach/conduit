@@ -1070,14 +1070,21 @@ proc main() =
       p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
-      removeDir(last_fasta_dir)
+      # removeDir(last_fasta_dir)
     
-    let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
-    if existsFile(final_consensus_path):
-      removeFile(final_consensus_path)
-    var last_fasta_dir = &"{opt.tmp_dir}{directory_number}{os.DirSep}fasta{os.DirSep}"
+      let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
+      if existsFile(final_consensus_path):
+        removeFile(final_consensus_path)
+      var final_fasta_dir = &"{opt.tmp_dir}{directory_number}{os.DirSep}fasta{os.DirSep}"
 
-    combineFiles(last_fasta_dir, opt.trims, final_consensus_path)
+      combineFiles(final_fasta_dir, opt.trims, final_consensus_path)
+    else:
+      let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
+      if existsFile(final_consensus_path):
+        removeFile(final_consensus_path)
+
+      combineFilesFinal(opt.tmp_dir, directory_number, opt.trims, final_consensus_path, last_correction)
+
     
     if not tmp_already_existed:
       removeDir(opt.tmp_dir)
