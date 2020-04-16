@@ -1024,10 +1024,10 @@ proc main() =
     for i in 0..directory_number:
       createDirs([&"{opt.tmp_dir}{i}{os.DirSep}", &"{opt.tmp_dir}{i}{os.DirSep}fasta{os.DirSep}"])
 
-    # let p = tps.newThreadPool(int(opt.thread_num))
-    # for file in opt.files:
-    #   p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
-    # p.sync()
+    let p = tps.newThreadPool(int(opt.thread_num))
+    for file in opt.files:
+      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
+    p.sync()
 
     var last_correction : Table[int,int]
     for iter in 1..opt.max_iterations:
@@ -1048,8 +1048,9 @@ proc main() =
       let index_prefix = &"{last_dir}bowtie2_index"
       echo execProcess("bowtie2-build", args =["--threads",&"{opt.thread_num}", last_consensus, index_prefix],options={poUsePath})
       
-      if not opt.intermediates:
-        removeFile(last_consensus)
+      removeFile(last_consensus)
+      if opt.intermediates:
+        combineFilesFinal(opt.tmp_dir,iter-1,opt.trims,last_consensus,last_correction)
       
       let sam = &"{last_dir}alignments.sam"
       let arguments = getBowtie2options(opt,index_prefix,sam)
