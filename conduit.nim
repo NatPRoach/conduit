@@ -309,6 +309,10 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     fasta_file = outFASTAfilepath
     last_num_reads = num_reads
     (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp")
+  if num_reads == last_num_reads:
+    for i in 0..<num_fastas:
+      let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
+      removeFile(tmp_fasta)
   var seq_file : PFile = fopen(cstring(fasta_file), "r")
   var po2 = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
   if delete_fasta_flag:
@@ -327,8 +331,8 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   let last_fasta_dir = &"{tmp_dir}{iter-1}{os.DirSep}fasta{os.DirSep}"
   let this_fasta_dir = &"{tmp_dir}{iter}{os.DirSep}fasta{os.DirSep}"
 
-  let last_fasta_filepath : cstring = &"{last_fasta_dir}{trim}.consensus.fa"
-  var seq_file : PFile = fopen(last_fasta_filepath, "r")
+  let last_fasta_filepath = &"{last_fasta_dir}{trim}.consensus.fa"
+  var seq_file : PFile = fopen(cstring(last_fasta_filepath), "r")
   var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function)
 
   let this_fasta_filepath = &"{this_fasta_dir}{trim}.consensus.fa"
@@ -345,8 +349,8 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(records,outfile)
   outfile.close()
-  result = sameFileContent(cast[string](last_fasta_filepath),this_fasta_filepath)
-  removeFile(cast[string](last_fasta_filepath))
+  result = sameFileContent(last_fasta_filepath,this_fasta_filepath)
+  removeFile(last_fasta_filepath)
 
 proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uint16)) {.thread.} = 
   let (tmp_dir, trim, converged_iter, iter,isoform_delta) = intuple
@@ -362,6 +366,7 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
   var bam : Bam
   discard open(infile,last_fasta_filepath)
   var reads = parseFasta(infile)
+  infile.close()
   var corrected : seq[FastaRecord]
   discard open(bam,bamfilepath,index=true)
   for read in reads:
@@ -976,10 +981,10 @@ proc main() =
     for i in 0..directory_number:
       createDirs([&"{opt.tmp_dir}{i}{os.DirSep}", &"{opt.tmp_dir}{i}{os.DirSep}fasta{os.DirSep}"])
 
-    let p = tps.newThreadPool(int(opt.thread_num))
-    for file in opt.files:
-      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
-    p.sync()
+    # let p = tps.newThreadPool(int(opt.thread_num))
+    # for file in opt.files:
+    #   p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
+    # p.sync()
 
     var last_correction : Table[int,int]
     for iter in 1..opt.max_iterations:
