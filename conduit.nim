@@ -31,6 +31,8 @@ type
     illumina_weight : uint64
     thread_num : uint64
     max_iterations : uint64
+    stringent : bool
+    stringent_tolerance : int
 
 #Minor TODOs:
 #TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
@@ -39,7 +41,7 @@ type
 #Major TODOs (Future release versions?):
 #TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
 #TODO - Add mode that continues polishing where a previous run left off
-#TODO - Write code to enforce that every isoform split / merge point be supported by at least 1 Illumina read
+#TODO - Stringent mode - Write code to enforce that every base / edge in graph is supported by at least 1 Illumina read, with tolerance at 5' & 3' ends set by the user 
 #TODO - Write code to grab the largest clusters first so we don't have this problem of running on few threads at the end of the first iteration
 #TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage to the rewrite is it makes doing clever things with the poa easier down the line. (Unless we did SIMD poa, which would require learning nim SIMD, and probably step on Eyras Lab's toes)
 #TODO - Example of clever thing we can do with poa - Write code to break huge clusters into smaller clusters at poaV2 step - max of 320(?) reads per sub-cluster recording number of reads supporting each extracted isoform, then poa the extracted isoforms, build new graph with extracted weights.
@@ -162,7 +164,13 @@ proc writeHybridHelp() =
   echo "    --final-polish (default)"
   echo "        Include a final correction of individual isoforms, not in a splice graph"
   echo "    --no-final-polish"
-  echo "        Do not do a final correction of individual isoforms, not in a splice graph" 
+  echo "        Do not do a final correction of individual isoforms, not in a splice graph"
+  echo "    --stringent (default)"
+  echo "        Enforce that every base / edge in each final reported isoform is supported by an Illumina read, excluding --stringent-tolerance bp on each end of each isoform"
+  echo "    --no-stringent"
+  echo "        Do not enforce that every base / edge in each final reported isoform is supported by an Illumina read"
+  echo "    --stringent-tolerance (100)"
+  echo "        Number of bases at the end of each isoform that do not have to have Illumina reads supporting them when run in --stringent mode; ignored when run with --no-stringents"
   echo "  Ouput:"
   echo "    -o, --output-dir <path> (conduit/)"
   echo "        <path> where corrected clusters will be written"
@@ -352,8 +360,8 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   result = sameFileContent(last_fasta_filepath,this_fasta_filepath)
   removeFile(last_fasta_filepath)
 
-proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uint16)) {.thread.} = 
-  let (tmp_dir, trim, converged_iter, iter,isoform_delta) = intuple
+proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uint16,bool,int)) {.thread.} = 
+  let (tmp_dir, trim, converged_iter, iter,isoform_delta,stringent,stringent_tolerance) = intuple
   let last_fasta_dir = &"{tmp_dir}{converged_iter}{os.DirSep}fasta{os.DirSep}"
   let this_fasta_dir = &"{tmp_dir}{iter}{os.DirSep}fasta{os.DirSep}"
 
@@ -373,7 +381,8 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
     var trim_po = getTrimmedGraphFromFastaRecord(read)
     illuminaPolishPOGraph(addr trim_po, bam,debug=true)
     discard getRepresentativePaths3(addr trim_po, psi = isoform_delta)
-    corrected.add(FastaRecord(read_id : read.read_id, sequence : getSequenceFromPath(trim_po,trim_po.reads[0].corrected_path)))
+    if (not stringent) or stringencyCheck(addr trim_po,trim_po.reads[0].corrected_path,stringent_tolerance = stringent_tolerance):
+      corrected.add(FastaRecord(read_id : read.read_id, sequence : getSequenceFromPath(trim_po,trim_po.reads[0].corrected_path)))
   var outfile : File
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(corrected,outfile)
@@ -498,6 +507,12 @@ proc parseOptions() : ConduitOptions =
 
   var final_polish = true
   var final_polish_flag = false
+
+  var stringent = true
+  var stringent_flag = false
+
+  var stringent_tolerance = 100
+  var stringent_tolerance_flag = false
 
   var output_dir = &"conduit-out{os.DirSep}"
   var output_dir_flag = false
@@ -728,6 +743,26 @@ proc parseOptions() : ConduitOptions =
                   run_flag = false
                   echo "ERROR - Conflicting flags: --final-polish and --no-final-polish both specified"
                   break
+              of "stringent":
+                if not stringent_flag:
+                  stringent_flag = true
+                elif not stringent:
+                  run_flag = false
+                  echo "ERROR - Conflicting flags: --stringent and --no-stringent both specified"
+              of "no-stringent":
+                if not stringent_flag:
+                  stringent_flag = true
+                  stringent = false
+                elif stringent:
+                  run_flag = false
+                  echo "ERROR - Conflicting flags: --stringent and --no-stringent both specified"
+              of "stringent-tolerance":
+                if not stringent_tolerance_flag:
+                  stringent_tolerance_flag = true
+                  if val != "":
+                    stringent_tolerance = parseInt(val)
+                  else:
+                    last = "stringent-tolerance"
               of "n", "no-intermediates":
                 if not intermediates_flag:
                   intermediates_flag = true
@@ -830,6 +865,8 @@ proc parseOptions() : ConduitOptions =
                 max_iterations = parseUInt(key)
               of "illumina-weight":
                 illumina_weight = parseUInt(key)
+              of "stringent-tolerance":
+                stringent_tolerance = parseInt(key)
               of "output-dir":
                 output_dir = key
               of "threads":
@@ -964,7 +1001,9 @@ proc parseOptions() : ConduitOptions =
                         ends_delta : ends_delta,
                         max_iterations : max_iterations,
                         illumina_weight : illumina_weight,
-                        thread_num : thread_num ) 
+                        thread_num : thread_num,
+                        stringent : stringent,
+                        stringent_tolerance : stringent_tolerance) 
 
 proc main() =
   let opt = parseOptions()
@@ -1066,7 +1105,7 @@ proc main() =
         var converged_iter = iter - 1
         if i in last_correction:
           converged_iter = uint64(last_correction[i])
-        p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,converged_iter,iter,uint16(opt.isoform_delta)))
+        p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,converged_iter,iter,uint16(opt.isoform_delta),opt.stringent,opt.stringent_tolerance))
       p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
