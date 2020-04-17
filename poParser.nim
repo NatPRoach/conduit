@@ -27,6 +27,7 @@ type
     # supporting_reads : seq[uint32]
     nanopore_support* : uint32
     illumina_support* : uint32
+    total_illumina_support : uint32
     align_ring_partner* : int32 #No partner if -1
     visited* : bool
     indegree* : uint16
@@ -52,6 +53,7 @@ type
     illumina_branches* : Table[seq[uint32],seq[uint32]]
     nanopore_counts* : Table[(uint32,uint32),uint32]
     illumina_counts* : Table[(uint32,uint32),uint32]
+    total_illumina_support* : Table[(uint32,uint32),uint32]
 
   
   IsoformExtractionDataStructure = object
@@ -418,8 +420,8 @@ proc stringencyCheck*(po : ptr TrimmedPOGraph, path : seq[uint32], stringent_tol
     let u = path[i-1]
     let v = path[i]
     let bck_node_idx = po[].node_indexes[('b',path[i])]
-    result = result and (po[].nodes[bck_node_idx].illumina_support > 0'u32) and ((u,v) in po[].illumina_counts)
-  result = result and ((path[^(stringent_tolerance - 2)],path[^(stringent_tolerance - 1)]) in po[].illumina_counts)
+    result = result and (po[].nodes[bck_node_idx].total_illumina_support > 0'u32) and ((u,v) in po[].total_illumina_support)
+  result = result and ((path[^(stringent_tolerance + 2)],path[^(stringent_tolerance + 1)]) in po[].total_illumina_support)
 
 # proc constructNewGraph( po : ptr POGraph,reads:seq[Read],previously_deleted_nodes:HashSet[uint32] = initHashSet[uint32]() ) : TrimmedPOGraph = 
 #   var edges : Table[uint32,seq[uint32]]
@@ -2574,6 +2576,7 @@ proc illuminaPolishPOGraph*( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:u
         # assert u in po[].edges
         # if u in po[].edges:
         po[].edges[u].add(v)
+      po[].nodes[po.node_indexes[('b',traveled_nodes[0])]].total_illumina_support += 1
       for i in 1..<traveled_nodes.len:
         let u = traveled_nodes[i-1]
         let v = traveled_nodes[i]
@@ -2581,6 +2584,11 @@ proc illuminaPolishPOGraph*( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:u
           po[].weights[(u,v)] += illumina_weight
         else:
           po[].weights[(u,v)] = illumina_weight
+        po[].nodes[po.node_indexes[('b',v)]].total_illumina_support += 1
+        if (u,v) in po[].total_illumina_support: 
+          po[].total_illumina_support[(u,v)] += 1
+        else:
+          po[].total_illumina_support[(u,v)] = 1
       # po = topologicalSort(po)
       # if debug:
       #   assert que_index == s.len
