@@ -27,7 +27,7 @@ type
     # supporting_reads : seq[uint32]
     nanopore_support* : uint32
     illumina_support* : uint32
-    total_illumina_support : uint32
+    illumina_supported* : bool
     align_ring_partner* : int32 #No partner if -1
     visited* : bool
     indegree* : uint16
@@ -53,7 +53,7 @@ type
     illumina_branches* : Table[seq[uint32],seq[uint32]]
     nanopore_counts* : Table[(uint32,uint32),uint32]
     illumina_counts* : Table[(uint32,uint32),uint32]
-    total_illumina_support* : Table[(uint32,uint32),uint32]
+    illumina_supported* : HashSet[(uint32,uint32)]
 
   
   IsoformExtractionDataStructure = object
@@ -67,6 +67,7 @@ type
 #TODO: clean up redundancies, remove dead code blocks
 #TODO: break up this into several .nim files, each with a more descriptive / accurate name
 #TODO: remove unused functions
+#TODO: Convert new total_illumina_support to a bool / HashSet respectively, more efficient I think. Don't actually need the values.
 
 proc collapseLinearStretches( po2 : TrimmedPOGraph) : TrimmedPOGraph =
   var po = po2
@@ -419,9 +420,9 @@ proc stringencyCheck*(po : ptr TrimmedPOGraph, path : seq[uint32], stringent_tol
   for i in stringent_tolerance..<path.len-stringent_tolerance:
     let u = path[i-1]
     let v = path[i]
-    let bck_node_idx = po[].node_indexes[('b',path[i])]
-    result = result and (po[].nodes[bck_node_idx].total_illumina_support > 0'u32) and ((u,v) in po[].total_illumina_support)
-  result = result and ((path[^(stringent_tolerance + 2)],path[^(stringent_tolerance + 1)]) in po[].total_illumina_support)
+    let bck_node_idx = po[].node_indexes[('b',v)]
+    result = result and po[].nodes[bck_node_idx].illumina_supported  and ((u,v) in po[].illumina_supported)
+  # result = result and ((path[^(stringent_tolerance + 2)],path[^(stringent_tolerance + 1)]) in po[].total_illumina_support)
 
 # proc constructNewGraph( po : ptr POGraph,reads:seq[Read],previously_deleted_nodes:HashSet[uint32] = initHashSet[uint32]() ) : TrimmedPOGraph = 
 #   var edges : Table[uint32,seq[uint32]]
@@ -2280,12 +2281,19 @@ proc topologicalSort( po : ptr TrimmedPOGraph) =
       assert new_path[i-1] < new_path[i]
     new_illumina_branches[new_path] = po[].illumina_branches[s]
   
+  var new_illumina_supported : HashSet[(uint32,uint32)]
+  for (old_u,old_v) in po[].illumina_supported.items:
+    let new_u = new_node_indexes[('f',po[].node_indexes[('b',old_u)])]
+    let new_v = new_node_indexes[('f',po[].node_indexes[('b',old_v)])]
+    new_illumina_supported.incl((new_u,new_v))
+
   po[].node_indexes = new_node_indexes
   po[].edges = new_edges
   po[].weights = new_weights
   # po[].illumina_reads = new_illumina_reads
   po[].illumina_branches = new_illumina_branches
   po[].nanopore_counts = new_nanopore_counts
+  po[].illumina_supported = new_illumina_supported
 
 proc illuminaPolishPOGraph*( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:uint32 = 10,debug=true)=
   po[].nanopore_counts = po[].weights
@@ -2576,7 +2584,7 @@ proc illuminaPolishPOGraph*( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:u
         # assert u in po[].edges
         # if u in po[].edges:
         po[].edges[u].add(v)
-      po[].nodes[po.node_indexes[('b',traveled_nodes[0])]].total_illumina_support += 1
+      po[].nodes[po.node_indexes[('b',traveled_nodes[0])]].illumina_supported = true
       for i in 1..<traveled_nodes.len:
         let u = traveled_nodes[i-1]
         let v = traveled_nodes[i]
@@ -2584,11 +2592,8 @@ proc illuminaPolishPOGraph*( po : ptr TrimmedPOGraph, bam:Bam, illumina_weight:u
           po[].weights[(u,v)] += illumina_weight
         else:
           po[].weights[(u,v)] = illumina_weight
-        po[].nodes[po.node_indexes[('b',v)]].total_illumina_support += 1
-        if (u,v) in po[].total_illumina_support: 
-          po[].total_illumina_support[(u,v)] += 1
-        else:
-          po[].total_illumina_support[(u,v)] = 1
+        po[].nodes[po.node_indexes[('b',v)]].illumina_supported = true
+        po[].illumina_supported.incl((u,v))
       # po = topologicalSort(po)
       # if debug:
       #   assert que_index == s.len

@@ -1113,7 +1113,7 @@ proc main() =
         p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,converged_iter,iter,uint16(opt.isoform_delta),opt.stringent,opt.stringent_tolerance))
       p.sync()
 
-      removeFiles([bam, &"{bam}.bai"])
+      # removeFiles([bam, &"{bam}.bai"])
       # removeDir(last_fasta_dir)
     
       let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
