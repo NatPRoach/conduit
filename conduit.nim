@@ -39,11 +39,11 @@ type
 #TODO - Get rid of unused poaV2 code (main.c, heaviest_bundle.c, etc), modifying code if necessary
 
 #Major TODOs (Future release versions?):
+#TODO .gz support for nanopore scaffolds. Can probably do what Trinity does and just add a decompress step for generating temp files.
 #TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
 #TODO - Add mode that continues polishing where a previous run left off
 #TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage to the rewrite is it makes doing clever things with the poa easier down the line. (Unless we did SIMD poa, which would require learning nim SIMD, and probably step on Eyras Lab's toes)
-#TODO - Example of clever thing we can do with poa - Write code to break huge clusters into smaller clusters at poaV2 step - max of 320(?) reads per sub-cluster recording number of reads supporting each extracted isoform, then poa the extracted isoforms, build new graph with extracted weights.
-#TODO - get rid of fasta subdirectory in tmp-dir, no longer needed
+#TODO - Example of clever thing we can do with poa - Write code to break huge clusters into smaller clusters at poaV2 step - max of 320(?) reads per sub-cluster recording number of reads supporting each extracted isoform, then poa the extracted isoforms, *build new graph with extracted weights*.
 #TODO - Clustering mode for when you DO have a reference genome? Or is that too similar to Stringtie2 to be worth doing? -- Probably too similar?
 #TODO - Break poParser into smaller .nim files with more accurate and descriptive names
 #TODO - Figure out if there's anything to be done about the left-aligned problem inherent to the partial order graph based correction? (thereby allowing us to get rid of linear polishing step)
@@ -58,6 +58,10 @@ proc writeDefaultHelp() =
   echo conduitVersion()
   echo "Usage:"
   echo "  ./conduit <nano | hybrid>"
+  echo "NOTE: nano mode not yet implemented... coming soon"
+  echo "      to run the equivalent of nano mode, run hybrid mode with -i:0 and --no-final-polish"
+  echo "      this will still require 'illumina' files to be passed, but will not check that they actually exist"
+  echo "      so including -U this_file_does_not_exist.fq should run."
 
 proc writeNanoHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -104,7 +108,7 @@ proc writeHybridHelp() =
   echo "Usage:"
   echo "  ./conduit hybrid [options] <clusters_directory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}"
   echo "  <clusters_directory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
-  echo "                         NOTE: .gz support coming for nanopore scaffold data, but is not an option at this time" #TODO
+  echo "                         NOTE: .gz support coming for nanopore scaffold data, but is not an option at this time"
   echo ""
   echo "  Illumina data is aligned with Bowtie2, therefore Illumina data is provided in the same format as Bowtie2, namely:"
   echo ""
@@ -151,9 +155,9 @@ proc writeHybridHelp() =
   echo "        Provide an alternative scoring matrix to use in partial order alignment"
   echo "        Example formatting for the score matrix can be found at poaV2/myNUC3.4.4.mat"
   echo "    -d, --isoform-delta (35)"
-  echo "        Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 0 and 255"
+  echo "        Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 2 and 255"
   echo "    -e, --ends-delta (35)"
-  echo "        Maximum size at the ends of isoforms to 'correct' before splitting. Must be between 0 and 255"
+  echo "        Maximum size at the ends of isoforms to 'correct' before splitting. Must be between 2 and 255"
   echo "    -i, --max-iterations (5)"
   echo "        Maximum number of iterations to align to and correct scaffolds. Does not include optional final polshing step"
   echo "        Note: Providing a value of 0 will not perform any graph based illumina correction"
@@ -962,14 +966,14 @@ proc parseOptions() : ConduitOptions =
         run_flag = false
         echo &"ERROR - No files of type .fq or .fastq found in <clusters directory> {clusters_directory}"
         echo "NOTE: We don't currently support .gzip'd or bzip2'd scaffold files, though support for these formats is coming"
-    if isoform_delta > 255'u64 or isoform_delta < 0'u64:
-      echo "ERROR - Isoform delta must be between 0 and 255"
+    if isoform_delta > 255'u64 or isoform_delta < 2'u64:
+      echo "ERROR - Isoform delta must be between 2 and 255"
       run_flag = false
     elif isoform_delta < 15'u64:
       echo "WARNING - Low isoform delta values will increase the number of distinct isoforms and dramatically increase runtime"
       echo "          An isoform delta value of 15 or above is reccomended"
-    if ends_delta > 255'u64 or ends_delta < 0'u64:
-      echo "ERROR - Ends delta must be between 0 and 255"
+    if ends_delta > 255'u64 or ends_delta < 2'u64:
+      echo "ERROR - Ends delta must be between 2 and 255"
       run_flag = false
     if thread_num < 1'u64:
       echo "ERROR - Must run at least 1 thread"

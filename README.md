@@ -39,6 +39,28 @@ This should result in a `conduit` binary file which can then be used.
 
 A Conda recipe is coming ASAP, which should ease installation significantly.
 
+### Running CONDUIT - 
+CONDUIT requires as input reads clustered at the gene level. For this purpose we reccomend the use of RATTLE (https://github.com/comprna/RATTLE) gene level clustering, which outperforms minimizer based clustering per the RATTLE preprint (https://doi.org/10.1101/2020.02.08.939942).
+
+Therefore, if one has a dRNAseq fastq file `nano_reads.fastq`, first install and run RATTLE clustering:
+```
+path/to/rattle/binary/rattle cluster -i path/to/nano_reads.fastq --rna --fastq -o path/to/gene/clusters/
+```
+Following this, clusters must be extracted from the `clusters.out` binary file RATTLE produces. Because CONDUIT can in theory polish sufficiently accurate single read clusters, `-m` can be set as low as `1`, though higher `-m` values will result in more stringent and accurate final clusters.:
+```
+path/to/rattle/binary/rattle extract_clusters -i path/to/nano_reads.fastq -c path/to/gene/clusters/clusters.out --fastq -m 1 -o path/to/gene/clusters/
+```
+
+Once clusters have been extracted by RATTLE, CONDUIT is ready to run. If you only have nanopore data, you can run in `nano` mode, though `hybrid` mode is strongly encouraged as `nano` mode extracted reads will still have a reasonably high level of error.
+
+An example CONDUIT command is provided below, for more advanced usage check the `--help` statement or the usage statement below:
+```
+path/to/conduit/binary/conduit hybrid -o path/to/outdir/ --tmp-dir path/to/tmpdir/ path/to/gene/clusters/ -1 path/to/illumina/mate_1.fastq.gz -2 path/to/illumina/mate_2.fastq.gz
+```
+
+#### A note about adapters -
+Both RATTLE gene level clustering and CONDUIT consensus extraction work better if reads are trimmed of adapters before use. For cDNA, porechop (https://github.com/rrwick/Porechop) is a good adapter trimming tool (though it is no longer supported). Up to date ont-guppy basecallers have built in adapter trimming and should suffice for this purpose as well, for both cDNA and dRNA reads.
+
 ### Usage statement for hybrid (ONT + Illumina) assembly:
 ```
 CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:
