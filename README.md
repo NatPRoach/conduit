@@ -11,14 +11,14 @@ CONDUIT is built in Nim (A statically typed, compiled systems programming langua
 CONDUIT therefore requires a Nim installation. Easy Nim installation instructions can be found here: https://nim-lang.org/install.html
 
 CONDUIT also uses the following libraries:
-*    poaV2 (https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), the necessary files of which are distributed in the CONDUIT GitHub and need not be downloaded separately.
-*    nim-hts (https://github.com/brentp/hts-nim), which wraps htslib in nim.
-*    htslib (https://github.com/samtools/htslib), a C library for interfacing with common bioinformatics file formats.
-*    threadpools (https://github.com/yglukhov/threadpools), which provides instance threadpools in nim.
+*    [poaV2](https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), the necessary files of which are distributed in the CONDUIT GitHub and need not be downloaded separately.
+*    [nim-hts](https://github.com/brentp/hts-nim), which wraps htslib in nim.
+*    [htslib](https://github.com/samtools/htslib), a C library for interfacing with common bioinformatics file formats.
+*    [threadpools](https://github.com/yglukhov/threadpools), which provides instance threadpools in nim.
 
 And the following tools must be installed:
-*   samtools (https://github.com/samtools/samtools)
-*   bowtie2 (https://github.com/BenLangmead/bowtie2)
+*   [samtools](https://github.com/samtools/samtools)
+*   [bowtie2](https://github.com/BenLangmead/bowtie2)
 
 #### Installing threadpools:
 Threadpools is the only library listed above without listed installation instructions, they are therefore provided here.
@@ -40,13 +40,13 @@ This should result in a `conduit` binary file which can then be used.
 A Conda recipe is coming ASAP, which should ease installation significantly.
 
 ### Running CONDUIT - 
-CONDUIT requires as input reads clustered at the gene level. For this purpose we reccomend the use of RATTLE (https://github.com/comprna/RATTLE) gene level clustering, which outperforms minimizer based clustering per the RATTLE preprint (https://doi.org/10.1101/2020.02.08.939942).
+CONDUIT requires as input reads clustered at the gene level, with one gene level cluster per FASTA or FASTQ file located in the same directory. For this purpose we reccomend the use of [RATTLE](https://github.com/comprna/RATTLE) gene level clustering, which outperforms minimizer based clustering per the [RATTLE preprint](https://doi.org/10.1101/2020.02.08.939942).
 
 Therefore, if one has a dRNAseq fastq file `nano_reads.fastq`, first install and run RATTLE clustering:
 ```
 path/to/rattle/binary/rattle cluster -i path/to/nano_reads.fastq --rna --fastq -o path/to/gene/clusters/
 ```
-Following this, clusters must be extracted from the `clusters.out` binary file RATTLE produces. Because CONDUIT can in theory polish sufficiently accurate single read clusters, `-m` can be set as low as `1`, though higher `-m` values will result in more stringent and accurate final clusters.:
+RATTLE clustering outputs a binary file, `clusters.out`, summarizing the clusters extracted. At the moment, CONDUIT requires these clusters to be extracted from the `clusters.out` file RATTLE produces into one FASTQ or FASTA file per gene cluster, all located in the same directory. Because CONDUIT can in theory polish sufficiently accurate single read clusters, `-m` can be set as low as `1`, though higher `-m` values will result in more stringent and accurate final clusters (though `--stringent` mode should overcome this loss in stringency, and so we reccomend running with `-m 1` if running in `hybrid` `--stringent` mode):
 ```
 path/to/rattle/binary/rattle extract_clusters -i path/to/nano_reads.fastq -c path/to/gene/clusters/clusters.out --fastq -m 1 -o path/to/gene/clusters/
 ```
