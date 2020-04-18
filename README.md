@@ -11,7 +11,7 @@ CONDUIT is built in Nim (A statically typed, compiled systems programming langua
 CONDUIT therefore requires a Nim installation. Easy Nim installation instructions can be found here: https://nim-lang.org/install.html
 
 CONDUIT also uses the following libraries:
-*    poaV2 (https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), which is distributed in the CONDUIT GitHub and need not be downloaded separately.
+*    poaV2 (https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), the necessary files of which are distributed in the CONDUIT GitHub and need not be downloaded separately.
 *    nim-hts (https://github.com/brentp/hts-nim), which wraps htslib in nim.
 *    htslib (https://github.com/samtools/htslib), a C library for interfacing with common bioinformatics file formats.
 *    threadpools (https://github.com/yglukhov/threadpools), which provides instance threadpools in nim.
@@ -51,7 +51,7 @@ Following this, clusters must be extracted from the `clusters.out` binary file R
 path/to/rattle/binary/rattle extract_clusters -i path/to/nano_reads.fastq -c path/to/gene/clusters/clusters.out --fastq -m 1 -o path/to/gene/clusters/
 ```
 
-Once clusters have been extracted by RATTLE, CONDUIT is ready to run. If you only have nanopore data, you can run in `nano` mode, though `hybrid` mode is strongly encouraged as `nano` mode extracted reads will still have a reasonably high level of error.
+Once clusters have been extracted by RATTLE, CONDUIT is ready to run. If you only have nanopore data, you can run in `nano` mode, though `hybrid` mode is strongly encouraged as `nano` mode extracted transcripts will still have a reasonably high level of error.
 
 An example CONDUIT command is provided below, for more advanced usage check the `--help` statement or the usage statement below:
 ```

@@ -13,15 +13,12 @@ LIBOBJECTS= \
 	black_flag.o \
 	seq_util.o \
 	fasta_format.o \
-	msa_format.o \
 	align_lpo2.o \
 	align_lpo_po2.o \
 	buildup_lpo.o \
 	lpo.o \
-	heaviest_bundle.o \
 	lpo_format.o \
 	create_seq.o \
-	remove_bundle.o \
 	numeric_data.o \
 	stringptr.o
 

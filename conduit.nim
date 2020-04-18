@@ -49,6 +49,8 @@ type
 #TODO - Figure out if there's anything to be done about the left-aligned problem inherent to the partial order graph based correction? (thereby allowing us to get rid of linear polishing step)
 #TODO - Add option to output .po files (or a new format, a multi-po file) to explain the relationships between isoforms.
 #TODO - Add quantification output for each isoform / gene
+#TODO - Add options that allow you to specify the path to the bowtie2 and samtools binaries
+
 
 proc conduitVersion() : string =
   return "CONDUIT Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
