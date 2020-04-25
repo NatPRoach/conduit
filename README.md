@@ -8,7 +8,7 @@
 ### Building CONDUIT:
 CONDUIT is built in Nim (A statically typed, compiled systems programming language with python-like syntax).
 
-CONDUIT therefore requires a Nim installation. Easy Nim installation instructions can be found here: https://nim-lang.org/install.html
+CONDUIT therefore requires a Nim installation. Easy Nim installation instructions can be found [here](https://nim-lang.org/install.html)
 
 CONDUIT also uses the following libraries:
 *    [poaV2](https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), the necessary files of which are distributed in the CONDUIT GitHub and need not be downloaded separately.
@@ -46,6 +46,10 @@ Therefore, if one has a dRNAseq fastq file `nano_reads.fastq`, first install and
 ```
 path/to/rattle/binary/rattle cluster -i path/to/nano_reads.fastq --rna --fastq -o path/to/gene/clusters/
 ```
+(Note that reads clustered by RATTLE must be longer than the k used in the clustering, and so it is reccomended reads be filtered for reads longer than 150 bp, this can be done easily with the command `awk 'BEGIN{OFS="\n"} {header = $0 ; getline seq; getline qheader; getline qseq; if (length(seq) >= 150) {print header,seq,qheader,qseq}}' nano_reads.fq > nano_reads.filtered.fq`)
+
+(Also note that U characters in the nucleotide sequence must be converted to Ts before running CONDUIT. This can be done simply with the following command `sed s/U/T/g nano_reads.filtered.fq > nano_reads.filtered.UtoT.fq`)
+
 RATTLE clustering outputs a binary file, `clusters.out`, summarizing the clusters extracted. At the moment, CONDUIT requires these clusters to be extracted from the `clusters.out` file RATTLE produces into one FASTQ or FASTA file per gene cluster, all located in the same directory. Because CONDUIT can in theory polish sufficiently accurate single read clusters, `-m` can be set as low as `1`, though higher `-m` values will result in more stringent and accurate final clusters (though `--stringent` mode should overcome this loss in stringency, and so we reccomend running with `-m 1` if running in `hybrid` `--stringent` mode):
 ```
 path/to/rattle/binary/rattle extract_clusters -i path/to/nano_reads.fastq -c path/to/gene/clusters/clusters.out --fastq -m 1 -o path/to/gene/clusters/

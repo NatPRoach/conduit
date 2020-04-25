@@ -1,9 +1,10 @@
 import os
+import times
 import osproc
 import parseopt
 import strutils
 import strformat
-import poParser
+import poGraphUtils
 import tables
 import threadpool_simple as tps
 import hts
@@ -17,7 +18,10 @@ type
     final_polish : bool
     intermediates : bool
     mode : string
+    clusters_directory : string
     nanopore_format : string
+    illumina_format : string
+    u2t : bool
     bowtie_strand_constraint : string
     bowtie_alignment_mode : string
     bowtie_read_inputs : string
@@ -36,10 +40,10 @@ type
 
 #Minor TODOs:
 #TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
-#TODO - Get rid of unused poaV2 code (main.c, heaviest_bundle.c, etc), modifying code if necessary
 
 #Major TODOs (Future release versions?):
-#TODO .gz support for nanopore scaffolds. Can probably do what Trinity does and just add a decompress step for generating temp files.
+#TODO - Add option to output both sensitive and stringent isoform sets in the same run
+#TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does and just add a decompress step for generating temp files.
 #TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
 #TODO - Add mode that continues polishing where a previous run left off
 #TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage to the rewrite is it makes doing clever things with the poa easier down the line. (Unless we did SIMD poa, which would require learning nim SIMD, and probably step on Eyras Lab's toes)
@@ -130,15 +134,20 @@ proc writeHybridHelp() =
   echo "Options (defaults in parentheses):"
   echo "  Scaffold Type:"
   echo "    --drna (default)"
-  echo "        Scaffold reads are stranded forward relative to coding strand, and may contain U characters instead of Ts"
+  echo "        Scaffold reads are stranded forward relative to coding strand, enforces --UtoT"
   echo "    --cdna-rev-stranded"
   echo "        Scaffold reads are stranded reverse complemented relative to coding strand"
   echo "    --cdna"
   echo "        Scaffold reads are NOT stranded"
   echo "    --sfq (default)"
-  echo "        Scaffold reads are in FASTQ format"
+  echo "        Scaffold reads are in FASTQ format, enforces --UtoT"
   echo "    --sfa"
   echo "        Scaffold reads are in FASTA format"
+  echo "    --UtoT (default)"
+  echo "        Scaffold reads contain Us instead of Ts. Converts U nucleotides to Ts in the sequences"
+  echo "        NOTE: This adds a bit of I/O overhead but doesn't affect things if your sequences are already U free"
+  echo "    --noUtoT"
+  echo "        Scaffold reads do not contain Us and do not need to be converted."
   echo "  Illumina Type:"
   echo "    -u, --unstranded"
   echo "        Illumina reads are unstranded"
@@ -197,8 +206,18 @@ proc writeHybridHelp() =
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
   echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
+  # echo "    --samtools-path (samtools)" #TODO
+  # echo "    --bowtie2-path (bowtie2)" #TODO
   # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." #TODO
   # echo "              If CPU number cannot be detected, the default of 4 threads will be used. #TODO
+
+proc removeFiles(files : openArray[string]) =
+  for file in files:
+    removeFile(file)
+
+proc createDirs(dirs : openArray[string]) = 
+  for dir in dirs:
+    createDir(dir)
 
 proc returnFalse() : bool {.thread.} = 
   return false
@@ -216,12 +235,75 @@ proc convertFASTQtoFASTA(infilepath,outfilepath:string) =
         echo "File not in FASTQ format"
         raise
       outfile.write(&">{line1[1..^1]}\n")
-      outfile.write(&"{infile.readLine()}\n")
+      outfile.write(&"{infile.readLine().replace(sub='U',by='T')}\n")
       discard infile.readLine()
       discard infile.readLine()
     except EOFError:
       break
   infile.close()
+  outfile.close()
+
+proc convertUtoTinFASTA(infilepath,outfilepath:string) =
+  var infile,outfile : File
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  while true:
+    try:
+      let line = infile.readLine()
+      if line[0] == '>':
+        outfile.write(&"{line}\n")
+      else:
+        outfile.write(&"{line.replace(sub='U',by='T')}\n")
+    except EOFError:
+      break
+  infile.close()
+  outfile.close()
+
+proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOptions) =
+  var outfile : File
+  discard open(outfile,outfilepath,fmWrite)
+  outfile.write("CONDUIT Timing Log:\n")
+  for i in 0..time_seq.len - 2:
+    outfile.write(&"Iter {i}: {(time_seq[i + 1] - time_seq[0]).inSeconds} s\n")
+  if opts.final_polish:
+    outfile.write(&"Final Polish: {(time_seq[^1] - time_seq[0]).inSeconds} s\n")
+  outfile.close()
+
+proc outputSettings(outfilepath : string,opts : ConduitOptions) = 
+  var outfile : File
+  discard open(outfile,outfilepath,fmWrite)
+  outfile.write("CONDUIT Command Log:\n")
+  outfile.write("Working directory:\n")
+  outfile.write(&"    {getCurrentDir()}\n")
+  outfile.write("Command:\n")
+  let command_params = commandLineParams().join(sep = " ")
+  outfile.write(&"    {getAppFilename()} {command_params}\n")
+  outfile.write("CONDUIT Settings:\n")
+  outfile.write(&"    mode : {opts.mode}\n")
+  outfile.write(&"    rounds of graph based polishing : {opts.max_iterations}\n")
+  outfile.write(&"    final round of linear polishing : {opts.final_polish}\n")
+  outfile.write(&"    stringent mode : {opts.stringent}\n")
+  if opts.stringent:
+    outfile.write(&"    stringent tolerance : {opts.stringent_tolerance}\n")
+  outfile.write(&"    save intermediates : {opts.intermediates}\n")
+  outfile.write(&"    scaffold directory : {opts.clusters_directory}\n") #TODO 
+  outfile.write(&"    scaffold file type : {opts.nanopore_format}\n")
+  outfile.write(&"    Convert U to T : {opts.u2t}") #TODO
+  outfile.write(&"    Illumina files : {opts.bowtie_read_inputs}\n")
+  outfile.write(&"    Illumina file type : {opts.illumina_format}") #TODO
+  outfile.write(&"    isoform delta : {opts.isoform_delta}\n")
+  outfile.write(&"    ends delta : {opts.ends_delta}\n")
+  outfile.write(&"    Illumina weight : {opts.illumina_weight}\n")
+  outfile.write(&"    threads : {opts.thread_num}\n")
+  if opts.score_matrix_path == "":
+    outfile.write( "    score matrix : default\n")
+  else:
+    outfile.write(&"    score matrix : {opts.score_matrix_path}\n")
+  outfile.write(&"    output directory : {opts.output_dir}\n")
+  outfile.write(&"    temporary directory : {opts.tmp_dir}\n")
+  outfile.write("Bowtie2 Settings:\n")
+  outfile.write(&"    bowtie2 strand constraint : {opts.bowtie_strand_constraint}\n")
+  outfile.write(&"    bowtie2 alignment mode : {opts.bowtie_alignment_mode}\n")
   outfile.close()
 
 proc splitFASTA(infilepath,outfilepath_prefix : string, split_num : int = 200) : (int,int) =
@@ -261,6 +343,56 @@ proc splitFASTA(infilepath,outfilepath_prefix : string, split_num : int = 200) :
       outfile.close()
   return (num_outfiles,records.len)
 
+proc mergeFiles(infilepaths : openArray[string],outfilepath : string,delete_old_files = false) = 
+  var outfile : File
+  discard open(outfile,outfilepath,fmWrite)
+  for infilepath in infilepaths:
+    var infile : File
+    discard open(infile,infilepath,fmRead)
+    outfile.write(infile.readAll)
+    infile.close()
+  if delete_old_files:
+    removeFiles(infilepaths)
+  outfile.close()
+
+
+proc splitFASTA2(infilepath,outfilepath_prefix : string, split_num : int = 200) : (int,int) =
+  # Takes in a fasta file with more reads than some arbitrary number split_num
+  # produces fasta files split into sizes of that size or smaller. Different from RATTLE implementation in that size bias is not considered and linear blocks of sequences are extracted
+  var infile : File
+  discard open(infile,infilepath,fmRead)
+  var records : seq[FastaRecord]
+  var read_id : string
+  var sequence : string
+  var count = 0
+  while true:
+    try:
+      let line = infile.readLine()
+      if line[0] == '>':
+        if count != 0:
+          records.add(FastaRecord( read_id : read_id, sequence : sequence))
+          sequence = ""
+        count += 1
+        read_id = line.strip(leading=true,trailing=false,chars = {'>'}).strip(leading=false,trailing=true,chars = {'\n'})
+      else:
+        sequence = sequence & line.strip(leading=false,trailing=true,chars = {'\n'})
+    except EOFError:
+      records.add(FastaRecord( read_id : read_id, sequence : sequence))
+      break
+  infile.close()
+  let num_outfiles = int(records.len mod split_num != 0) + (records.len div split_num)
+  if num_outfiles > 1:
+    for i in 0..<num_outfiles:
+      var outfile : File
+      discard open(outfile,&"{outfilepath_prefix}_subfasta{i}.fa",fmWrite)
+      for j in 0..<split_num:
+        let idx = (i*split_num) + j
+        if idx < records.len:
+          outfile.write(">",records[idx].read_id,"\n")
+          outfile.writeLine(records[idx].sequence)
+      outfile.close()
+  return (num_outfiles,records.len)
+
 # proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16)) {.thread.} =
 #   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta) = intuple 
 #   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
@@ -287,56 +419,147 @@ proc splitFASTA(infilepath,outfilepath_prefix : string, split_num : int = 200) :
 #   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
 #   outFASTAfile.close()
 
-proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16)) {.thread.} =
-  let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta) = intuple 
+proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
+  let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple
   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
   var fasta_file : string
   if format == "fasta":
-    fasta_file = infilepath
+    if u2t:
+      fasta_file = &"{outdir}{trim}.tmp.fa"
+      convertUtoTinFASTA(infilepath,fasta_file)
+    else:
+      fasta_file = infilepath
   elif format == "fastq":
     fasta_file = &"{outdir}{trim}.tmp.fa"
     convertFASTQtoFASTA(infilepath,fasta_file)
   var last_num_reads = 0
-  var (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp")
+  var split_num = 200
+  var (num_fastas,num_reads) = splitFASTA2(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
   var delete_fasta_flag = false
-  if format == "fastq" or num_fastas > 1:
+  if format == "fastq" or u2t or num_fastas > 1:
     delete_fasta_flag = true
-  while num_fastas > 1 and num_reads != last_num_reads: #num_fastas > 1
-    if format == "fastq":
-      removeFile(fasta_file)
-    let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus.fa"
-    var outFASTAfile : File
-    discard open(outFASTAfile,outFASTAfilepath,fmWrite)
+  if num_fastas > 1:
+    # Cacluate representative reads for each subfasta, store each in separate consensus fasta file
     for i in 0..<num_fastas:
-      #Calculate subclusters
+      let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
+      var outFASTAfile : File
+      discard open(outFASTAfile,outFASTAfilepath,fmWrite)
       let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
       var seq_file : PFile = fopen(cstring(tmp_fasta))
       var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
       removeFile(tmp_fasta)
-      var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
-      var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-      let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
-      poParser.writeCorrectedReads(consensus_po,outFASTAfile)
-    outFASTAfile.close()
-    fasta_file = outFASTAfilepath
-    last_num_reads = num_reads
-    (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp")
-  if num_reads == last_num_reads:
-    for i in 0..<num_fastas:
-      let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
+      var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
+      var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
+      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
+      poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
+      outFASTAfile.close()
+  while num_fastas > 1:
+    for i in 0..<(num_fastas div 2):
+      # Merge subfastas:
+      let subfastapath1 = &"{outdir}{trim}.tmp_consensus{2*i}.fa"
+      let subfastapath2 = &"{outdir}{trim}.tmp_consensus{2*i + 1}.fa"
+      let tmp_fasta = &"{outdir}{trim}.tmp_merged_subfasta{i}.fa"
+      mergeFiles([subfastapath1,subfastapath2],tmp_fasta, delete_old_files = true)
+      #Calculate POGraph for merged subfastas:
+      let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
+      var outFASTAfile : File
+      discard open(outFASTAfile,outFASTAfilepath,fmWrite)
+      var seq_file : PFile = fopen(cstring(tmp_fasta))
+      var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
       removeFile(tmp_fasta)
+      var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
+      # Decompose graph into representative paths
+      var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
+      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
+      # Output those path to out outfile
+      poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
+      outFASTAfile.close()
+      
+    if bool(num_fastas mod 2):
+      #uneven split, merge last subfasta with last merged subfasta
+      let idx1 = num_fastas - 1
+      let idx2 = (num_fastas div 2) - 1
+      let last_fasta = &"{outdir}{trim}.tmp_consensus{idx1}.fa"
+      let last_merge = &"{outdir}{trim}.tmp_consensus{idx2}.fa"
+      let tmp_file =   &"{outdir}{trim}.tmp_final_merge.fa"
+      mergeFiles([last_fasta,last_merge],tmp_file, delete_old_files = true)
+      moveFile(tmp_file,last_merge)
+    num_fastas = num_fastas div 2
+  fasta_file = &"{outdir}{trim}.tmp_consensus0.fa"
+
+  # if num_reads == last_num_reads:
+  #   for i in 0..<num_fastas:
+  #     let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
+  #     removeFile(tmp_fasta)
   var seq_file : PFile = fopen(cstring(fasta_file), "r")
   var po2 = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
   if delete_fasta_flag:
     removeFile(fasta_file)
-  var trim_po2 = poParser.convertPOGraphtoTrimmedPOGraph(po2)
-  var representative_paths = poParser.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
-  let consensus_po = poParser.buildConsensusPO(addr po2, representative_paths,trim)
+  var trim_po2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
+  var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
+  let consensus_po = poGraphUtils.buildConsensusPO(addr po2, representative_paths,trim)
   let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
   var outFASTAfile : File
   discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-  poParser.writeCorrectedReads(consensus_po,outFASTAfile)
+  poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
   outFASTAfile.close()
+
+# proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
+#   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple
+#   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
+#   var fasta_file : string
+#   if format == "fasta":
+#     if u2t:
+#       fasta_file = &"{outdir}{trim}.tmp.fa"
+#       convertUtoTinFASTA(infilepath,fasta_files)
+#     else:
+#       fasta_file = infilepath
+#   elif format == "fastq":
+#     fasta_file = &"{outdir}{trim}.tmp.fa"
+#     convertFASTQtoFASTA(infilepath,fasta_file)
+#   var last_num_reads = 0
+#   var split_num = 200
+#   var (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
+#   var delete_fasta_flag = false
+#   if format == "fastq" or u2t or num_fastas > 1:
+#     delete_fasta_flag = true
+#   while num_fastas > 1 and num_reads != last_num_reads: #num_fastas > 1
+#     if format == "fastq":
+#       removeFile(fasta_file)
+#     let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus.fa"
+#     var outFASTAfile : File
+#     discard open(outFASTAfile,outFASTAfilepath,fmWrite)
+#     for i in 0..<num_fastas:
+#       #Calculate subclusters
+#       let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
+#       var seq_file : PFile = fopen(cstring(tmp_fasta))
+#       var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
+#       removeFile(tmp_fasta)
+#       var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
+#       var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
+#       let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
+#       poParser.writeCorrectedReads(consensus_po,outFASTAfile)
+#     outFASTAfile.close()
+#     fasta_file = outFASTAfilepath
+#     last_num_reads = num_reads
+#     split_num = split_num * 2 #As consensus sequences are collapsed, we should generate fewer spurious edges and nodes with more reads, should be able to handle more reads faster.
+#     (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
+#   if num_reads == last_num_reads:
+#     for i in 0..<num_fastas:
+#       let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
+#       removeFile(tmp_fasta)
+#   var seq_file : PFile = fopen(cstring(fasta_file), "r")
+#   var po2 = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
+#   if delete_fasta_flag:
+#     removeFile(fasta_file)
+#   var trim_po2 = poParser.convertPOGraphtoTrimmedPOGraph(po2)
+#   var representative_paths = poParser.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
+#   let consensus_po = poParser.buildConsensusPO(addr po2, representative_paths,trim)
+#   let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
+#   var outFASTAfile : File
+#   discard open(outFASTAfile,outFASTAfilepath,fmWrite)
+#   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
+#   outFASTAfile.close()
 
 proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} =
   let (tmp_dir, trim, matrix_filepath, iter,isoform_delta,ends_delta) = intuple
@@ -391,14 +614,6 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(corrected,outfile)
   outfile.close()
-
-proc removeFiles(files : openArray[string]) =
-  for file in files:
-    removeFile(file)
-
-proc createDirs(dirs : openArray[string]) = 
-  for dir in dirs:
-    createDir(dir)
 
 proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath : string) = 
   var outfile : File
@@ -493,6 +708,9 @@ proc parseOptions() : ConduitOptions =
 
   var nanopore_format="fastq"
   var nanopore_format_flag = false
+
+  var u2t = true
+  var u2t_flag = false
 
   var score_matrix_path = ""
   var score_matrix_path_flag = false
@@ -632,6 +850,21 @@ proc parseOptions() : ConduitOptions =
                   run_flag = false
                   echo "ERROR - Multiple scaffold format input, choose one of FASTA (--sfa) or FASTQ (--sfq)"
                   help_flag = true
+                  break
+              of "UtoT":
+                if not u2t_flag:
+                  u2t_flag = true
+                elif not u2t:
+                  run_flag = false
+                  echo "ERROR - Conflicting flags: --UtoT and --noUtoT both specified"
+                  break
+              of "noUtoT":
+                if not u2t_flag:
+                  u2t_flag = true
+                  u2t = false
+                elif u2t:
+                  run_flag = false
+                  echo "ERROR - Conflicting flags: --UtoT and --noUtoT both specified"
                   break
               of "m", "score-matrix":
                 if not score_matrix_path_flag:
@@ -998,13 +1231,16 @@ proc parseOptions() : ConduitOptions =
                         final_polish : final_polish,
                         intermediates : intermediates,
                         mode : mode,
+                        clusters_directory : clusters_directory,
                         nanopore_format : nanopore_format,
+                        illumina_format : illumina_format,
+                        u2t : u2t,
                         bowtie_strand_constraint : bowtie_strand_constraint,
                         bowtie_alignment_mode : bowtie_alignment_mode,
                         bowtie_read_inputs : bowtie_read_inputs,
                         score_matrix_path : score_matrix_path,
-                        output_dir : output_dir,
-                        tmp_dir : tmp_dir,
+                        output_dir : &"{output_dir}{os.DirSep}",
+                        tmp_dir : &"{tmp_dir}{os.DirSep}",
                         files : files,
                         trims : trims,
                         isoform_delta : isoform_delta,
@@ -1018,8 +1254,13 @@ proc parseOptions() : ConduitOptions =
 proc main() =
   let opt = parseOptions()
   if opt.mode == "hybrid" and opt.run_flag:
+    
+    var iter_times : seq[Time]
+    iter_times.add(getTime())
+
     if not existsDir(opt.output_dir):
       createDir(opt.output_dir)
+    outputSettings(&"{opt.output_dir}CONDUIT.settings", opt)
 
     var tmp_already_existed = true
     if not existsDir(opt.tmp_dir):
@@ -1032,9 +1273,9 @@ proc main() =
 
     let p = tps.newThreadPool(int(opt.thread_num))
     for file in opt.files:
-      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta)))
+      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta),opt.u2t))
     p.sync()
-
+    iter_times.add(getTime())
     var last_correction : Table[int,int]
     for iter in 1..opt.max_iterations:
       let last_dir = &"{opt.tmp_dir}{iter-1}{os.DirSep}"
@@ -1082,6 +1323,7 @@ proc main() =
           last_correction[i] = int(iter)
 
       removeFiles([bam, &"{bam}.bai"])
+      iter_times.add(getTime())
     if opt.final_polish:
       let iter = opt.max_iterations + 1
       let last_dir = &"{opt.tmp_dir}{iter-1}{os.DirSep}"
@@ -1119,7 +1361,7 @@ proc main() =
         p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,converged_iter,iter,uint16(opt.isoform_delta),opt.stringent,opt.stringent_tolerance))
       p.sync()
 
-      # removeFiles([bam, &"{bam}.bai"])
+      removeFiles([bam, &"{bam}.bai"])
       # removeDir(last_fasta_dir)
     
       let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
@@ -1138,5 +1380,7 @@ proc main() =
     
     if not tmp_already_existed:
       removeDir(opt.tmp_dir)
-
+    iter_times.add(getTime())
+    outputTiming(&"{opt.output_dir}CONDUIT.timing", iter_times, opt)
+  
 main()
