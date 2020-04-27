@@ -6,7 +6,7 @@ import ../poGraphUtils
 import tables
 import sequtils
 import strutils
-import strformat
+# import strformat
 
 ###########################################################
 ###------  Import Relevant Functions from poaV2   ------###
@@ -49,18 +49,10 @@ proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
   var edges : Table[uint32,seq[uint32]]
   var weights : Table[(uint32,uint32),uint32]
   var paths : seq[seq[uint32]]
-  var read_id_duplicate_check : Table[string,uint32]
   for i in 0..<num_reads:
     let name = source_seqs[i].name
     let length = source_seqs[i].length
-    let string_name = toString(toSeq(name)).strip(chars = {'\0'})
-    var name_pad = 0'u32
-    if string_name in read_id_duplicate_check:
-      name_pad = read_id_duplicate_check[string_name]
-      read_id_duplicate_check[string_name] += 1'u32
-    else:
-      read_id_duplicate_check[string_name] = 1'u32
-    reads.add(Read(name : &"{string_name}_{name_pad}",length : uint32(length)))
+    reads.add(Read(name : toString(toSeq(name)).strip(chars = {'\0'}),length : uint32(length)))
     paths.add(@[])
   for i in 0..<num_nodes:
     # echo matrix.symbol
