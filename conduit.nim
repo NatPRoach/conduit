@@ -44,8 +44,9 @@ type
 #TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
 
 #Major TODOs (Future release versions?):
-#TODO - Change major logic for the merging operations - merge smallest files progressively until everything is merged
-#TODO - Change major logic for the merging operations - keep track of how many reads support each extracted isoform and weight the resulting POGraphs based on this later.
+#TODO - Change major logic for the merging operations - keep track of how many reads support each extracted isoform and weight the resulting POGraphs based on this later. <== Top Priority
+#TODO - Move filtering step to a graph based polishing step, the linear step has a problem of too low coverage or too many isoforms leading to isoforms not being completely covered by illumina reads when they should be.
+#TODO - Add support for duplicate read ID's that doesn't break everything.
 #TODO - Add option to output both sensitive and stringent isoform sets in the same run
 #TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does and just add a decompress step for generating temp files.
 #TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
@@ -152,6 +153,8 @@ proc writeHybridHelp() =
   echo "        NOTE: This adds a bit of I/O overhead but doesn't affect things if your sequences are already U free"
   echo "    --noUtoT"
   echo "        Scaffold reads do not contain Us and do not need to be converted."
+  # echo "    --duplicate-filter"
+  # echo "        Scaffold reads have duplicate read IDs, filter them out"
   echo "  Illumina Type:"
   echo "    -u, --unstranded"
   echo "        Illumina reads are unstranded"
@@ -267,7 +270,7 @@ proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOption
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   outfile.write("CONDUIT Timing Log:\n")
-  for i in 0..time_seq.len - 2:
+  for i in 0..<time_seq.len - 2:
     outfile.write(&"Iter {i}: {(time_seq[i + 1] - time_seq[i]).inSeconds} s\n")
   if opts.final_polish:
     outfile.write(&"Final Polish: {(time_seq[^1] - time_seq[^2]).inSeconds} s\n")
@@ -709,6 +712,8 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
   writeCorrectedReads(corrected,outfile)
   outfile.close()
 
+# proc runStringencyFilter() {.thread.}
+
 proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath : string) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
@@ -760,12 +765,15 @@ proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openA
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string) : seq[string] = 
+proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string, final_polish : bool = false) : seq[string] = 
   var arguments : seq[string]
   arguments.add("--xeq")
   arguments.add("--no-unal")
   arguments.add("-p")
   arguments.add(&"{opt.thread_num}")
+  if final_polish:
+    arguments.add("-k")
+    arguments.add("100")
   arguments.add(opt.bowtie_strand_constraint)
   arguments.add(opt.bowtie_alignment_mode)
   arguments.add("--n-ceil")
@@ -1438,7 +1446,7 @@ proc main() =
         removeFile(last_consensus)
 
       let sam = &"{last_dir}alignments.sam"
-      let arguments = getBowtie2options(opt,index_prefix,sam)
+      let arguments = getBowtie2options(opt,index_prefix,sam,final_polish = true)
       echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
       let bam = &"{last_dir}alignments.bam"
