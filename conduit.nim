@@ -9,6 +9,7 @@ import tables
 import heapqueue
 import threadpool_simple as tps
 import hts
+import sets
 import poaV2/header
 import poaV2/poa
 
@@ -154,7 +155,7 @@ proc writeHybridHelp() =
   echo "    --noUtoT"
   echo "        Scaffold reads do not contain Us and do not need to be converted."
   # echo "    --duplicate-filter"
-  # echo "        Scaffold reads have duplicate read IDs, filter them out"
+  # echo "        Scaffold reads have duplicate read IDs, filter out the duplicate reads"
   echo "  Illumina Type:"
   echo "    -u, --unstranded"
   echo "        Illumina reads are unstranded"
@@ -233,6 +234,7 @@ proc convertFASTQtoFASTA(infilepath,outfilepath:string) =
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
+  var read_ids : HashSet[]
   while true:
     try:
       let line1 = infile.readLine()
@@ -241,10 +243,16 @@ proc convertFASTQtoFASTA(infilepath,outfilepath:string) =
       except AssertionError:
         echo "File not in FASTQ format"
         raise
-      outfile.write(&">{line1[1..^1]}\n")
-      outfile.write(&"{infile.readLine().replace(sub='U',by='T')}\n")
-      discard infile.readLine()
-      discard infile.readLine()
+      if line1 notin read_ids:
+        read_ids.incl(line1)
+        outfile.write(&">{line1[1..^1]}\n")
+        outfile.write(&"{infile.readLine().replace(sub='U',by='T')}\n")
+        discard infile.readLine()
+        discard infile.readLine()
+      else:
+        discard infile.readLine()
+        discard infile.readLine()
+        discard infile.readLine()
     except EOFError:
       break
   infile.close()
