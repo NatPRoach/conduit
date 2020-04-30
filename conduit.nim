@@ -234,7 +234,7 @@ proc convertFASTQtoFASTA(infilepath,outfilepath:string) =
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
-  var read_ids : HashSet[]
+  var read_ids : HashSet[string]
   while true:
     try:
       let line1 = infile.readLine()
