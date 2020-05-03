@@ -24,7 +24,8 @@ type
     conss_seqs : seq[seq[string]]
     sbjct_seqs : seq[seq[string]]
 
-    
+#TODO: Make these functions callable from the command line, such that other people can use these utils.
+
 
 proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] = 
   ##
