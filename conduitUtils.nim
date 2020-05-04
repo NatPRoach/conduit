@@ -1,3 +1,5 @@
+import os
+import osproc
 import strutils
 import strformat
 import tables
@@ -9,7 +11,7 @@ type
     query_len : uint
     match_names : seq[string]
     match_lens : seq[uint]
-    scores : seq[seq[uint]]
+    scores : seq[seq[float]]
     evals : seq[seq[float]]
     identities_numerators : seq[seq[uint]]
     identities_denominators : seq[seq[uint]]
@@ -23,15 +25,64 @@ type
     query_seqs : seq[seq[string]]
     conss_seqs : seq[seq[string]]
     sbjct_seqs : seq[seq[string]]
+  
+  UtilOptions = object
+    mode : string
+    run_flag : bool
+    infilepath : string
+    outfilepath : string
+    min_length : uint
 
 #TODO: Make these functions callable from the command line, such that other people can use these utils.
 
 
-proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] = 
+proc conduitUtilsVersion() : string =
+  return "CONDUIT Utilities Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+
+proc writeDefaultHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "Usage:"
+  echo "  ./conduitUtils <translate | bed2gtf | parseBLASTP>"
+
+proc writeTranslateHelp() =
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "Usage:"
+  echo "  ./conduitUtils translate [options] -i <transcripts.fa> -o <predicted_protein.fa>"
+  echo "  <transcripts.fa>         FASTA infile containing putative transcripts to be translated"
+  echo "  <predicted_protein.fa>   FASTA outfile containing in silico translated ORFs from transcripts.fa"
+  echo ""
+  echo "Options (defaults in parentheses):"
+  echo "  Filtering Options:"
+  echo "    -l, --min-length (75)"
+  echo "        Minimum length in Amino Acids necessary for a putative ORF to be reported"
+
+proc writeBED2GTFHelp() =
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "Usage:"
+  echo "  ./conduitUtils bed2gtf -i <infile.bed> -o <outfile.gtf>"
+  echo "  <infile.bed>    BED12 infile to be converted in to GTF format"
+  echo "  <outfile.gtf>   GTF outfile"
+
+proc writeBLASTPHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "Usage:"
+  echo "  ./conduitUtils parseBLASTP -i <inBLASTP.txt> -o <outPutativeOrthologs.tsv>"
+  echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
+  echo "  <outPutativeOrthologs.tsv>  Tab separated file of putative ortholog matches"
+  echo "                              In format: <Query ID>\t<Reference proteome top match ID>\t<E value>"
+
+proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] = 
   ##
   ## Takes in BLASTP default output file and outputs seq of matching proteins
   ##
   # Discard the header / citation info
+  var infile : File
+  discard open(infile,infilepath,fmRead)
+
   for _ in 0..<23:
     discard infile.readLine()
   while true:
@@ -48,7 +99,7 @@ proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] =
       var match_names : seq[string]
       var match_lens  : seq[uint]
       var evals : seq[seq[float]]
-      var scores : seq[seq[uint]]
+      var scores : seq[seq[float]]
       var identities_numerators : seq[seq[uint]]
       var identities_denominators : seq[seq[uint]]
       var identities_percentages : seq[seq[float]]
@@ -93,7 +144,6 @@ proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] =
           # echo "seq num: ", i
           # echo nextline
           var match_name = nextline[2..^1]
-          match_names.add(match_name)
           var first_iter = true
           while true:
             if nextline.len == 0:
@@ -108,11 +158,12 @@ proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] =
             else:
               match_name = match_name & nextline
             nextline = infile.readLine()
+          match_names.add(match_name)
           # echo "match name - ", match_name
           let match_length = parseUInt(nextline[7..^1])
           # echo "match len - ", match_length
           match_lens.add(match_length)
-          var scores_for_match : seq[uint]
+          var scores_for_match : seq[float]
           var evals_for_match : seq[float]
           var ids_numerators_for_match : seq[uint]
           var ids_denominators_for_match : seq[uint]
@@ -134,7 +185,7 @@ proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] =
             elif nextline[0..7] == "Score = ":
               var fields0 = nextline.split(seps={','})
               var fields1 = fields0[0].splitWhitespace()
-              let score = parseUInt(fields1[2])
+              let score = parseFloat(fields1[2])
               scores_for_match.add(score)
               fields1 = fields0[1].strip().splitWhitespace()
               let evalue = parseFloat(fields1[2])
@@ -267,6 +318,7 @@ proc parseBLASTPoutput*(infile : File) : seq[BLASTmatch] =
                              gap_percentages : gap_percentages ))
     except EOFError:
       break
+  infile.close()
   
 proc translateORF*(nts : string,to_stop = true) : string =
   let translation_table = { "TTT" : 'F',
@@ -371,8 +423,9 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
         outfile.write(&"{translation[i*wrap_len..(i+1)*wrap_len - 1]}\n")
       if translation.len mod wrap_len != 0 :
         outfile.write(&"{translation[wrap_len*(translation.len div wrap_len)..^1]}\n")
+  outfile.close()
 
-proc convertBED12toGTF*(infilepath : string,outfilepath : string ) =
+proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
   ## Converts BED12 formatted file to well-formed GTF file suitable for evaluation with GFFcompare
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
@@ -388,30 +441,155 @@ proc convertBED12toGTF*(infilepath : string,outfilepath : string ) =
       let strand = bedfields[5]
       outfile.write(&"{chr}\tBLANK\ttranscript\t{start_idx}\t{end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\";\n")
       let block_sizes = bedfields[10].split(sep=',')
-      let block_starts= bedfileds[11].split(sep=',')
+      let block_starts= bedfields[11].split(sep=',')
 
       # var exon_count = 1
       # var reverse_exon_count = block_starts.len
       for i in 0..<block_starts.len:
-        var new_start_idx, new_end_idx, exon_number : int
+        var new_start_idx, new_end_idx, exon_number : uint
         if strand == "+":
           new_start_idx = start_idx + parseUInt(block_starts[i])
           new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
-          exon_number = i + 1
+          exon_number = uint(i + 1)
         elif strand == "-":
           new_start_idx = start_idx + parseUInt(block_starts[i])
           new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
-          exon_number = block_starts.len - i
+          exon_number = uint(block_starts.len - i)
         outfile.write(&"{chr}\tBLANK\ttranscript\t{new_start_idx}\t{new_end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
   except EOFError:
     discard
+  infile.close()
+  outfile.close()
 
-# var infile : File
-# discard open(infile,"test.blast.txt",fmRead)
-# let blast_output = parseBLASTPoutput(infile)
-# for blast_match in blast_output:
-#   if blast_match.identities_percentages.len != 0:
-#     echo blast_match.identities_percentages[0][0] 
 
-# let test = @[FastaRecord(read_id : "testing", sequence : "ATGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATGA")]
-# translateTranscripts(test,"testing_translation.fa")
+proc parseOptions() : UtilOptions = 
+  
+  var i = 0
+  var mode = ""
+  var last = ""
+
+  var min_length = 75'u64
+  var min_length_flag = false
+
+  var infilepath = ""
+  var infilepath_flag = false
+  
+  var outfilepath = ""
+  var outfilepath_flag = false
+
+  for kind, key, val in getopt():
+    # echo kind," ", key," ", val
+    if i == 0:
+      mode = key
+      i += 1
+      continue
+    if i == 1:
+      help_flag = false
+    i += 1
+    case mode:
+      of "translate", "bed2gtf", "parseBLASTP":
+        case kind:
+          of cmdEnd:
+            break
+          of cmdShortOption, cmdLongOption:
+            if last != "":
+              echo &"ERROR - Option {last} provided without an argument"
+              run_flag = false
+              break
+            case key:
+              of "l", "min-length":
+                if not min_length_flag:
+                  min_length_flag = true
+                  if val != "":
+                    min_length = parseUInt(val)
+                  else:
+                    last = "min-length"
+                else:
+                  echo "ERROR - Multiple min-length provided"
+                  run_flag = false
+              of "-i":
+                if not infilepath_flag:
+                  infilepath_flag = true
+                  if val != "":
+                    infilepath = val
+                  else:
+                    last = "infile"
+                else:
+                  echo "ERROR - Multiple infiles provided"
+                  run_flag = false
+              of "-o":
+                if not outfilepath_flag:
+                  outfilepath_flag = true
+                  if val != "":
+                    infilepath = val
+                  else:
+                    last = "outfile"
+                else:
+                  echo "ERROR - Multiple outfiles provided"
+                  run_flag = false
+          of cmdArgument:
+            case last:
+              of "min-length":
+                min_length = parseUInt(key)
+              of "infile":
+                infilepath = key
+              of "outfile":
+                outfilepath = key
+              else:
+                echo &"ERROR - unknown option {last} provided"
+                run_flag = false
+                break
+            last = ""
+      else:
+        help_flag = true
+        break
+  if infilepath == "":
+    echo "ERROR - infilepath must be specified"
+    run_flag = false
+    help_flag = true
+  if outfilepath == "":
+    echo "ERROR - outfilepath must be specified"
+    run_flag = false
+    help_flag = true
+  if help_flag:
+    case mode:
+      of "translate":
+        writeTranslateHelp()
+      of "bed2gtf":
+        writeBED2GTFHelp()
+      of "parseBLASTP":
+        writeBLASTPHelp()
+      else:
+        echo "ERROR - first argument must specify utility function: \"translate\", \"bed2gtf\", or \"parseBLASTP\""
+        writeDefaultHelp()
+  return UtilOptions(mode : mode,
+                     run_flag : run_flag
+                     infilepath : infilepath,
+                     outfilepath : outfilepath,
+                     min_length : min_length
+                     )
+proc main() =
+  let opt = parseOptions()
+  if opt.run_flag:
+    case opt.mode:
+      of "translate":
+        var infile : File
+        discard open(infile,infilepath,fmRead)
+        records = poGraphUtils.parseFasta(infile)
+        infile.close()
+        translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length))
+      of "bed2gtf":
+        convertBED12toGTF(opt.infilepath,opt.outfilepath)
+      of "parseBLASTP":
+        let blast_output = parseBLASTPoutput(opt.infilepath)
+        var outfile : File
+        discard open(outfile,opt.outfilepath,fmWrite)
+        for blast_match in blast_output:
+          if blast_match.identities_percentages.len != 0:
+            outfile.write(&"{blast_match.query_name}\t{blast_match.match_names[0]}\t{blast_match.evals[0][0]}\n")
+          else:
+            outfile.write(&"{blast_match.query_name}\t----\t----\n")
+        outfile.close()
+
+
+
