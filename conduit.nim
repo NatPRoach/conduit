@@ -47,6 +47,7 @@ type
 #Major TODOs (Future release versions?):
 #TODO - Change major logic for the merging operations - keep track of how many reads support each extracted isoform and weight the resulting POGraphs based on this later. <== Top Priority
 #TODO - Move filtering step to a graph based polishing step, the linear step has a problem of too low coverage or too many isoforms leading to isoforms not being completely covered by illumina reads when they should be.
+#TODO - Add less stringent filtering step that extracts out the longest contiguous region covered by Illumina reads (with ends tolerance?) should be easy to do and reduce # of false negatives.
 #TODO - Add support for duplicate read ID's that doesn't break everything.
 #TODO - Add option to output both sensitive and stringent isoform sets in the same run
 #TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does and just add a decompress step for generating temp files.

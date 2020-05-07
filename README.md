@@ -63,7 +63,7 @@ path/to/conduit/binary/conduit hybrid -o path/to/outdir/ --tmp-dir path/to/tmpdi
 ```
 
 #### A note about adapters -
-Both RATTLE gene level clustering and CONDUIT consensus extraction work better if reads are trimmed of adapters before use. For cDNA, porechop (https://github.com/rrwick/Porechop) is a good adapter trimming tool (though it is no longer supported). Up to date ont-guppy basecallers have built in adapter trimming and should suffice for this purpose as well, for both cDNA and dRNA reads.
+Both RATTLE gene level clustering and CONDUIT consensus extraction work better if reads are trimmed of adapters before use. For cDNA, [porechop](https://github.com/rrwick/Porechop) is a good adapter trimming tool (though it is no longer supported). For dRNA we've had success with [Poreplex](https://github.com/hyeshik/poreplex), however this tool is based on the Albacore basecaller, not the most recent guppy basecallers. Up to date ont-guppy basecallers have built in adapter trimming and should suffice for this purpose as well, for both cDNA and dRNA reads.
 
 ### Usage statement for hybrid (ONT + Illumina) assembly:
 ```

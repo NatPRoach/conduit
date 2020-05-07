@@ -1,8 +1,10 @@
-import os
-import osproc
+# import os
+# import osproc
+import parseopt
 import strutils
 import strformat
 import tables
+import sets
 import poGraphUtils
 
 type
@@ -31,10 +33,16 @@ type
     run_flag : bool
     infilepath : string
     outfilepath : string
-    min_length : uint
+    min_length : uint64
+    fastq : bool
 
-#TODO: Make these functions callable from the command line, such that other people can use these utils.
+  FastqRecord* = object
+    read_id* : string
+    sequence* : string
+    qualities* : string
 
+
+#TODO : Add FASTQ support for translation util (should be easy)
 
 proc conduitUtilsVersion() : string =
   return "CONDUIT Utilities Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -50,10 +58,15 @@ proc writeTranslateHelp() =
   echo conduitUtilsVersion()
   echo "Usage:"
   echo "  ./conduitUtils translate [options] -i <transcripts.fa> -o <predicted_protein.fa>"
-  echo "  <transcripts.fa>         FASTA infile containing putative transcripts to be translated"
+  echo "  <transcripts.fa>         FASTA/Q infile containing putative transcripts to be translated"
   echo "  <predicted_protein.fa>   FASTA outfile containing in silico translated ORFs from transcripts.fa"
   echo ""
   echo "Options (defaults in parentheses):"
+  echo "  Input Options:"
+  echo "    -a, --fasta (default)"
+  echo "        Input file is in FASTA format"
+  echo "    -q, --fastq"
+  echo "        Input file is in FASTQ format"
   echo "  Filtering Options:"
   echo "    -l, --min-length (75)"
   echo "        Minimum length in Amino Acids necessary for a putative ORF to be reported"
@@ -74,6 +87,33 @@ proc writeBLASTPHelp() =
   echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
   echo "  <outPutativeOrthologs.tsv>  Tab separated file of putative ortholog matches"
   echo "                              In format: <Query ID>\t<Reference proteome top match ID>\t<E value>"
+
+proc parseFASTQ(infile : File) : seq[FastqRecord] = 
+  while true:
+    try:
+      let line1 = infile.readLine()
+      try:
+        assert line1[0] == '@'
+      except AssertionError:
+        echo "File not in FASTQ format"
+        raise
+      let read_id = line1[1..^1]
+      let sequence = infile.readLine().replace(sub='U',by='T')
+      discard infile.readLine()
+      let quals = infile.readLine()
+      result.add(FastqRecord( read_id   : read_id,
+                              sequence  : sequence,
+                              qualities : quals))
+    except EOFError:
+      break
+
+proc convertFASTQtoFASTA(record : FastqRecord) : FastaRecord = 
+  result.read_id = record.read_id
+  result.sequence = record.sequence
+
+proc convertFASTQtoFASTA(records : openArray[FastqRecord]) : seq[FastaRecord] =
+  for record in records:
+    result.add(convertFASTQtoFASTA(record))
 
 proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] = 
   ##
@@ -425,6 +465,9 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
         outfile.write(&"{translation[wrap_len*(translation.len div wrap_len)..^1]}\n")
   outfile.close()
 
+proc translateTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60) =
+  translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,threshold,wrap_len)
+
 proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
   ## Converts BED12 formatted file to well-formed GTF file suitable for evaluation with GFFcompare
   var infile,outfile : File
@@ -461,12 +504,40 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
   infile.close()
   outfile.close()
 
+proc compareTranslations*(reference_infilepath : string, translation_infilepath : string) =
+  var r_infile, t_infile : File
+  discard open(r_infile,reference_infilepath,fmRead)
+  discard open(t_infile,translation_infilepath,fmRead)
+  let r_records = poGraphUtils.parseFasta(r_infile)
+  r_infile.close()
+  let t_records = poGraphUtils.parseFasta(t_infile)
+  t_infile.close()
+  var r_proteins,t_proteins : HashSet[string]
+  for record in r_records:
+    r_proteins.incl(record.sequence)
+  for record in t_records:
+    t_proteins.incl(record.sequence)
+  let tp = intersection(r_proteins,t_proteins).len
+  let fp = difference(t_proteins,r_proteins).len
+  let fn = difference(r_proteins,t_proteins).len
+  echo "TP: ", tp
+  echo "FP: ", fp
+  echo "FN: ", fn
+  echo ""
+  echo &"Precision: {float(tp) / float(tp+fp)}"
+  echo &"Recall:    {float(tp) / float(tp+fn)}"
 
 proc parseOptions() : UtilOptions = 
   
   var i = 0
   var mode = ""
   var last = ""
+
+  var help_flag = true
+  var run_flag = true
+
+  var fastq = false
+  var fastq_flag = false
 
   var min_length = 75'u64
   var min_length_flag = false
@@ -507,7 +578,7 @@ proc parseOptions() : UtilOptions =
                 else:
                   echo "ERROR - Multiple min-length provided"
                   run_flag = false
-              of "-i":
+              of "i":
                 if not infilepath_flag:
                   infilepath_flag = true
                   if val != "":
@@ -517,7 +588,18 @@ proc parseOptions() : UtilOptions =
                 else:
                   echo "ERROR - Multiple infiles provided"
                   run_flag = false
-              of "-o":
+              of "q", "fastq":
+                if not fastq_flag:
+                  fastq = true
+                  fastq_flag = true
+                elif not fastq:
+                  echo "ERROR - Conflicting flags -q / --fastq and -a / --fasta"
+              of "a", "fasta":
+                if not fastq_flag:
+                  fastq_flag = true
+                elif fastq:
+                  echo "ERROR - Conflicting flags -q / --fastq and -a / --fasta"
+              of "o":
                 if not outfilepath_flag:
                   outfilepath_flag = true
                   if val != "":
@@ -527,6 +609,10 @@ proc parseOptions() : UtilOptions =
                 else:
                   echo "ERROR - Multiple outfiles provided"
                   run_flag = false
+              of "h", "help":
+                help_flag = true
+                run_flag = false
+                break
           of cmdArgument:
             case last:
               of "min-length":
@@ -543,11 +629,11 @@ proc parseOptions() : UtilOptions =
       else:
         help_flag = true
         break
-  if infilepath == "":
+  if infilepath == "" and not help_flag:
     echo "ERROR - infilepath must be specified"
     run_flag = false
     help_flag = true
-  if outfilepath == "":
+  if outfilepath == "" and not help_flag:
     echo "ERROR - outfilepath must be specified"
     run_flag = false
     help_flag = true
@@ -563,21 +649,28 @@ proc parseOptions() : UtilOptions =
         echo "ERROR - first argument must specify utility function: \"translate\", \"bed2gtf\", or \"parseBLASTP\""
         writeDefaultHelp()
   return UtilOptions(mode : mode,
-                     run_flag : run_flag
+                     run_flag : run_flag,
                      infilepath : infilepath,
                      outfilepath : outfilepath,
-                     min_length : min_length
+                     min_length : min_length,
+                     fastq : fastq
                      )
+
 proc main() =
   let opt = parseOptions()
   if opt.run_flag:
     case opt.mode:
       of "translate":
         var infile : File
-        discard open(infile,infilepath,fmRead)
-        records = poGraphUtils.parseFasta(infile)
-        infile.close()
-        translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length))
+        discard open(infile,opt.infilepath,fmRead)
+        if opt.fastq:
+          let records = parseFASTQ(infile)
+          infile.close()
+          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length))
+        else:
+          let records = poGraphUtils.parseFasta(infile)
+          infile.close()
+          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length))
       of "bed2gtf":
         convertBED12toGTF(opt.infilepath,opt.outfilepath)
       of "parseBLASTP":
@@ -592,4 +685,4 @@ proc main() =
         outfile.close()
 
 
-
+main()
