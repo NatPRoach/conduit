@@ -33,6 +33,7 @@ type
     run_flag : bool
     infilepath : string
     outfilepath : string
+    reference_infilepath : string
     min_length : uint64
     fastq : bool
 
@@ -504,7 +505,7 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
   infile.close()
   outfile.close()
 
-proc compareTranslations*(reference_infilepath : string, translation_infilepath : string) =
+proc compareExactTranslations*(reference_infilepath : string, translation_infilepath : string) =
   var r_infile, t_infile : File
   discard open(r_infile,reference_infilepath,fmRead)
   discard open(t_infile,translation_infilepath,fmRead)
@@ -520,6 +521,33 @@ proc compareTranslations*(reference_infilepath : string, translation_infilepath 
   let tp = intersection(r_proteins,t_proteins).len
   let fp = difference(t_proteins,r_proteins).len
   let fn = difference(r_proteins,t_proteins).len
+  echo "TP: ", tp
+  echo "FP: ", fp
+  echo "FN: ", fn
+  echo ""
+  echo &"Precision: {float(tp) / float(tp+fp)}"
+  echo &"Recall:    {float(tp) / float(tp+fn)}"
+
+proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath : string,) =
+  var fp = 0
+  var reference_id_set : HashSet[string]
+  var match_set : HashSet[string]
+  var ref_infile : File
+  discard open(ref_infile,reference_infilepath,fmRead)
+  let reference_records = poGraphUtils.parseFasta(ref_infile)
+  ref_infile.close()
+  for record in reference_records:
+    reference_id_set.incl(record.read_id)
+  
+  let blast_records = parseBLASTPoutput(blastp_infilepath)
+  for record in blast_records:
+    if record.match_names.len > 0:
+      match_set.incl(record.match_names[0])
+    else:
+      fp += 1
+
+  let tp = match_set.len
+  let fn = difference(reference_id_set,match_set).len
   echo "TP: ", tp
   echo "FP: ", fp
   echo "FN: ", fn
@@ -544,6 +572,9 @@ proc parseOptions() : UtilOptions =
 
   var infilepath = ""
   var infilepath_flag = false
+
+  var reference_infilepath = ""
+  var reference_infilepath_flag = false
   
   var outfilepath = ""
   var outfilepath_flag = false
@@ -558,7 +589,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA":
         case kind:
           of cmdEnd:
             break
@@ -588,17 +619,22 @@ proc parseOptions() : UtilOptions =
                 else:
                   echo "ERROR - Multiple infiles provided"
                   run_flag = false
+                  break
               of "q", "fastq":
                 if not fastq_flag:
                   fastq = true
                   fastq_flag = true
                 elif not fastq:
                   echo "ERROR - Conflicting flags -q / --fastq and -a / --fasta"
+                  run_flag = false
+                  break
               of "a", "fasta":
                 if not fastq_flag:
                   fastq_flag = true
                 elif fastq:
                   echo "ERROR - Conflicting flags -q / --fastq and -a / --fasta"
+                  run_flag = false
+                  break
               of "o":
                 if not outfilepath_flag:
                   outfilepath_flag = true
@@ -609,6 +645,18 @@ proc parseOptions() : UtilOptions =
                 else:
                   echo "ERROR - Multiple outfiles provided"
                   run_flag = false
+                  break
+              of "r":
+                if not reference_infilepath_flag:
+                  reference_infilepath_flag = true
+                  if val != "":
+                    reference_infilepath = val
+                  else:
+                    last = "reference"
+                else:
+                  echo "ERROR Multiple references provided"
+                  run_flag = false
+                  break
               of "h", "help":
                 help_flag = true
                 run_flag = false
@@ -621,6 +669,8 @@ proc parseOptions() : UtilOptions =
                 infilepath = key
               of "outfile":
                 outfilepath = key
+              of "reference":
+                reference_infilepath = key
               else:
                 echo &"ERROR - unknown option {last} provided"
                 run_flag = false
@@ -652,6 +702,7 @@ proc parseOptions() : UtilOptions =
                      run_flag : run_flag,
                      infilepath : infilepath,
                      outfilepath : outfilepath,
+                     reference_infilepath : reference_infilepath,
                      min_length : min_length,
                      fastq : fastq
                      )
@@ -683,6 +734,10 @@ proc main() =
           else:
             outfile.write(&"{blast_match.query_name}\t----\t----\n")
         outfile.close()
+      of "compareBLASTP":
+        compareBLASTPTranslations(opt.reference_infilepath,opt.infilepath)
+      of "compareFASTA":
+        compareExactTranslations(opt.reference_infilepath,opt.infilepath)
 
 
 main()
