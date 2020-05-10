@@ -686,7 +686,7 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
 
   let last_fasta_filepath = &"{last_fasta_dir}{trim}.consensus.fa"
   var seq_file : PFile = fopen(cstring(last_fasta_filepath), "r")
-  var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function)
+  var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function,weight_support = true)
 
   let this_fasta_filepath = &"{this_fasta_dir}{trim}.consensus.fa"
 
