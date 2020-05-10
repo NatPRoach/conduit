@@ -40,6 +40,8 @@ type
     max_iterations : uint64
     stringent : bool
     stringent_tolerance : int
+    samtools_memory : string
+    max_alignments : uint64
 
 #Minor TODOs:
 #TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
@@ -193,6 +195,8 @@ proc writeHybridHelp() =
   echo "        Do not enforce that every base / edge in each final reported isoform is supported by an Illumina read"
   echo "    --stringent-tolerance (100)"
   echo "        Number of bases at the end of each isoform that do not have to have Illumina reads supporting them when run in --stringent mode; ignored when run with --no-stringents"
+  # echo "    --scaffold-minimum (1)" #TODO
+  # echo "        Minimum number of scaffolding reads supporting an isoform necessary to report the isoform in the final output"
   echo "  Ouput:"
   echo "    -o, --output-dir <path> (conduit/)"
   echo "        <path> where corrected clusters will be written"
@@ -206,6 +210,14 @@ proc writeHybridHelp() =
   echo "        Align Illumina reads to ONT scaffolds in end-to-end alignment mode"
   echo "    --local"
   echo "        Align Illumina reads to ONT scaffolds in local alignment mode"
+  echo "    -k,--bowtie2-max-alignments (50)"
+  echo "        Maximum number of alignments per Illumina read to be used in final polishing step"
+  # echo "    --bowtie2-path (bowtie2)" #TODO
+  echo "  SAMtools:"
+  echo "    --samtools-thread-memory (768 MiB)"
+  echo "        Memory amount to use per SAMtools thread"
+  echo "        Specified either in bytes or with a K, M, or G suffix"
+  # echo "    --samtools-path (samtools)" #TODO
   echo "  Miscellaneous:"
   echo "    -h, --help"
   echo "        Display this help message and exit"
@@ -215,8 +227,6 @@ proc writeHybridHelp() =
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
   echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
-  # echo "    --samtools-path (samtools)" #TODO
-  # echo "    --bowtie2-path (bowtie2)" #TODO
   # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." #TODO
   # echo "              If CPU number cannot be detected, the default of 4 threads will be used. #TODO
 
@@ -318,9 +328,12 @@ proc outputSettings(outfilepath : string,opts : ConduitOptions) =
     outfile.write(&"    score matrix : {opts.score_matrix_path}\n")
   outfile.write(&"    output directory : {opts.output_dir}\n")
   outfile.write(&"    temporary directory : {opts.tmp_dir}\n")
+  outfile.write("SAMtools Settings\n")
+  outfile.write(&"    SAMtools thread memory : {opts.samtools_memory}\n")
   outfile.write("Bowtie2 Settings:\n")
   outfile.write(&"    bowtie2 strand constraint : {opts.bowtie_strand_constraint}\n")
   outfile.write(&"    bowtie2 alignment mode : {opts.bowtie_alignment_mode}\n")
+  outfile.write(&"    bowtie2 max alignments : {opts.max_alignments}\n")
   outfile.close()
 
 proc splitFASTA(infilepath,outfilepath_prefix : string, split_num : int = 200) : (int,int) =
@@ -371,7 +384,6 @@ proc mergeFiles(infilepaths : openArray[string],outfilepath : string,delete_old_
   if delete_old_files:
     removeFiles(infilepaths)
   outfile.close()
-
 
 proc splitFASTA2(infilepath,outfilepath_prefix : string, split_num : int = 200) : (int,int) =
   # Takes in a fasta file with more reads than some arbitrary number split_num
@@ -468,8 +480,8 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
       var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
       removeFile(tmp_fasta)
       var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
+      var (representative_paths,read_supports) = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
+      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths, read_supports, &"{trim}.tmp_subfasta{i}")
       poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
       outFASTAfile.close()
       merge_queue.push((consensus_po.reads.len,i))
@@ -488,11 +500,11 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
 
       # Decompose the new temp file
       var seq_file : PFile = fopen(cstring(new_tmp_filepath))
-      var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
+      var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function,weight_support = true)
       removeFile(new_tmp_filepath)
       var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{total_fastas}")
+      var (representative_paths,read_supports) = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
+      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths, read_supports, &"{trim}.tmp_subfasta{total_fastas}")
       
       # Write the decomposition to a new consensus file
       new_filepath = &"{outdir}{trim}.tmp_consensus{total_fastas}.fa"
@@ -516,8 +528,8 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     if delete_fasta_flag:
       removeFile(fasta_file)
     var trim_po2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
-    var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
-    let consensus_po = poGraphUtils.buildConsensusPO(addr po2, representative_paths,trim)
+    var (representative_paths,read_supports) = poGraphUtils.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
+    let consensus_po = poGraphUtils.buildConsensusPO(addr po2, representative_paths, read_supports, trim)
     let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
     var outFASTAfile : File
     discard open(outFASTAfile,outFASTAfilepath,fmWrite)
@@ -684,8 +696,8 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   var trim_po = convertPOGraphtoTrimmedPOGraph(po)
   discard open(bam,bamfilepath,index=true)
   illuminaPolishPOGraph(addr trim_po, bam)
-  var representative_paths = getRepresentativePaths3(addr trim_po, psi = isoform_delta,ends_delta = ends_delta)
-  var records = getFastaRecordsFromTrimmedPOGraph(addr trim_po, representative_paths, trim)
+  var (representative_paths,read_supports) = getRepresentativePaths3(addr trim_po, psi = isoform_delta,ends_delta = ends_delta)
+  var records = getFastaRecordsFromTrimmedPOGraph(addr trim_po, representative_paths, read_supports, trim)
   var outfile : File
   discard open(outfile,this_fasta_filepath,fmWrite)
   writeCorrectedReads(records,outfile)
@@ -782,7 +794,7 @@ proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string, final_p
   arguments.add(&"{opt.thread_num}")
   if final_polish:
     arguments.add("-k")
-    arguments.add("100")
+    arguments.add(&"{opt.max_alignments}")
   arguments.add(opt.bowtie_strand_constraint)
   arguments.add(opt.bowtie_alignment_mode)
   arguments.add("--n-ceil")
@@ -855,6 +867,12 @@ proc parseOptions() : ConduitOptions =
 
   var local = false
   var local_flag = false
+
+  var max_alignments = 50'u64
+  var max_alignments_flag = false
+
+  var samtools_memory = "768M"
+  var samtools_memory_flag = false
 
   var help_flag = true
   var version_flag = false
@@ -1155,6 +1173,29 @@ proc parseOptions() : ConduitOptions =
                     run_flag = false
                     echo "ERROR - Conflicting flags: --local and --end-to-end both specified"
                     break
+              of "k","bowtie2-max-alignments":
+                if not max_alignments_flag:
+                  max_alignments_flag = true
+                  if val == "":
+                    last = "bowtie2-max-alignments"
+                  else:
+                    max_alignments = parseUInt(val)
+                else:
+                  run_flag = false
+                  echo "ERROR - Max bowtie2 alignments specified multiple times"
+                  break
+              of "samtools-thread-memory":
+                if not samtools_memory_flag:
+                  samtools_memory_flag = true
+                  if val == "":
+                    last = "samtools-thread-memory"
+                  else:
+                    samtools_memory = val
+                else:
+                  run_flag = false
+                  echo "ERROR SAMtools thread memory specified multiple times"
+                  break
+
               of "t", "threads":
                 if not thread_num_flag:
                   if val == "":
@@ -1217,6 +1258,10 @@ proc parseOptions() : ConduitOptions =
                 stringent_tolerance = parseInt(key)
               of "output-dir":
                 output_dir = key
+              of "bowtie2-max-alignments":
+                max_alignments = parseUInt(key)
+              of "samtools-thread-memory":
+                samtools_memory = key
               of "threads":
                 thread_num = parseUInt(key)
               of "tmp-dir":
@@ -1360,7 +1405,9 @@ proc parseOptions() : ConduitOptions =
                         illumina_weight : illumina_weight,
                         thread_num : thread_num,
                         stringent : stringent,
-                        stringent_tolerance : stringent_tolerance) 
+                        stringent_tolerance : stringent_tolerance,
+                        samtools_memory : samtools_memory,
+                        max_alignments : max_alignments)
 
 proc main() =
   let opt = parseOptions()
@@ -1415,8 +1462,9 @@ proc main() =
       echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
       let bam = &"{last_dir}alignments.bam"
-      echo execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath,poStdErrToStdOut})
-      echo execProcess("samtools", args=["index", bam],options={poUsePath})
+      # echo execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath})
+      echo execProcess("samtools", args=["sort", "-@", &"{opt.thread_num}", "-o", bam, "-m", opt.samtools_memory, sam], options={poUsePath,poStdErrToStdOut})
+      echo execProcess("samtools", args=["index", bam],options={poUsePath,poStdErrToStdOut})
       
       removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
 
@@ -1459,8 +1507,9 @@ proc main() =
       echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
       let bam = &"{last_dir}alignments.bam"
-      echo execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath})
-      echo execProcess("samtools", args=["index", bam],options={poUsePath})
+      # echo execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath})
+      echo execProcess("samtools", args=["sort", "-@", &"{opt.thread_num}", "-o", bam, "-m", opt.samtools_memory, sam], options={poUsePath,poStdErrToStdOut})
+      echo execProcess("samtools", args=["index", bam],options={poUsePath,poStdErrToStdOut})
       
       removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
 

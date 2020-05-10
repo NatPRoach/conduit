@@ -35,7 +35,7 @@ proc build_lpo_from_fasta(seq_file : Pfile;
 ###---------  Utility functions to interface   ---------###
 ###########################################################
 
-proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
+proc convertPOFormats(lpo_return_result : LPOReturnResult_T, weight_support : bool = false) : POGraph =
   let lpo = lpo_return_result.lpo_seqs
   let matrix = lpo_return_result.matrix
   let num_reads = lpo.nsource_seq
@@ -50,9 +50,14 @@ proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
   var weights : Table[(uint32,uint32),uint32]
   var paths : seq[seq[uint32]]
   for i in 0..<num_reads:
-    let name = source_seqs[i].name
+    let name = toString(toSeq(source_seqs[i].name)).strip(chars = {'\0'})
     let length = source_seqs[i].length
-    reads.add(Read(name : toString(toSeq(name)).strip(chars = {'\0'}),length : uint32(length)))
+    var support = 0'u32
+    if weight_support:
+      support = uint32(parseUInt(name.split('_')[^1]))
+    else:
+      support = 1'u32
+    reads.add(Read(name : name,length : uint32(length),support : support))
     paths.add(@[])
   for i in 0..<num_nodes:
     # echo matrix.symbol
@@ -78,14 +83,14 @@ proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
                    end_node_flag : false,
                    start_node_flag : false,
                    nanopore_support : uint32(supports.len)))
-  for path in paths:
+  for j,path in paths:
     for i in 1..<path.len:
       let u = path[i-1]
       let v = path[i]
       if (u,v) in weights:
-        weights[(u,v)] += 1'u32
+        weights[(u,v)] += reads[j].support
       else:
-        weights[(u,v)] = 1'u32
+        weights[(u,v)] = reads[j].support
   
   free_return_result(lpo_return_result)
 
@@ -100,9 +105,10 @@ proc convertPOFormats(lpo_return_result : LPOReturnResult_T) : POGraph =
 proc getPOGraphFromFasta*(seq_file : Pfile;
                          score_matrix_filepath : cstring;
                          use_global_alignment : cint;
-                         scoring_function : proc (a1 : cint; a2 : cint; a3 : ptr LPOLetter_T; a4 : ptr LPOLetter_T; a5 : ptr ResidueScoreMatrix_T) : LPOScore_T) : POGraph =
+                         scoring_function : proc (a1 : cint; a2 : cint; a3 : ptr LPOLetter_T; a4 : ptr LPOLetter_T; a5 : ptr ResidueScoreMatrix_T) : LPOScore_T,
+                         weight_support : bool = false) : POGraph =
   let lpo_return_result = build_lpo_from_fasta(seq_file,
                                                score_matrix_filepath,
                                                use_global_alignment,
                                                scoring_function)
-  return convertPOFormats(lpo_return_result)
+  return convertPOFormats(lpo_return_result,weight_support = weight_support)

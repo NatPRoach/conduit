@@ -21,6 +21,7 @@ type
     path* : seq[uint32]
     corrected_path* : seq[uint32]
     sequence* : string
+    support* : uint32
   
   Node* = object
     nts* : string
@@ -67,7 +68,7 @@ type
 #TODO: clean up redundancies, remove dead code blocks
 #TODO: break up this into several .nim files, each with a more descriptive / accurate name
 #TODO: remove unused functions
-#TODO: Convert new total_illumina_support to a bool / HashSet respectively, more efficient I think. Don't actually need the values.
+#TODO: Keep track of how many reads supported each isoform
 
 proc collapseLinearStretches( po2 : TrimmedPOGraph) : TrimmedPOGraph =
   var po = po2
@@ -282,7 +283,7 @@ proc writeCorrectedReads*( po : TrimmedPOGraph,outfile : File) =
     var sequence : seq[string]
     for idx in read.corrected_path:
       sequence.add(po.nodes[po.node_indexes[('b',idx)]].nts)
-    outfile.write(">",read.name,"\n")
+    outfile.write(">",read.name,&"_{read.support}","\n")
     outfile.writeLine(sequence.join())
 
 proc writeCorrectedReads*( records : seq[FastaRecord],outfile : File) = 
@@ -861,8 +862,9 @@ proc correctPaths( q_path : var seq[uint32],
     echo q_path.len
   return (diff_flag,q_path)
 
-proc walkHeaviestPaths( po : ptr POGraph,ends_delta = 15) : seq[seq[uint32]] = 
+proc walkHeaviestPaths( po : ptr POGraph,ends_delta = 15) : (seq[seq[uint32]],seq[uint32]) = 
   var representative_paths : seq[seq[uint32]]
+  var read_supports : seq[uint32]
   var remaining_reads = toSeq(0..<po[].reads.len)
   # var total_st_time = 0.0
   # var total_sort_time = 0.0
@@ -1139,6 +1141,10 @@ proc walkHeaviestPaths( po : ptr POGraph,ends_delta = 15) : seq[seq[uint32]] =
       removed_reads.add(po[].reads[remaining_reads[read_id_to_idx[read_id]]])
       # echo read_id_to_idx[read_id]
       # echo "here"
+    var support = 0'u32
+    for read in removed_reads:
+      support += read.support
+    read_supports.add(support)
     for idx in sorted(to_delete_reads,order = SortOrder.Descending):
       remaining_reads.delete(idx)
   # echo "ST update time - ", total_st_time
@@ -1146,7 +1152,7 @@ proc walkHeaviestPaths( po : ptr POGraph,ends_delta = 15) : seq[seq[uint32]] =
   # echo "Walk time - ", total_walk_time
   # echo "sort time - ", total_sort_time
 
-  return representative_paths
+  return (representative_paths,read_supports)
 
 proc updateGraph( rep_po : ptr TrimmedPOGraph, new_path,old_path : seq[uint32],weight:uint32 = 1'u32) =
   ## NEW PATH
@@ -1480,7 +1486,7 @@ proc trimMinipaths( rep_po : ptr TrimmedPOGraph,greedy_path : seq[uint32], psi :
     rep_po.illumina_branches.del(minipath)
   # echo "after branches - ", rep_po.illumina_branches.len
 
-proc getRepresentativePaths3*( rep_po : ptr TrimmedPOGraph, psi : uint16 = 10, ends_delta : uint16 = 10,illumina_weight:uint32 = 10) : seq[seq[uint32]] =
+proc getRepresentativePaths3*( rep_po : ptr TrimmedPOGraph, psi : uint16 = 10, ends_delta : uint16 = 10,illumina_weight:uint32 = 10) : (seq[seq[uint32]],seq[uint32]) =
   ########################################################################################
   ###------------------- Collect greedy walks from each source node -------------------###
   ########################################################################################
@@ -2714,7 +2720,7 @@ proc convertPOGraphtoTrimmedPOGraph*( po : var POGraph) : TrimmedPOGraph =
                          deleted_nodes : deleted_nodes,
                          nanopore_counts : po.weights)
 
-proc buildConsensusPO*( po : ptr POGraph, paths : seq[seq[uint32]], read_prefix : string) : TrimmedPOGraph = 
+proc buildConsensusPO*( po : ptr POGraph, paths : seq[seq[uint32]], supports : seq[uint32], read_prefix : string) : TrimmedPOGraph = 
   var edges : Table[uint32,seq[uint32]]
   var weights : Table[(uint32,uint32),uint32]
   var u_set,v_set : HashSet[uint32]
@@ -2737,6 +2743,7 @@ proc buildConsensusPO*( po : ptr POGraph, paths : seq[seq[uint32]], read_prefix 
     reads.add(Read(name : &"{read_prefix}_{j}",
                    length : uint32(path.len),
                    path : path,
+                   support : supports[j],
                    corrected_path : path,
                    sequence : sequence.join()))
     # for i in 0..<read.corrected_path.len:
@@ -2829,12 +2836,12 @@ proc getSequenceFromPath*(po : TrimmedPOGraph, path : seq[uint32]) : string =
     sequence1.add(po.nodes[po.node_indexes[('b',idx)]].nts)
   return sequence1.join()
 
-proc getFastaRecordsFromTrimmedPOGraph*(po : ptr TrimmedPOGraph, paths : seq[seq[uint32]],label : string) : seq[FastaRecord] = 
+proc getFastaRecordsFromTrimmedPOGraph*(po : ptr TrimmedPOGraph, paths : seq[seq[uint32]], supports : seq[uint32], label : string) : seq[FastaRecord] = 
   var records : seq[FastaRecord]
   for i,path in paths:
     var sequence : seq[string]
     for fwd_u in path:
       let bck_u = po[].node_indexes[('b',fwd_u)]
       sequence.add(po[].nodes[bck_u].nts)
-    records.add(FastaRecord(read_id : &"{label}_{i}", sequence : sequence.join()))
+    records.add(FastaRecord(read_id : &"{label}_{i}_{supports[i]}", sequence : sequence.join()))
   return records
