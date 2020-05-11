@@ -141,9 +141,13 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
       if query_line[0..11] == "  Database: ":
         break
       assert query_line[0..6] == "Query= "
-      let query_name = query_line[7..^1]
-
-      discard infile.readLine() # ""
+      var query_name = query_line[7..^1]
+      while true:
+        let next = infile.readLine() # ""
+        if next == "":
+          break
+        else:
+          query_name = query_name & next
 
       var match_names : seq[string]
       var match_lens  : seq[uint]
@@ -465,7 +469,7 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for transcript in transcripts:
-    let translation = translateTranscript(transcript.sequence)
+    let translation = translateTranscript(transcript.sequence.toUpperAscii)
     if translation.len >= threshold:
       outfile.write(&">{transcript.read_id}\n")
       for i in 0..<(translation.len div wrap_len):
