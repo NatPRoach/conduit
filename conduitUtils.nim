@@ -120,15 +120,22 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
   ##
   ## Takes in BLASTP default output file and outputs seq of matching proteins
   ##
-  # Discard the header / citation info
+  
   var infile : File
   discard open(infile,infilepath,fmRead)
-
-  for _ in 0..<23:
-    discard infile.readLine()
+  # Discard the header / citation info
+  var query_line : string
+  var first_iter1 = true
+  while true:
+    query_line = infile.readLine()
+    if query_line[0..6] == "Query= ":
+      break
   while true:
     try:
-      let query_line = infile.readLine() # Query= cluster_10_0 <unknown description>
+      if not first_iter1:
+        query_line = infile.readLine() # Query= cluster_10_0 <unknown description>
+      else:
+        first_iter1 = false
       # echo query_line
       if query_line[0..11] == "  Database: ":
         break
