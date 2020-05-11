@@ -469,7 +469,10 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for transcript in transcripts:
-    let translation = translateTranscript(transcript.sequence.toUpperAscii)
+    let upper = transcript.sequence.toUpperAscii
+    if upper.find('N') != -1:
+      continue
+    let translation = translateTranscript(upper)
     if translation.len >= threshold:
       outfile.write(&">{transcript.read_id}\n")
       for i in 0..<(translation.len div wrap_len):
