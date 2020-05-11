@@ -128,8 +128,9 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
   var first_iter1 = true
   while true:
     query_line = infile.readLine()
-    if query_line[0..6] == "Query= ":
-      break
+    if query_line.len >= 7:
+      if query_line[0..6] == "Query= ":
+        break
   while true:
     try:
       if not first_iter1:
