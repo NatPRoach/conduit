@@ -43,7 +43,6 @@ type
     qualities* : string
 
 
-#TODO : Add FASTQ support for translation util (should be easy)
 
 proc conduitUtilsVersion() : string =
   return "CONDUIT Utilities Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -570,6 +569,36 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   echo &"Precision: {float(tp) / float(tp+fp)}"
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
+proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1,2,5,10,20,40,80,160,320,640]) = 
+  var infile : File
+  discard open(infile,infilepath, fmRead)
+  let fasta_records = parseFasta(infile)
+  infile.close()
+  var split_records : seq[seq[FastaRecord]]
+  for i in 0..<bins.len:
+    split_records.add(@[])
+  for record in fasta_records:
+    num_reads = parseUInt(fasta_records.read_id.split('_')[^1])
+    var bin = -1
+    for i in 0..<(bins.len - 1):
+      if num_reads >= bins[i] and num_reads < bins[i+1]:
+    if num_reads > bins[^1]:
+      bin = bins.len - 1
+    if bin != -1:
+      split_records[bin].add(record)
+  for i,split in split_records:
+    var bin_id = ""
+    if i == bins.len - 1:
+      bin_id = &"{bins[^1]+}"
+    else:
+      bin_id = &"{bins[i]}-{bins[i+1] - 1}"
+    var outfile : File
+    discard open(outfile,&"{outfile_prefix}_{bin_id}.fa",fmWrite)
+    for record in split:
+      outfile.write(&">{record.read_id}\n")
+      outfile.writeLine(record.sequence)
+    outfile.close()
+
 proc parseOptions() : UtilOptions = 
   
   var i = 0
@@ -604,7 +633,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA":
         case kind:
           of cmdEnd:
             break
@@ -753,6 +782,8 @@ proc main() =
         compareBLASTPTranslations(opt.reference_infilepath,opt.infilepath)
       of "compareFASTA":
         compareExactTranslations(opt.reference_infilepath,opt.infilepath)
+      of "splitFASTA":
+        splitFASTAByReadCounts(opt.infilepath,opt.outfilepath,)
 
 
 main()
