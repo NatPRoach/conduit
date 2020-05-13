@@ -582,6 +582,7 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
     var bin = -1
     for i in 0..<(bins.len - 1):
       if num_reads >= bins[i] and num_reads < bins[i+1]:
+        bin = i
     if num_reads > bins[^1]:
       bin = bins.len - 1
     if bin != -1:
