@@ -590,7 +590,7 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
   for i,split in split_records:
     var bin_id = ""
     if i == bins.len - 1:
-      bin_id = &"{bins[^1]+}"
+      bin_id = &"{bins[^1]}+"
     else:
       bin_id = &"{bins[i]}-{bins[i+1] - 1}"
     var outfile : File
