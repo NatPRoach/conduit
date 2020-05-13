@@ -569,7 +569,7 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   echo &"Precision: {float(tp) / float(tp+fp)}"
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
-proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1,2,5,10,20,40,80,160,320,640]) = 
+proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1'u64,2'u64,5'u64,10'u64,20'u64,40'u64,80'u64,160'u64,320'u64,640'u64]) = 
   var infile : File
   discard open(infile,infilepath, fmRead)
   let fasta_records = parseFasta(infile)
@@ -578,7 +578,7 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
   for i in 0..<bins.len:
     split_records.add(@[])
   for record in fasta_records:
-    num_reads = parseUInt(fasta_records.read_id.split('_')[^1])
+    let num_reads = uint64(parseUInt(fasta_records.read_id.split('_')[^1]))
     var bin = -1
     for i in 0..<(bins.len - 1):
       if num_reads >= bins[i] and num_reads < bins[i+1]:
