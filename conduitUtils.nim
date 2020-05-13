@@ -600,6 +600,19 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
       outfile.writeLine(record.sequence)
     outfile.close()
 
+proc filterFASTAByReadCounts*(infilepath,outfilepath : string, filter : uint64 = 5'u64) =
+  var infile,outfile : File
+  discard open(infile,infilepath, fmRead)
+  let fasta_records = parseFasta(infile)
+  infile.close()
+  discard open(outfile,outfilepath,fmWrite)
+  for record in fasta_records:
+    let num_reads = uint64(parseUInt(record.read_id.split('_')[^1]))
+    if num_reads >= filter:
+      outfile.write(&">{record.read_id}\n")
+      outfile.writeLine(record.sequence)
+  outfile.close()
+
 proc parseOptions() : UtilOptions = 
   
   var i = 0
@@ -634,7 +647,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA":
         case kind:
           of cmdEnd:
             break
@@ -784,7 +797,9 @@ proc main() =
       of "compareFASTA":
         compareExactTranslations(opt.reference_infilepath,opt.infilepath)
       of "splitFASTA":
-        splitFASTAByReadCounts(opt.infilepath,opt.outfilepath,)
+        splitFASTAByReadCounts(opt.infilepath,opt.outfilepath)
+      of "filterFASTA":
+        filterFASTAByReadCounts(opt.infilepath,opt.outfilepath)
 
 
 main()
