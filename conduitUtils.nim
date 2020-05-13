@@ -578,7 +578,7 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
   for i in 0..<bins.len:
     split_records.add(@[])
   for record in fasta_records:
-    let num_reads = uint64(parseUInt(fasta_records.read_id.split('_')[^1]))
+    let num_reads = uint64(parseUInt(record.read_id.split('_')[^1]))
     var bin = -1
     for i in 0..<(bins.len - 1):
       if num_reads >= bins[i] and num_reads < bins[i+1]:
