@@ -684,7 +684,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       if "transcript_id" in attributes:
         let new_chr = fields0[0]
         let new_start_idx =  uint64(parseUInt(fields0[3]))
-        let new_end_idx = uint64(parseUInt(fields0[4]))
+        let new_end_idx = uint64(parseUInt(fields0[4])) - 1'u32
         if attributes["transcript_id"] in last_exons:
           let (chr, start_idx,end_idx)= last_exons[attributes["transcript_id"]]
           assert chr == new_chr
@@ -707,7 +707,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       let indices = fields0[3].strip(chars={'(',')','+','-'})
       let split_indices = indices.split('-')
       let start_idx = uint64(parseUInt(split_indices[0])) 
-      let end_idx = uint64(parseUInt(split_indices[1])) + 1
+      let end_idx = uint64(parseUInt(split_indices[1]))
       if (chr,start_idx,end_idx) notin  reference_introns:
         echo "query: ", chr,":",start_idx,"-",end_idx
         novel_counter += 1
