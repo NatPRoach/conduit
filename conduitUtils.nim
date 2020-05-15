@@ -683,8 +683,8 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       let attributes = parseAttributes(fields0[8])
       if "transcript_id" in attributes:
         let new_chr = fields0[0]
-        let new_start_idx =  uint64(parseUInt(fields0[3]))
-        let new_end_idx = uint64(parseUInt(fields0[4])) - 1'u32
+        let new_start_idx =  uint64(parseUInt(fields0[3])) - 1'u32
+        let new_end_idx = uint64(parseUInt(fields0[4]))
         if attributes["transcript_id"] in last_exons:
           let (chr, start_idx,end_idx)= last_exons[attributes["transcript_id"]]
           assert chr == new_chr
