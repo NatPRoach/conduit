@@ -708,6 +708,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       let start_idx = uint64(parseUInt(split_indices[0])) + 1 
       let end_idx = uint64(parseUInt(split_indices[1]))
       if (chr,start_idx,end_idx) notin  reference_introns:
+        echo chr," ",start_idx," ",end_idx
         novel_counter += 1
   except EOFError:
     discard
