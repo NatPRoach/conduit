@@ -714,7 +714,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
   except EOFError:
     discard
   infile.close()
-  # echo &"Novel introns - {novel_counter}"
+  echo &"Novel introns - {novel_counter}"
   
 proc parseOptions() : UtilOptions = 
   
