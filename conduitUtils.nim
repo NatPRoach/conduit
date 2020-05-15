@@ -705,8 +705,8 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       let chr = fields0[2]
       let indices = fields0[3].strip(chars={'(',')','+','-'})
       let split_indices = indices.split('-')
-      let start_idx = uint64(parseUInt(split_indices[0])) + 1 
-      let end_idx = uint64(parseUInt(split_indices[1]))
+      let start_idx = uint64(parseUInt(split_indices[0])) 
+      let end_idx = uint64(parseUInt(split_indices[1])) + 1
       if (chr,start_idx,end_idx) notin  reference_introns:
         echo chr," ",start_idx," ",end_idx
         novel_counter += 1
