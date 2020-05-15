@@ -689,12 +689,12 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
           let (chr, start_idx,end_idx)= last_exons[attributes["transcript_id"]]
           try:
             assert chr == new_chr
+            reference_introns.incl((chr, end_idx, new_start_idx))
           except AssertionError:
             echo "ERROR - same transcript on different chromosomes:"
             let tx_id = attributes["transcript_id"]
             echo &"{chr}:{start_idx}-{end_idx} {tx_id}"
             echo &"{new_chr}:{new_start_idx}-{new_end_idx} {tx_id}"
-          reference_introns.incl((chr, end_idx, new_start_idx))
           #echo chr,"\t",end_idx,"\t",new_start_idx,"\t","reference_intron"
         last_exons[attributes["transcript_id"]] = (new_chr, new_start_idx, new_end_idx)
       else:
