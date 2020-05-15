@@ -689,7 +689,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
           let (chr, start_idx,end_idx)= last_exons[attributes["transcript_id"]]
           assert chr == new_chr
           reference_introns.incl((chr, end_idx, new_start_idx))
-          echo "reference: ",chr,":",end_idx,"-",new_start_idx
+          echo chr,"\t",end_idx,"\t",new_start_idx,"\t","reference_intron"
         last_exons[attributes["transcript_id"]] = (new_chr, new_start_idx, new_end_idx)
       else:
         echo "ERROR - no field transcript_id"
@@ -709,12 +709,12 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       let start_idx = uint64(parseUInt(split_indices[0])) 
       let end_idx = uint64(parseUInt(split_indices[1]))
       if (chr,start_idx,end_idx) notin  reference_introns:
-        echo "query: ", chr,":",start_idx,"-",end_idx
+        echo chr,"\t",start_idx,"\t",end_idx,"\t","query_intron"
         novel_counter += 1
   except EOFError:
     discard
   infile.close()
-  echo &"Novel introns - {novel_counter}"
+  # echo &"Novel introns - {novel_counter}"
   
 proc parseOptions() : UtilOptions = 
   
