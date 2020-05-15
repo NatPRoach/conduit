@@ -569,6 +569,48 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   echo &"Precision: {float(tp) / float(tp+fp)}"
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
+proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) = 
+  ## Grabs Introns from BED12 file and reports one per line in BED format, with ID = ID from the BED12 line
+  var infile,outfile : File
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  try:
+    while true:
+      let bedline = infile.readLine()
+      let bedfields = bedline.split(sep='\t')
+      let chr = bedfields[0]
+      let start_idx = parseUInt(bedfields[1])
+      let end_idx = parseUInt(bedfields[2])
+      let txid = bedfields[3]
+      let strand = bedfields[5]
+      let block_sizes = bedfields[10].split(sep=',')
+      let block_starts= bedfields[11].split(sep=',')
+
+      # var exon_count = 1
+      # var reverse_exon_count = block_starts.len
+      for i in 1..<block_starts.len:
+        let intron_start_idx = start_idx + parseUInt(block_starts[i-1]) + parseUInt(block_sizes[i-1])
+        let intron_end_idx = start_idx + parseUInt(block_starts[i])
+        outfile.write(&"{chr}\t{intron_start_idx}\t{intron_end_idx}\t{txid}\t.\t{strand}\n")
+  except EOFError:
+    discard
+  infile.close()
+  outfile.close()
+
+proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string) =
+  var infile,outfile : File
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  let records = parseFasta(infile)
+  infile.close()
+  for record in records:
+    if record.sequence.len < 2:
+      echo "WARNING - Very short intron detected"
+    else:
+      if record.sequence[0..1].toUpperAscii() != "GT" or record.sequence[^2..^1].toUpperAscii() != "AG":
+        outfile.writeLine(record.read_id)
+  outfile.close()
+
 proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1'u64,2'u64,5'u64,10'u64,20'u64,40'u64,80'u64,160'u64,320'u64,640'u64]) = 
   var infile : File
   discard open(infile,infilepath, fmRead)
@@ -647,7 +689,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical":
         case kind:
           of cmdEnd:
             break
@@ -800,6 +842,10 @@ proc main() =
         splitFASTAByReadCounts(opt.infilepath,opt.outfilepath)
       of "filterFASTA":
         filterFASTAByReadCounts(opt.infilepath,opt.outfilepath)
+      of "extractIntrons":
+        extractIntronsFromBED12(opt.infilepath,opt.outfilepath)
+      of "callNonCanonical":
+        callNonCanonicalSplicingFromFASTA(opt.infilepath,opt.outfilepath)
 
 
 main()
