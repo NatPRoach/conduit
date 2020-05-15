@@ -748,7 +748,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical":
         case kind:
           of cmdEnd:
             break
