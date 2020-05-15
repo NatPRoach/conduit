@@ -671,7 +671,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
   var last_exons : Table[string,(string,uint64,uint64)]
   try:
     while true:
-      let line = infile.readLine()
+      let line = reference_infile.readLine()
       if line.len == 0:
         continue
       let fields0 = line.split('\t')
