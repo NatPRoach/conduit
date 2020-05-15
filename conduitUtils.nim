@@ -655,6 +655,65 @@ proc filterFASTAByReadCounts*(infilepath,outfilepath : string, filter : uint64 =
       outfile.writeLine(record.sequence)
   outfile.close()
 
+proc parseAttributes(s : string) : Table[string,string] = 
+  let fields = s.split(';')[0..^2]
+  for field in fields:
+    let fields1 = field.strip(leading=true,trailing=true,chars={' '}).split(' ')
+    let key = fields1[0]
+    let val = fields1[1].strip(leading=true,trailing=true,chars = {'"'})
+    result[key] = val
+
+proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
+  var reference_infile,infile : File
+  discard open(reference_infile,reference_infilepath,fmRead)
+  discard open(infile,infilepath,fmRead)
+  var reference_introns : HashSet[(string,uint64,uint64)]
+  var last_exons : Table[string,(string,uint64,uint64)]
+  try:
+    while true:
+      let line = infile.readLine()
+      if line.len == 0:
+        continue
+      let fields0 = line.split('\t')
+      if fields0[2] != "exon":
+        continue
+      let attributes = parseAttributes(fields0[8])
+      if "transcript_id" in attributes:
+        let new_chr = fields0[0]
+        let new_start_idx =  uint64(parseUInt(fields0[3]))
+        let new_end_idx = uint64(parseUInt(fields0[4]))
+        if attributes["transcript_id"] in last_exons:
+          let (chr, start_idx,end_idx)= last_exons[attributes["transcript_id"]]
+          assert chr == new_chr
+          reference_introns.incl((chr, end_idx, new_start_idx))
+        last_exons[attributes["transcript_id"]] = (new_chr, new_start_idx, new_end_idx)
+      else:
+        echo "ERROR - no field transcript_id"
+
+  except EOFError:
+    discard
+  reference_infile.close()
+  var novel_counter = 0
+  try:
+    while true:
+      let line = infile.readLine()
+      if line.len == 0:
+        continue
+      let fields0 = line.split(':')
+      let chr = fields0[2]
+      let indices = fields0[3].strip(chars={'(',')','+','-'})
+      let split_indices = indices.split('-')
+      let start_idx = uint64(parseUInt(split_indices[0]))
+      let end_idx = uint64(parseUInt(split_indices[1]))
+      if (chr,start_idx,end_idx) in  reference_introns:
+        continue
+      else:
+        novel_counter += 1
+  except EOFError:
+    discard
+  infile.close()
+  echo &"Novel introns - {novel_counter}"
+  
 proc parseOptions() : UtilOptions = 
   
   var i = 0
@@ -846,6 +905,8 @@ proc main() =
         extractIntronsFromBED12(opt.infilepath,opt.outfilepath)
       of "callNonCanonical":
         callNonCanonicalSplicingFromFASTA(opt.infilepath,opt.outfilepath)
+      of "callNovelNonCanonical":
+        callNovelNonCanonical(opt.reference_infilepath,opt.infilepath)
 
 
 main()
