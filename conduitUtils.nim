@@ -663,10 +663,11 @@ proc parseAttributes(s : string) : Table[string,string] =
     let val = fields1[1].strip(leading=true,trailing=true,chars = {'"'})
     result[key] = val
 
-proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
-  var reference_infile,infile : File
+proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string) =
+  var reference_infile,infile,outfile : File
   discard open(reference_infile,reference_infilepath,fmRead)
   discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmRead)
   var reference_introns : HashSet[(string,uint64,uint64)]
   var last_exons : Table[string,(string,uint64,uint64)]
   try:
@@ -695,7 +696,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
             let tx_id = attributes["transcript_id"]
             echo &"{chr}:{start_idx}-{end_idx} {tx_id}"
             echo &"{new_chr}:{new_start_idx}-{new_end_idx} {tx_id}"
-          #echo chr,"\t",end_idx,"\t",new_start_idx,"\t","reference_intron"
+          # outfilepath.writeLine(chr,"\t",end_idx,"\t",new_start_idx,"\t","reference_intron")
         last_exons[attributes["transcript_id"]] = (new_chr, new_start_idx, new_end_idx)
       else:
         echo "ERROR - no field transcript_id"
@@ -715,11 +716,12 @@ proc callNovelNonCanonical(reference_infilepath, infilepath : string) =
       let start_idx = uint64(parseUInt(split_indices[0])) 
       let end_idx = uint64(parseUInt(split_indices[1]))
       if (chr,start_idx,end_idx) notin  reference_introns:
-        #echo chr,"\t",start_idx,"\t",end_idx,"\t","query_intron"
+        outfile.writeLine(&"chr,"\t",start_idx,"\t",end_idx,"\t","query_intron"")
         novel_counter += 1
   except EOFError:
     discard
   infile.close()
+  outfile.close()
   echo &"Novel introns - {novel_counter}"
   
 proc parseOptions() : UtilOptions = 
