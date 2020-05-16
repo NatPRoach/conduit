@@ -667,7 +667,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
   var reference_infile,infile,outfile : File
   discard open(reference_infile,reference_infilepath,fmRead)
   discard open(infile,infilepath,fmRead)
-  discard open(outfile,outfilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
   var reference_introns : HashSet[(string,uint64,uint64)]
   var last_exons : Table[string,(string,uint64,uint64)]
   try:
