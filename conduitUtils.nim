@@ -716,7 +716,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
       let start_idx = uint64(parseUInt(split_indices[0])) 
       let end_idx = uint64(parseUInt(split_indices[1]))
       if (chr,start_idx,end_idx) notin  reference_introns:
-        outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\t{query_intron}")
+        outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\tquery_intron")
         novel_counter += 1
   except EOFError:
     discard
