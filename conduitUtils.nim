@@ -675,6 +675,8 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
       let line = reference_infile.readLine()
       if line.len == 0:
         continue
+      elif line[0] == '#':
+        continue
       let fields0 = line.split('\t')
       # echo fields0
       # if fields0.len == 0:
