@@ -663,7 +663,7 @@ proc parseAttributes(s : string) : Table[string,string] =
     let val = fields1[1].strip(leading=true,trailing=true,chars = {'"'})
     result[key] = val
 
-proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string) =
+proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string,threshold : uint = 5) =
   var reference_infile,infile,outfile : File
   discard open(reference_infile,reference_infilepath,fmRead)
   discard open(infile,infilepath,fmRead)
@@ -712,14 +712,17 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
       if line.len == 0:
         continue
       let fields0 = line.split(':')
+      let cluster_id = fields0[0]
+      let read_support = parseUInt(cluster_id.split('_')[^1])
       let chr = fields0[2]
       let indices = fields0[3].strip(chars={'(',')','+','-'})
       let split_indices = indices.split('-')
       let start_idx = uint64(parseUInt(split_indices[0])) 
       let end_idx = uint64(parseUInt(split_indices[1]))
       if (chr,start_idx,end_idx) notin  reference_introns:
-        outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\tquery_intron")
-        novel_counter += 1
+        if read_support > threshold:
+          outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\tquery_intron")
+          novel_counter += 1
   except EOFError:
     discard
   infile.close()
