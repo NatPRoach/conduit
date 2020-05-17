@@ -725,7 +725,38 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
   infile.close()
   outfile.close()
   echo &"Novel introns - {novel_counter}"
-  
+
+proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : string) =
+  var reference_infile,infile,outfile : File
+  discard open(reference_infile,reference_infilepath,fmRead)
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  var reference_introns : HashSet[string]
+  # var last_exons : Table[string,(string,uint64,uint64)]
+  try:
+    while true:
+      let line = infile.readLine()
+      reference_introns.incl(line)
+  except EOFError:
+    discard
+  reference_infile.close()
+  var novel_counter = 0
+  var overlapping_counter = 0
+  try:
+    while true:
+      let line = infile.readLine()
+      if line notin  reference_introns:
+        novel_counter += 1
+      else:
+        outfile.writeLine(line)
+        overlapping_counter += 1
+  except EOFError:
+    discard
+  infile.close()
+  outfile.close()
+  echo &"Non-overlapping introns - {novel_counter}"
+  echo &"Overlapping introns - {novel_counter}"
+
 proc parseOptions() : UtilOptions = 
   
   var i = 0
@@ -760,7 +791,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping":
         case kind:
           of cmdEnd:
             break
@@ -919,6 +950,8 @@ proc main() =
         callNonCanonicalSplicingFromFASTA(opt.infilepath,opt.outfilepath)
       of "callNovelNonCanonical":
         callNovelNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+      of "callOverlapping:"
+        callOverlappingNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
 
 
 main()
