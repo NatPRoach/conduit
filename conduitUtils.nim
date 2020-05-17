@@ -731,12 +731,20 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
   discard open(reference_infile,reference_infilepath,fmRead)
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
-  var reference_introns : HashSet[string]
+  var reference_introns : HashSet[(string,uint64,uint64)]
   # var last_exons : Table[string,(string,uint64,uint64)]
   try:
     while true:
       let line = reference_infile.readLine()
-      reference_introns.incl(line)
+      if line.len == 0:
+        continue
+      let fields0 = line.split(':')
+      let chr = fields0[2]
+      let indices = fields0[3].strip(chars={'(',')','+','-'})
+      let split_indices = indices.split('-')
+      let start_idx = uint64(parseUInt(split_indices[0])) 
+      let end_idx = uint64(parseUInt(split_indices[1]))
+      reference_introns.incl((chr,start_idx,end_idx))
   except EOFError:
     discard
   reference_infile.close()
@@ -745,7 +753,15 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
   try:
     while true:
       let line = infile.readLine()
-      if line notin  reference_introns:
+      if line.len == 0:
+        continue
+      let fields0 = line.split(':')
+      let chr = fields0[2]
+      let indices = fields0[3].strip(chars={'(',')','+','-'})
+      let split_indices = indices.split('-')
+      let start_idx = uint64(parseUInt(split_indices[0])) 
+      let end_idx = uint64(parseUInt(split_indices[1]))
+      if (chr,start_idx,end_idx) notin  reference_introns:
         novel_counter += 1
       else:
         outfile.writeLine(line)
