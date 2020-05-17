@@ -950,7 +950,7 @@ proc main() =
         callNonCanonicalSplicingFromFASTA(opt.infilepath,opt.outfilepath)
       of "callNovelNonCanonical":
         callNovelNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
-      of "callOverlapping:"
+      of "callOverlapping":
         callOverlappingNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
 
 
