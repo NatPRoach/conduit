@@ -720,7 +720,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
       let split_indices = indices.split('-')
       let start_idx = uint64(parseUInt(split_indices[0])) 
       let end_idx = uint64(parseUInt(split_indices[1]))
-      if read_support > threshold:
+      if read_support >= threshold:
         total_counter += 1
         if (chr,start_idx,end_idx) notin  reference_introns:
           outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\tquery_intron")
