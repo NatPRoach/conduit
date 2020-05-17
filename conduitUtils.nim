@@ -755,7 +755,7 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
   infile.close()
   outfile.close()
   echo &"Non-overlapping introns - {novel_counter}"
-  echo &"Overlapping introns - {novel_counter}"
+  echo &"Overlapping introns - {overlapping_counter}"
 
 proc parseOptions() : UtilOptions = 
   
