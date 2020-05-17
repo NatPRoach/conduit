@@ -706,6 +706,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
     discard
   reference_infile.close()
   var novel_counter = 0
+  var total_counter = 0
   try:
     while true:
       let line = infile.readLine()
@@ -719,14 +720,16 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
       let split_indices = indices.split('-')
       let start_idx = uint64(parseUInt(split_indices[0])) 
       let end_idx = uint64(parseUInt(split_indices[1]))
-      if (chr,start_idx,end_idx) notin  reference_introns:
-        if read_support > threshold:
+      if read_support > threshold:
+        total_counter += 1
+        if (chr,start_idx,end_idx) notin  reference_introns:
           outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\tquery_intron")
           novel_counter += 1
   except EOFError:
     discard
   infile.close()
   outfile.close()
+  echo &"Total introns above threshold - {total_counter}"
   echo &"Novel introns - {novel_counter}"
 
 proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : string) =
