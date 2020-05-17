@@ -735,7 +735,7 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
   # var last_exons : Table[string,(string,uint64,uint64)]
   try:
     while true:
-      let line = infile.readLine()
+      let line = reference_infile.readLine()
       reference_introns.incl(line)
   except EOFError:
     discard
