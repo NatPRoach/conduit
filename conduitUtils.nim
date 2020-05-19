@@ -51,11 +51,36 @@ proc writeDefaultHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
   echo "Usage:"
-  echo "  ./conduitUtils <translate | bed2gtf | parseBLASTP>"
+  echo "  ./conduitUtils <function>"
+  echo "Where <function> is one of the following:"
+  echo "  translate   - Translates FASTA/Q nucleotide sequences into protein based on their longest ORF"
+  echo ""
+  echo "  bed2gtf     - Converts BED12 files to well structured GTF file suitable for use in GFFcompare"
+  echo ""
+  echo "  parseBLASTP   - Parses BLASTP output and outputs closest match for each query transcript as determined by BLASTP"
+  echo ""
+  echo "  compareBLASTP - Compares BLASTP output and reference proteome to determine the # of TP, FP, and FN for a sample"
+  echo ""
+  echo "  compareFASTA  - Compares two FASTA files, an input and a reference, to determine the # of TP, FP, and FN for a sample"
+  echo ""
+  echo "  splitFASTA    - Splits CONDUIT produced FASTA file based on the number of reads supporting each isoform"
+  echo ""
+  echo "  filterFASTA   - Filters CONDUIT produced FASTA file based on number of reads supporting each isoform"
+  echo ""
+  echo "  extractIntrons   - Extracts out intronic sequences from BED12 formatted input and outputs as BED6"
+  echo ""
+  echo "  callNonCanonical - Reads in a FASTA file and reports the readIDs of sequences that dont begin with GT and end with AG"
+  echo ""
+  echo "  callNovelNonCanonical - Compares introns described by reference GTF file to introns described by a list of readIDs in the format produced by `bedtools getfasta -name` function, outputs the novel introns in BED format"
+  echo ""
+  echo "  callOverlapping - Compares two files of readIDs specifying introns in the format produced by `bedtools getfasta -name`, and reports the introns that are shared between the two files (not stranded)"
+  echo ""
+
 
 proc writeTranslateHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
+  echo "translate   - Translates FASTA/Q nucleotide sequences into protein based on their longest ORF"
   echo "Usage:"
   echo "  ./conduitUtils translate [options] -i <transcripts.fa> -o <predicted_protein.fa>"
   echo "  <transcripts.fa>         FASTA/Q infile containing putative transcripts to be translated"
@@ -74,6 +99,7 @@ proc writeTranslateHelp() =
 proc writeBED2GTFHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
+  echo "bed2gtf     - Converts BED12 files to well structured GTF file suitable for use in GFFcompare"
   echo "Usage:"
   echo "  ./conduitUtils bed2gtf -i <infile.bed> -o <outfile.gtf>"
   echo "  <infile.bed>    BED12 infile to be converted in to GTF format"
@@ -82,11 +108,92 @@ proc writeBED2GTFHelp() =
 proc writeBLASTPHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
+  echo "parseBLASTP   - Parses BLASTP output and outputs closest match for each query transcript as determined by BLASTP"
   echo "Usage:"
   echo "  ./conduitUtils parseBLASTP -i <inBLASTP.txt> -o <outPutativeOrthologs.tsv>"
   echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
   echo "  <outPutativeOrthologs.tsv>  Tab separated file of putative ortholog matches"
   echo "                              In format: <Query ID>\t<Reference proteome top match ID>\t<E value>"
+
+proc writeCompareBLASTPHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "compareBLASTP - Compares BLASTP output and reference proteome to determine the # of true positives, false positives, and false negatives for a sample"
+  echo "Usage:"
+  echo "  ./conduitUtils compareBLASTP -r <reference_proteome.fa> -i <inBLASTP.txt>"
+  echo "  <reference_proteome.fa>     FASTA file describing the reference proteome used in the BLASTP search"
+  echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
+
+proc writeCompareFASTAHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "compareFASTA  - Compares two FASTA files, an input and a reference, to determine the # of true positives, false positives, and false negatives for a sample"
+  echo "Usage:"
+  echo "  ./conduitUtils compareFASTA -r <reference.fa> -i <query.fa>"
+  echo "  <reference.fa>              Reference FASTA file defining the truth set"
+  echo "  <query.fa>                  Query FASTA files defining the query set"
+
+proc writeSplitFASTAHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "splitFASTA    - Splits CONDUIT produced FASTA file based on the number of reads supporting each isoform"
+  echo "Usage:"
+  echo "  ./conduitUtils splitFASTA -i <conduit_output.fa> -o <outprefix>"
+  echo "  <conduit_output.fa>         CONDUIT produced FASTA file to be split based on number of reads supporting each isoform"
+  echo "  <outprefix>                 Prefix for the fasta files to be output, suffix will describe the bin being reported"
+
+proc writeFilterFASTAHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "filterFASTA   - Filters CONDUIT produced FASTA file based on number of reads supporting each isoform"
+  echo "Usage:"
+  echo "  ./conduitUtils filterFASTA -i <inBLASTP.txt> -o <outPutativeOrthologs.tsv>"
+  echo "  <conduit_output.fa>         CONDUIT produced FASTA file to be filtered based on number of reads supporting each isoform"
+  echo "  <filtered.fa>               Output FASTA file for filtered reads"
+  echo "Options: (defaults in parentheses)"
+  echo "  Filtering options:"
+  echo "     -n (5)"
+  echo "        Minimum number of reads that must support an isoform for it to be reported in the filtered FASTA"
+
+proc writeExtractIntronsHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "extractIntrons   - Extracts out intronic sequences from BED12 formatted input and outputs as BED6"
+  echo "Usage:"
+  echo "  ./conduitUtils extractIntrons -i <transcripts.bed12> -o <introns.bed>"
+  echo "  <transcripts.bed12>         Transcripts in BED12 format to extract introns from"
+  echo "  <introns.bed>               BED6 output of extracted introns"
+
+proc writeCallNonCanonicalHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "callNonCanonical - Reads in a FASTA file and reports the readIDs of sequences that dont begin with GT and end with AG"
+  echo "Usage:"
+  echo "  ./conduitUtils callNonCanonical -i <introns.fa> -o <noncanonical.txt>"
+  echo "  <introns.fa>              FASTA describing the stranded sequence of introns extracted from `extractIntrons`"
+  echo "                            Introns sequences can be obtained using `bedtools getfasta -name -s`"
+  echo "  <noncanonical.txt>        Read IDs of the sequences that didn't begin with GT and end with AG"
+
+proc writeCallNovelNonCanonicalHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "callNovelNonCanonical - Compares introns described by reference GTF file to introns described by a list of readIDs in the format produced by `bedtools getfasta -name` function, outputs the novel introns in BED format"
+  echo "Usage:"
+  echo "  ./conduitUtils callNovelNonCanonical -r <reference.gtf> -i <noncanonical.txt> -o <novel.bed>"
+  echo "  <reference.gtf>              Reference GTF file specifying the introns to compare against"
+  echo "  <noncanonical.txt>           Read IDs specifying intron structure in the format produced by `bedtools getfasta -name`"
+  echo "  <novel.bed>                  Output of introns found in the noncanonical.txt file but not found in the reference, in BED6 format"
+
+proc writeCallOverlappingHelp() = 
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "callOverlapping - Compares two files of readIDs specifying introns in the format produced by `bedtools getfasta -name`, and reports the introns that are shared between the two files (not stranded)"
+  echo "Usage:"
+  echo "  ./conduitUtils callOverlapping -r <introns1.txt> -i <introns2.txt> -o <shared_introns.txt>"
+  echo "  <introns1.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
+  echo "  <introns2.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
+  echo "  <shared_introns.txt>        The introns in common between the two files"
+
 
 proc parseFASTQ(infile : File) : seq[FastqRecord] = 
   while true:
@@ -543,7 +650,7 @@ proc compareExactTranslations*(reference_infilepath : string, translation_infile
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
 proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath : string,) =
-  var fp = 0
+  var tp,fp = 0
   var reference_id_set : HashSet[string]
   var match_set : HashSet[string]
   var ref_infile : File
@@ -557,10 +664,11 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   for record in blast_records:
     if record.match_names.len > 0:
       match_set.incl(record.match_names[0])
+      tp += 1
     else:
       fp += 1
 
-  let tp = match_set.len
+  # let tp = match_set.len
   let fn = difference(reference_id_set,match_set).len
   echo "TP: ", tp
   echo "FP: ", fp
