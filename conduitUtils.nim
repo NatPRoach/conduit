@@ -650,7 +650,7 @@ proc compareExactTranslations*(reference_infilepath : string, translation_infile
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
 proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath : string,) =
-  var tp,fp = 0
+  var fp = 0
   var reference_id_set : HashSet[string]
   var match_set : HashSet[string]
   var ref_infile : File
@@ -664,11 +664,11 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   for record in blast_records:
     if record.match_names.len > 0:
       match_set.incl(record.match_names[0])
-      tp += 1
+      # tp += 1
     else:
       fp += 1
 
-  # let tp = match_set.len
+  let tp = match_set.len
   let fn = difference(reference_id_set,match_set).len
   echo "TP: ", tp
   echo "FP: ", fp
@@ -1015,10 +1015,17 @@ proc parseOptions() : UtilOptions =
     echo "ERROR - infilepath must be specified"
     run_flag = false
     help_flag = true
-  if outfilepath == "" and not help_flag:
-    echo "ERROR - outfilepath must be specified"
-    run_flag = false
-    help_flag = true
+  case mode:
+    of "translate","bed2gtf","parseBLASTP","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping":
+      if outfilepath == "" and not help_flag:
+        echo "ERROR - outfilepath must be specified"
+        run_flag = false
+        help_flag = true
+    of "compareBLASTP","compareFASTA","callNonCanonical","callNovelNonCanonical","callOverlapping":
+      if reference_infilepath == "" and not help_flag:
+        echo "ERROR - referencefilepath must be specified"
+        run_flag = false
+        help_flag = true
   if help_flag:
     case mode:
       of "translate":
@@ -1027,8 +1034,24 @@ proc parseOptions() : UtilOptions =
         writeBED2GTFHelp()
       of "parseBLASTP":
         writeBLASTPHelp()
+      of "compareBLASTP":
+        writeCompareBLASTPHelp()
+      of "compareFASTA":
+        writeCompareFASTAHelp()
+      of "splitFASTA":
+        writeSplitFASTAHelp()
+      of "filterFASTA":
+        writeFilterFASTAHelp()
+      of "extractIntrons":
+        writeExtractIntronsHelp()
+      of "callNonCanonical":
+        writeCallNonCanonicalHelp()
+      of "callNovelNonCanonical":
+        writeCallNovelNonCanonicalHelp()
+      of "callOverlapping":
+        writeCallOverlappingHelp()
       else:
-        echo "ERROR - first argument must specify utility function: \"translate\", \"bed2gtf\", or \"parseBLASTP\""
+        echo "ERROR - first argument must specify utility function"
         writeDefaultHelp()
   return UtilOptions(mode : mode,
                      run_flag : run_flag,
