@@ -1015,17 +1015,24 @@ proc parseOptions() : UtilOptions =
     echo "ERROR - infilepath must be specified"
     run_flag = false
     help_flag = true
+  var require_outfile,require_reference = false
   case mode:
-    of "translate","bed2gtf","parseBLASTP","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping":
-      if outfilepath == "" and not help_flag:
-        echo "ERROR - outfilepath must be specified"
-        run_flag = false
-        help_flag = true
-    of "compareBLASTP","compareFASTA","callNonCanonical","callNovelNonCanonical","callOverlapping":
-      if reference_infilepath == "" and not help_flag:
-        echo "ERROR - referencefilepath must be specified"
-        run_flag = false
-        help_flag = true
+    of "translate","bed2gtf","parseBLASTP","splitFASTA","filterFASTA","extractIntrons":
+      require_outfile = true
+    of "compareBLASTP","compareFASTA":
+      require_reference = true
+    of "callNonCanonical","callNovelNonCanonical","callOverlapping":
+      require_reference = true
+      require_outfile = true
+  
+  if require_outfile and outfilepath == "" and not help_flag:
+    echo "ERROR - outfilepath must be specified"
+    run_flag = false
+    help_flag = true
+  if require_reference and reference_infilepath == "" and not help_flag:
+    echo "ERROR - referencefilepath must be specified"
+    run_flag = false
+    help_flag = true
   if help_flag:
     case mode:
       of "translate":
