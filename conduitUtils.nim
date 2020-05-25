@@ -944,6 +944,7 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
   var tx_introns : Table[(string,seq[(uint64,uint64)]), string]
   var single_exon_genes : Table[string,seq[(uint64,uint64,string)]]
   for (tx_id,chr) in tx_exons.keys:
+    echo chr
     let exon_chain = tx_exons[(tx_id,chr)]
     if exon_chain.len > 1:
       var intron_chain : seq[(uint64,uint64)]
