@@ -6,6 +6,7 @@ import strformat
 import tables
 import sets
 import poGraphUtils
+import algorithm
 
 type
   BLASTmatch* = object
@@ -705,6 +706,30 @@ proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) =
   infile.close()
   outfile.close()
 
+proc testOverlap(read : (uint64,uint64),single_exon_gene_list : seq[(uint64,uint64,string)]) : string = 
+  result = ""
+  for gene in single_exon_gene_list: #gene list must be sorted
+    if read[0] >= gene[0] and read[0] <= gene[1]:
+      if result != "":
+        if result != gene[2]:
+          break
+      else:
+          result = gene[2]
+    elif read[1] >= gene[0] and read[1] <= gene[1]:
+      if result != "":
+        if result != gene[2]:
+          break
+      else:
+          result = gene[2]
+    elif read[0] <= gene[0] and read[1] >= gene[1]:
+      if result != "":
+        if result != gene[2]:
+          break
+      else:
+          result = gene[2]
+    elif read[1] <= gene[0]:
+      break
+
 proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string) =
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
@@ -887,6 +912,86 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
   echo &"Non-overlapping introns - {novel_counter}"
   echo &"Overlapping introns - {overlapping_counter}"
 
+proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) = 
+  var reference_infile,infile,outfile : File
+  discard open(reference_infile,reference_infilepath,fmRead)
+  var tx_exons : Table[(string,string),seq[(uint64,uint64)]]
+  try:
+    while true:
+      let line = reference_infile.readLine()
+      if line.len == 0:
+        continue
+      elif line[0] == '#':
+        continue
+      let fields0 = line.split('\t')
+      # echo fields0
+      # if fields0.len == 0:
+      #   echo line
+      if fields0[2] != "exon":
+        continue
+      let attributes = parseAttributes(fields0[8])
+      if "transcript_id" in attributes:
+        let new_chr = fields0[0]
+        let new_start_idx =  uint64(parseUInt(fields0[3])) - 1'u32
+        let new_end_idx = uint64(parseUInt(fields0[4]))
+        if (attributes["transcript_id"],new_chr) in tx_exons:
+          tx_exons[(attributes["transcript_id"],new_chr)].add((new_start_idx,new_end_idx))
+      else:
+        echo "ERROR - no field transcript_id"
+  except EOFError:
+    discard
+  reference_infile.close()
+  var tx_introns : Table[(string,seq[(uint64,uint64)]), string]
+  var single_exon_genes : Table[string,seq[(uint64,uint64,string)]]
+  for (tx_id,chr) in tx_exons.keys:
+    let exon_chain = tx_exons[(tx_id,chr)]
+    if exon_chain.len > 1:
+      var intron_chain : seq[(uint64,uint64)]
+      for i in 1..<exon_chain.len:
+        intron_chain.add((exon_chain[i-1][1],exon_chain[i][0]))
+      tx_introns[(chr,intron_chain)] = tx_id
+    else:
+      if chr in single_exon_genes:
+        single_exon_genes[chr].add((exon_chain[0][0],exon_chain[0][1],tx_id))
+      else:
+        single_exon_genes[chr] = @[(exon_chain[0][0],exon_chain[0][1],tx_id)]
+  for chr in single_exon_genes.keys:
+    single_exon_genes[chr].sort
+  
+  #Read in BED12 file and get intron chains
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  try:
+    while true:
+      let bedline = infile.readLine()
+      let bedfields = bedline.split(sep='\t')
+      let chr = bedfields[0]
+      let start_idx = parseUInt(bedfields[1])
+      let end_idx = parseUInt(bedfields[2])
+      let txid = bedfields[3]
+      let strand = bedfields[5]
+      let block_sizes = bedfields[10].split(sep=',')
+      let block_starts= bedfields[11].split(sep=',')
+      var reference_id = ""
+      if block_starts.len > 1:
+        var intron_chain : seq[(uint64,uint64)]
+        for i in 1..<block_starts.len:
+          let intron_start_idx = uint64(start_idx + parseUInt(block_starts[i-1]) + parseUInt(block_sizes[i-1]))
+          let intron_end_idx = uint64(start_idx + parseUInt(block_starts[i]))
+          intron_chain.add((intron_start_idx,intron_end_idx))
+        if (chr,intron_chain) in tx_introns:
+          reference_id = tx_introns[(chr,intron_chain)]
+      else:
+        reference_id = testOverlap((uint64(start_idx),uint64(end_idx)),single_exon_genes[chr])
+      if reference_id == "":
+        outfile.write(&"{txid}\t.\n")
+      else:
+        outfile.write(&"{txid}\t{reference_id}\n")
+  except EOFError:
+    discard
+  infile.close()
+  outfile.close()
+
 proc parseOptions() : UtilOptions = 
   
   var i = 0
@@ -921,7 +1026,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping":
+      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs":
         case kind:
           of cmdEnd:
             break
@@ -1112,6 +1217,8 @@ proc main() =
         callNovelNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
       of "callOverlapping":
         callOverlappingNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+      of "assignIDs":
+        assignTxIDs(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
 
 
 main()
