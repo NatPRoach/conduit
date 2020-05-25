@@ -936,6 +936,8 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
         let new_end_idx = uint64(parseUInt(fields0[4]))
         if (attributes["transcript_id"],new_chr) in tx_exons:
           tx_exons[(attributes["transcript_id"],new_chr)].add((new_start_idx,new_end_idx))
+        else:
+          tx_exons[(attributes["transcript_id"],new_chr)] = @[(new_start_idx,new_end_idx)]
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
@@ -944,7 +946,7 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
   var tx_introns : Table[(string,seq[(uint64,uint64)]), string]
   var single_exon_genes : Table[string,seq[(uint64,uint64,string)]]
   for (tx_id,chr) in tx_exons.keys:
-    echo chr
+    # echo chr
     let exon_chain = tx_exons[(tx_id,chr)]
     if exon_chain.len > 1:
       var intron_chain : seq[(uint64,uint64)]
