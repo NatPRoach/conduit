@@ -564,6 +564,18 @@ proc findAll*(s,sub : string) : seq[int] =
     result.add(idx)
     start = idx + 1 
 
+proc revComp*(nts : string) : string =
+  let wc_pairs = {'A' : 'T',
+                  'C' : 'G',
+                  'T' : 'A',
+                  'G' : 'C'}.toTable()
+  var revcomp : seq[char]
+  for i in 1..nts.len:
+    revcomp.add(wc_pairs[nts[^i]])
+  result = revcomp.join("")
+
+
+
 proc translateTranscript*(nts : string) : string =
   let start_codon_indices = findAll(nts,"ATG")
   result = ""
@@ -579,7 +591,13 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
     let upper = transcript.sequence.toUpperAscii
     if upper.find('N') != -1:
       continue
-    let translation = translateTranscript(upper)
+    let translation1 = translateTranscript(upper)
+    let translation2 = translateTranscript(revComp(upper))
+    var translation : string
+    if translation1.len > translation2.len:
+      translation = translation1
+    else:
+      translation = translation2
     if translation.len >= threshold:
       outfile.write(&">{transcript.read_id}\n")
       for i in 0..<(translation.len div wrap_len):
