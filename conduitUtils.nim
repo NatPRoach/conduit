@@ -37,6 +37,7 @@ type
     reference_infilepath : string
     min_length : uint64
     fastq : bool
+    stranded : bool
 
   FastqRecord* = object
     read_id* : string
@@ -93,6 +94,8 @@ proc writeTranslateHelp() =
   echo "        Input file is in FASTA format"
   echo "    -q, --fastq"
   echo "        Input file is in FASTQ format"
+  echo "    -s, --stranded"
+  echo "        Input reads are forward stranded"
   echo "  Filtering Options:"
   echo "    -l, --min-length (75)"
   echo "        Minimum length in Amino Acids necessary for a putative ORF to be reported"
@@ -574,8 +577,6 @@ proc revComp*(nts : string) : string =
     revcomp.add(wc_pairs[nts[^i]])
   result = revcomp.join("")
 
-
-
 proc translateTranscript*(nts : string) : string =
   let start_codon_indices = findAll(nts,"ATG")
   result = ""
@@ -584,20 +585,23 @@ proc translateTranscript*(nts : string) : string =
     if translation.len > result.len:
       result = translation
 
-proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60) =
+proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60, stranded = false) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for transcript in transcripts:
     let upper = transcript.sequence.toUpperAscii
     if upper.find('N') != -1:
       continue
-    let translation1 = translateTranscript(upper)
-    let translation2 = translateTranscript(revComp(upper))
     var translation : string
-    if translation1.len > translation2.len:
-      translation = translation1
+    if stranded:
+      translation = translateTranscript(upper)
     else:
-      translation = translation2
+      let translation1 = translateTranscript(upper)
+      let translation2 = translateTranscript(revComp(upper))
+      if translation1.len > translation2.len:
+        translation = translation1
+      else:
+        translation = translation2
     if translation.len >= threshold:
       outfile.write(&">{transcript.read_id}\n")
       for i in 0..<(translation.len div wrap_len):
@@ -606,8 +610,8 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
         outfile.write(&"{translation[wrap_len*(translation.len div wrap_len)..^1]}\n")
   outfile.close()
 
-proc translateTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60) =
-  translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,threshold,wrap_len)
+proc translateTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60,stranded = false) =
+  translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,threshold,wrap_len,stranded)
 
 proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
   ## Converts BED12 formatted file to well-formed GTF file suitable for evaluation with GFFcompare
@@ -1031,6 +1035,8 @@ proc parseOptions() : UtilOptions =
   var infilepath = ""
   var infilepath_flag = false
 
+  var stranded = false
+
   var reference_infilepath = ""
   var reference_infilepath_flag = false
   
@@ -1115,6 +1121,8 @@ proc parseOptions() : UtilOptions =
                   echo "ERROR Multiple references provided"
                   run_flag = false
                   break
+              of "s", "stranded":
+                stranded = true
               of "h", "help":
                 help_flag = true
                 run_flag = false
@@ -1192,7 +1200,8 @@ proc parseOptions() : UtilOptions =
                      outfilepath : outfilepath,
                      reference_infilepath : reference_infilepath,
                      min_length : min_length,
-                     fastq : fastq
+                     fastq : fastq,
+                     stranded : stranded
                      )
 
 proc main() =
@@ -1205,11 +1214,11 @@ proc main() =
         if opt.fastq:
           let records = parseFASTQ(infile)
           infile.close()
-          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length))
+          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
         else:
           let records = poGraphUtils.parseFasta(infile)
           infile.close()
-          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length))
+          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
       of "bed2gtf":
         convertBED12toGTF(opt.infilepath,opt.outfilepath)
       of "parseBLASTP":
