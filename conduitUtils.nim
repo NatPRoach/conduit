@@ -623,7 +623,7 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
       let bedline = infile.readLine()
       let bedfields = bedline.split(sep='\t')
       let chr = bedfields[0]
-      let start_idx = parseUInt(bedfields[1])
+      let start_idx = parseUInt(bedfields[1]) + 1'u
       let end_idx = parseUInt(bedfields[2])
       let txid = bedfields[3]
       let strand = bedfields[5]
