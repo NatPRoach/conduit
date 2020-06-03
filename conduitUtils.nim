@@ -100,6 +100,23 @@ proc writeTranslateHelp() =
   echo "    -l, --min-length (75)"
   echo "        Minimum length in Amino Acids necessary for a putative ORF to be reported"
 
+proc writeStrandTranscriptsHelp() =
+  echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
+  echo conduitUtilsVersion()
+  echo "strandTranscripts  - Translates FASTA/Q nucleotide sequences into protein based on their longest ORF"
+  echo "Usage:"
+  echo "  ./conduitUtils strandTranscripts [options] -i <transcripts.fa> -o <predicted_protein.fa>"
+  echo "  <transcripts.fa>            FASTA/Q infile containing putative transcripts to be translated"
+  echo "  <stranded_trasncripts.fa>   FASTA outfile containing in silico translated ORFs from transcripts.fa"
+  echo ""
+  echo "Options (defaults in parentheses):"
+  echo "  Input Options:"
+  echo "    -a, --fasta (default)"
+  echo "        Input file is in FASTA format"
+  echo "    -q, --fastq"
+  echo "        Input file is in FASTQ format"
+
+
 proc writeBED2GTFHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -656,6 +673,32 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
   infile.close()
   outfile.close()
 
+proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string, wrap_len : int = 60) =
+  var outfile : File
+  discard open(outfile,outfilepath,fmWrite)
+  for transcript in transcripts:
+    let upper = transcript.sequence.toUpperAscii
+    if upper.find('N') != -1:
+      continue
+    let rev = revComp(upper)
+    var stranded : string
+    let translation1 = translateTranscript(upper)
+    let translation2 = translateTranscript(rev)
+    if translation1.len > translation2.len:
+      stranded = upper
+    else:
+      stranded = rev
+    outfile.write(&">{transcript.read_id}\n")
+    for i in 0..<(stranded.len div wrap_len):
+      outfile.write(&"{stranded[i*wrap_len..(i+1)*wrap_len - 1]}\n")
+    if stranded.len mod wrap_len != 0 :
+      outfile.write(&"{stranded[wrap_len*(stranded.len div wrap_len)..^1]}\n")
+  outfile.close()
+
+
+proc strandTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string, wrap_len : int = 60) =
+  translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,wrap_len)
+
 proc compareExactTranslations*(reference_infilepath : string, translation_infilepath : string) =
   var r_infile, t_infile : File
   discard open(r_infile,reference_infilepath,fmRead)
@@ -1060,7 +1103,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs":
+      of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs":
         case kind:
           of cmdEnd:
             break
@@ -1178,6 +1221,8 @@ proc parseOptions() : UtilOptions =
     case mode:
       of "translate":
         writeTranslateHelp()
+      of "strandTranscripts":
+        writeStrandTranscriptsHelp()
       of "bed2gtf":
         writeBED2GTFHelp()
       of "parseBLASTP":
@@ -1226,6 +1271,17 @@ proc main() =
           let records = poGraphUtils.parseFasta(infile)
           infile.close()
           translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
+      of "strandTranscripts":
+        var infile : File
+        discard open(infile,opt.infilepath,fmRead)
+        if opt.fastq:
+          let records = parseFASTQ(infile)
+          infile.close()
+          strandTranscripts(records,opt.outfilepath)
+        else:
+          let records = poGraphUtils.parseFasta(infile)
+          infile.close()
+          strandTranscripts(records,opt.outfilepath)
       of "bed2gtf":
         convertBED12toGTF(opt.infilepath,opt.outfilepath,opt.stranded)
       of "parseBLASTP":
@@ -1256,6 +1312,7 @@ proc main() =
         callOverlappingNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
       of "assignIDs":
         assignTxIDs(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+
 
 
 main()
