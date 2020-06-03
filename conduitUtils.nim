@@ -638,7 +638,8 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
       # var reverse_exon_count = block_starts.len
       for i in 0..<block_starts.len:
         var new_start_idx, new_end_idx, exon_number : uint
-        if strand == "+":
+        # if strand == "+":
+        if true:
           new_start_idx = start_idx + parseUInt(block_starts[i])
           new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
           exon_number = uint(i + 1)
