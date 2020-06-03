@@ -647,9 +647,9 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
           new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
           exon_number = uint(block_starts.len - i)
         if stranded:
-          outfile.write(&"{chr}\tBLANK\ttranscript\t{new_start_idx}\t{new_end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
+          outfile.write(&"{chr}\tBLANK\texon\t{new_start_idx}\t{new_end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
         else:
-          outfile.write(&"{chr}\tBLANK\ttranscript\t{new_start_idx}\t{new_end_idx}\t.\t.\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
+          outfile.write(&"{chr}\tBLANK\texon\t{new_start_idx}\t{new_end_idx}\t.\t.\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
   except EOFError:
     discard
   infile.close()
