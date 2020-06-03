@@ -125,6 +125,11 @@ proc writeBED2GTFHelp() =
   echo "  ./conduitUtils bed2gtf -i <infile.bed> -o <outfile.gtf>"
   echo "  <infile.bed>    BED12 infile to be converted in to GTF format"
   echo "  <outfile.gtf>   GTF outfile"
+  echo ""
+  echo "Options (defaults in parentheses):"
+  echo "  Input Options:"
+  echo "    -s, --stranded"
+  echo "        Report gtf fields with strand information"
 
 proc writeBLASTPHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
