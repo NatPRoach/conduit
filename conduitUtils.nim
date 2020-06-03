@@ -585,7 +585,7 @@ proc translateTranscript*(nts : string) : string =
     if translation.len > result.len:
       result = translation
 
-proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60, stranded = false) =
+proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60, stranded : bool = false) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for transcript in transcripts:
@@ -613,7 +613,7 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
 proc translateTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60,stranded = false) =
   translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,threshold,wrap_len,stranded)
 
-proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
+proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bool = false ) =
   ## Converts BED12 formatted file to well-formed GTF file suitable for evaluation with GFFcompare
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
@@ -627,7 +627,10 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
       let end_idx = parseUInt(bedfields[2])
       let txid = bedfields[3]
       let strand = bedfields[5]
-      outfile.write(&"{chr}\tBLANK\ttranscript\t{start_idx}\t{end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\";\n")
+      if stranded:
+        outfile.write(&"{chr}\tBLANK\ttranscript\t{start_idx}\t{end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\";\n")
+      else:
+        outfile.write(&"{chr}\tBLANK\ttranscript\t{start_idx}\t{end_idx}\t.\t.\t.\ttranscript_id \"{txid}\";\n")
       let block_sizes = bedfields[10].split(sep=',')
       let block_starts= bedfields[11].split(sep=',')
 
@@ -643,7 +646,10 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ) =
           new_start_idx = start_idx + parseUInt(block_starts[i])
           new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
           exon_number = uint(block_starts.len - i)
-        outfile.write(&"{chr}\tBLANK\ttranscript\t{new_start_idx}\t{new_end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
+        if stranded:
+          outfile.write(&"{chr}\tBLANK\ttranscript\t{new_start_idx}\t{new_end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
+        else:
+          outfile.write(&"{chr}\tBLANK\ttranscript\t{new_start_idx}\t{new_end_idx}\t.\t.\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
   except EOFError:
     discard
   infile.close()
@@ -1220,7 +1226,7 @@ proc main() =
           infile.close()
           translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
       of "bed2gtf":
-        convertBED12toGTF(opt.infilepath,opt.outfilepath)
+        convertBED12toGTF(opt.infilepath,opt.outfilepath,opt.stranded)
       of "parseBLASTP":
         let blast_output = parseBLASTPoutput(opt.infilepath)
         var outfile : File
