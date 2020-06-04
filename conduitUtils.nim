@@ -699,7 +699,6 @@ proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : strin
       outfile.write(&"{stranded[wrap_len*(stranded.len div wrap_len)..^1]}\n")
   outfile.close()
 
-
 proc strandTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string, wrap_len : int = 60) =
   translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,wrap_len)
 
@@ -727,7 +726,7 @@ proc compareExactTranslations*(reference_infilepath : string, translation_infile
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
 proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath : string,) =
-  var fp = 0
+  var fp,tp1 = 0
   var reference_id_set : HashSet[string]
   var match_set : HashSet[string]
   var ref_infile : File
@@ -741,18 +740,20 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   for record in blast_records:
     if record.match_names.len > 0:
       match_set.incl(record.match_names[0])
-      # tp += 1
+      tp1 += 1
     else:
       fp += 1
 
-  let tp = match_set.len
+  let tp2 = match_set.len
   let fn = difference(reference_id_set,match_set).len
-  echo "TP: ", tp
-  echo "FP: ", fp
-  echo "FN: ", fn
+  
+  echo "TP1 - Total matches: ", tp1
+  echo "TP2 - Match set len: ", tp2
+  echo "FP  - Non matched query: ", fp
+  echo "FN  - Non matched reference: ", fn
   echo ""
-  echo &"Precision: {float(tp) / float(tp+fp)}"
-  echo &"Recall:    {float(tp) / float(tp+fn)}"
+  echo &"Precision (uses TP1): {float(tp1) / float(tp1+fp)}"
+  echo &"Recall (uses TP2):    {float(tp2) / float(tp2+fn)}"
 
 proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) = 
   ## Grabs Introns from BED12 file and reports one per line in BED format, with ID = ID from the BED12 line
