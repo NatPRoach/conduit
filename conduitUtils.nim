@@ -1155,8 +1155,13 @@ proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,out
   infile.close
 
   let novel = (inset - ref1set) - ref2set
-
-  echo novel.len
+  echo "Total in infile: ", inset.len
+  echo "Total in ref1:   ", ref1set.len
+  echo "Total in ref2:   ", ref2set.len
+  echo "infile - ref1:   ", (inset - ref1set).len
+  echo "infile - ref2:   ", (inset - ref2set).len
+  echo "ref1 - ref2:     ", (ref1set - ref2set).len
+  echo "Novel in infile: ", novel.len
 
   # discard open(outfile,outfilepath,fmWrite)
   # outfile.close
