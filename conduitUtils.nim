@@ -35,6 +35,7 @@ type
     infilepath : string
     outfilepath : string
     reference_infilepath : string
+    reference_infilepath2 : string
     min_length : uint64
     fastq : bool
     stranded : bool
@@ -43,8 +44,20 @@ type
     read_id* : string
     sequence* : string
     qualities* : string
+  
+  GTFTranscript* = object
+    chr* : string
+    strand* : char
+    start_idx* : uint64
+    end_idx* : uint64
+    introns* : seq[(uint64,uint64)]
 
-
+# proc intersect(a,b : HashSet[GTFTranscript]) =
+#   var a_,b_ = HashSet[(string,char,seq[(uint64,uint64)])]
+#   for tx in a.items:
+#     a_.incl((tx.chr,tx.strand,tx.introns))
+#   for tx in b.items:
+#     b_.incl(())
 
 proc conduitUtilsVersion() : string =
   return "CONDUIT Utilities Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -746,7 +759,7 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
 
   let tp2 = match_set.len
   let fn = difference(reference_id_set,match_set).len
-  
+
   echo "TP1 - Total matches: ", tp1
   echo "TP2 - Match set len: ", tp2
   echo "FP  - Non matched query: ", fp
@@ -1072,6 +1085,83 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
   infile.close()
   outfile.close()
 
+# proc parseGTF*(infile) : HashSet[(string,char,uint64,uint64,seq[(uint64,uint64)])] = 
+proc parseGTF1*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] = 
+  var exons : Table[string,seq[(string,char,uint64,uint64)]]
+  try:
+    while true:
+      let line = infile.readLine()
+      if line.len == 0:
+        continue
+      elif line[0] == '#':
+        continue
+      let fields0 = line.split('\t')
+      # echo fields0
+      # if fields0.len == 0:
+      #   echo line
+      if fields0[2] != "exon":
+        continue
+      let attributes = parseAttributes(fields0[8])
+      if "transcript_id" in attributes:
+        let new_chr = fields0[0]
+        let new_strand = fields0[6][0]
+        let new_start_idx =  uint64(parseUInt(fields0[3])) - 1'u32
+        let new_end_idx = uint64(parseUInt(fields0[4]))
+        if attributes["transcript_id"] in exons:
+          let (chr, strand, start_idx,end_idx)= exons[attributes["transcript_id"]][^1]
+          try:
+            assert chr == new_chr
+            assert strand == new_strand
+            # reference_introns.incl((chr, end_idx, new_start_idx))
+          except AssertionError:
+            echo "ERROR - same transcript on different strand or chromosomes:"
+            let tx_id = attributes["transcript_id"]
+            echo &"{chr}({strand}):{start_idx}-{end_idx} {tx_id}"
+            echo &"{new_chr}({new_strand}):{new_start_idx}-{new_end_idx} {tx_id}"
+          exons[attributes["transcript_id"]].add((new_chr, new_strand, new_start_idx, new_end_idx))
+        else:
+          exons[attributes["transcript_id"]] = @[(new_chr, new_strand, new_start_idx, new_end_idx)]
+      else:
+        echo "ERROR - no field transcript_id"
+  except EOFError:
+    discard
+
+  for tx_id in exons.keys:
+    let total_chr = exons[tx_id][0][0]
+    let total_strand = exons[tx_id][0][1]
+    let total_start = exons[tx_id][0][2]
+    let total_end = exons[tx_id][^1][3]
+    var introns : seq[(uint64,uint64)]
+    for i in 1..<exons[tx_id].len:
+      let (_,_,_,end_idx1) = exons[tx_id][i-1]
+      let (_,_,start_idx2,_) = exons[tx_id][i]
+      introns.add((end_idx1,start_idx2))
+    # result.incl((total_chr,total_start,total_end,total_strand,introns))
+    result.incl((total_chr,total_strand,introns))
+
+
+proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,outfilepath : string) =
+  var infile, ref1file, ref2file, outfile : File
+  discard open(ref1file,reference1_infilepath,fmRead)
+  let ref1set = parseGTF1(ref1file)
+  ref1file.close
+  
+  discard open(ref2file,reference2_infilepath,fmRead)
+  let ref2set = parseGTF1(ref2file)
+  ref2file.close
+  
+  discard open(infile,infilepath,fmRead)
+  let inset = parseGTF1(infile)
+  infile.close
+
+  let novel = (inset - ref1set) - ref2set
+
+  echo novel.len
+
+  # discard open(outfile,outfilepath,fmWrite)
+  # outfile.close
+
+
 proc parseOptions() : UtilOptions = 
   
   var i = 0
@@ -1095,6 +1185,9 @@ proc parseOptions() : UtilOptions =
   var reference_infilepath = ""
   var reference_infilepath_flag = false
   
+  var reference_infilepath2 = ""
+  var reference_infilepath2_flag = false
+
   var outfilepath = ""
   var outfilepath_flag = false
 
@@ -1108,7 +1201,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs":
+      of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs","idNovelIsoforms":
         case kind:
           of cmdEnd:
             break
@@ -1176,6 +1269,17 @@ proc parseOptions() : UtilOptions =
                   echo "ERROR Multiple references provided"
                   run_flag = false
                   break
+              of "r2":
+                if not reference_infilepath2_flag:
+                  reference_infilepath2_flag = true
+                  if val != "":
+                    reference_infilepath2 = val
+                  else:
+                    last = "reference2"
+                else:
+                  echo "ERROR Multiple references provided"
+                  run_flag = false
+                  break
               of "s", "stranded":
                 stranded = true
               of "h", "help":
@@ -1192,6 +1296,8 @@ proc parseOptions() : UtilOptions =
                 outfilepath = key
               of "reference":
                 reference_infilepath = key
+              of "reference2":
+                reference_infilepath2 = key
               else:
                 echo &"ERROR - unknown option {last} provided"
                 run_flag = false
@@ -1256,6 +1362,7 @@ proc parseOptions() : UtilOptions =
                      infilepath : infilepath,
                      outfilepath : outfilepath,
                      reference_infilepath : reference_infilepath,
+                     reference_infilepath2 : reference_infilepath2,
                      min_length : min_length,
                      fastq : fastq,
                      stranded : stranded
@@ -1317,6 +1424,8 @@ proc main() =
         callOverlappingNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
       of "assignIDs":
         assignTxIDs(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+      of "idNovelIsoforms":
+        idNovelIsoforms(opt.infilepath,opt.reference_infilepath,opt.reference_infilepath2,opt.outfilepath)
 
 
 
