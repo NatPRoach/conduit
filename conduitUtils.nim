@@ -1180,12 +1180,13 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
       elif line[0] == '#':
         continue
       let fields0 = line.split('\t')
-      if fields0[2] != "-":
+      if fields0[3] != "u" and fields0[3] != "p" and fields0[3] != "y" and fields0[3] != "i" and fields0[3] != "x" and fields0[3] != "s":
         continue
-      if fields0[2+field] != "-":
-        # novel_loci.incl(getTxId(fields0[2+field]))
-        for tx_id in fields0[2+field].split(','):
-          novel_loci.incl(tx_id)
+      echo fields0[1]
+      # if fields0[2+field] != "-":
+        novel_loci.incl(getTxId(fields0[2+field]))
+        # for tx_id in fields0[2+field].split(','):
+          # novel_loci.incl(tx_id)
   except EOFError:
     discard
   gfffile.close
