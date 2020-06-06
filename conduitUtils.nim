@@ -1139,7 +1139,6 @@ proc parseGTF1*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
     # result.incl((total_chr,total_start,total_end,total_strand,introns))
     result.incl((total_chr,total_strand,introns))
 
-
 proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,outfilepath : string) =
   var infile, ref1file, ref2file, outfile : File
   discard open(ref1file,reference1_infilepath,fmRead)
@@ -1166,6 +1165,39 @@ proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,out
   # discard open(outfile,outfilepath,fmWrite)
   # outfile.close
 
+proc getTxId*(s : string) : string =
+  result = s.split(':')[1].split('|')[0]
+
+proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,field = 1) = 
+  var novel_loci : HashSet[string]
+  var infile,gfffile,outfile : File
+  discard open(gfffile,gffcompare_infilepath,fmRead)
+  try:
+    while true:
+      let line = gfffile.readLine()
+      if line.len == 0:
+        continue
+      elif line[0] == '#':
+        continue
+      let fields0 = line.split('\t')
+      if fields0[3] != "u":
+        continue
+      if fields0[3+field] != "-":
+        novel_loci.incl(getTxId(fields0[3+field]))
+  except EOFError:
+    discard
+  gfffile.close
+  
+  discard open(infile,infilepath,fmRead)
+  discard open(outfile,outfilepath,fmWrite)
+  let records = parseFasta(infile)
+  var new_records : seq[FastaRecord]
+  for record in records:
+    if record.read_id in novel_loci:
+      new_records.add(record)
+  infile.close
+  writeCorrectedReads(new_records,outfile)
+  outfile.close
 
 proc parseOptions() : UtilOptions = 
   
@@ -1206,7 +1238,7 @@ proc parseOptions() : UtilOptions =
       help_flag = false
     i += 1
     case mode:
-      of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs","idNovelIsoforms":
+      of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs","idNovelIsoforms","getNovelLociFASTA":
         case kind:
           of cmdEnd:
             break
@@ -1431,6 +1463,8 @@ proc main() =
         assignTxIDs(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
       of "idNovelIsoforms":
         idNovelIsoforms(opt.infilepath,opt.reference_infilepath,opt.reference_infilepath2,opt.outfilepath)
+      of "getNovelLociFASTA":
+        getNovelLociFASTA(opt.infilepath,opt.reference_infilepath,opt.outfilepath)
 
 
 
