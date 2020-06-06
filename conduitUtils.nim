@@ -1183,7 +1183,8 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
       if fields0[2] != "-":
         continue
       if fields0[2+field] != "-":
-        novel_loci.incl(getTxId(fields0[2+field]))
+        # novel_loci.incl(getTxId(fields0[2+field]))
+        novel_loci.incl(fields0[2+field])
   except EOFError:
     discard
   gfffile.close
