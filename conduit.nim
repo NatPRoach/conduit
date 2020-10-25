@@ -56,7 +56,6 @@ type
 #TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
 #TODO - Add mode that continues polishing where a previous run left off
 #TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage to the rewrite is it makes doing clever things with the poa easier down the line. (Unless we did SIMD poa, which would require learning nim SIMD, and probably step on Eyras Lab's toes)
-#TODO - Example of clever thing we can do with poa - Write code to break huge clusters into smaller clusters at poaV2 step - max of 320(?) reads per sub-cluster recording number of reads supporting each extracted isoform, then poa the extracted isoforms, *build new graph with extracted weights*.
 #TODO - Clustering mode for when you DO have a reference genome? Or is that too similar to Stringtie2 to be worth doing? -- Probably too similar?
 #TODO - Break poParser into smaller .nim files with more accurate and descriptive names
 #TODO - Figure out if there's anything to be done about the left-aligned problem inherent to the partial order graph based correction? (thereby allowing us to get rid of linear polishing step)
