@@ -47,7 +47,7 @@ type
 #TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
 
 #Major TODOs (Future release versions?):
-#TODO - Change major logic for the merging operations - keep track of how many reads support each extracted isoform and weight the resulting POGraphs based on this later. <== Top Priority
+#TODO - Add clustering tool that runs with the benefit of a reference genome ( Cluster based on splice junctions / or overlap of alignments )
 #TODO - Move filtering step to a graph based polishing step, the linear step has a problem of too low coverage or too many isoforms leading to isoforms not being completely covered by illumina reads when they should be.
 #TODO - Add less stringent filtering step that extracts out the longest contiguous region covered by Illumina reads (with ends tolerance?) should be easy to do and reduce # of false negatives.
 #TODO - Add support for duplicate read ID's that doesn't break everything.
@@ -114,7 +114,6 @@ proc writeNanoHelp() =
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
   echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
-  #echo "    --cdna" #Not supported yet #TODO
 
 proc writeHybridHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
