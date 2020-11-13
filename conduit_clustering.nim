@@ -1,4 +1,5 @@
 import os
+import bitops
 import times
 import osproc
 import parseopt
@@ -18,7 +19,10 @@ type
     output_dir : string
     prefix : string
     out_type : string
-
+  
+  SpliceSiteGraph = object
+    adjacencies : seq[seq[uint32]]
+    ss_to_index : Table[uint32, uint32]
 
 proc conduitClusterVersion() : string =
   return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -61,7 +65,7 @@ proc writeClusterHelp() =
 #   discard open(outfile,outfilepath,fmWrite)
 #   outfile.close()
 
-proc spliceSitesFromBamRecord( record : Record, stranded : bool = false) : (char, (uint64, uint64), seq[(uint64, uint64)]) = 
+proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (uint64, uint64), seq[(uint64, uint64)]) = 
   if record.flag.unmapped:
       return
   let alignment_start = uint64(record.start)
@@ -87,9 +91,40 @@ proc spliceSitesFromBamRecord( record : Record, stranded : bool = false) : (char
   let alignment_end = ref_position
   result = (strand,(alignment_start,alignment_end),splice_sites)
 
-proc spliceSitesTableFromBam( bam : Bam,  chromosome : string, stranded : bool = false) : HashSet[(char, seq[(uint64, uint64)])] = 
+
+#TODO - Figure out if bitshifting flag for strand makes sense. At u32 assumes no chr larger than 2147483648 bp. Probably safe, just takes time to change the logic.
+proc collapsedSummariesFromBam( bam : Bam,  chromosome : string, stranded : bool = false) : (Table[char, OrderedTable[seq[(uint64, uint64)],seq[string]]], Table[char, OrderedTable[(uint64, uint64),seq[string]]]) = 
   for record in bam.query(chromosome):
-    echo spliceSitesFromBamRecord(record, stranded)
+    let summary = summaryFromBamRecord(record, stranded)
+    if summary[2].len == 0:
+      if summary[0] in  result[1]:
+        if summary[1] in result[1][summary[0]]:
+          result[1][summary[0]][summary[1]].add(record.qname)
+        else:
+          result[1][summary[0]][summary[1]] = @[record.qname]
+      else:
+        result[1][summary[0]] = [(summary[1], @[record.qname])].toOrderedTable
+    else:
+      if summary[0] in  result[0]:
+        if summary[2] in result[0][summary[0]]:
+          result[0][summary[0]][summary[2]].add(record.qname)
+        else:
+          result[0][summary[0]][summary[2]] = @[record.qname]
+      else:
+        result[0][summary[0]] = [(summary[2], @[record.qname])].toOrderedTable
+
+# proc cmpSpliced(a,b : (char,seq[(uint64,uint64)])) : int =
+
+
+proc cmpSpliced(a,b : (seq[(uint64,uint64)], seq[string])) : int =
+  for i in 0..<min(a[0].len,b[0].len):
+    result = system.cmp(a[0][i],b[0][i])
+    if result != 0:
+      return
+  result = system.cmp(a[0].len,b[0].len)
+
+proc cmpNonSpliced(a,b : ((char,(uint64,uint64)), seq[string])) : int =
+  result = system.cmp(a[0],b[0])
 
 proc parseOptions() : ClusteringOptions = 
   var file : string
@@ -243,10 +278,33 @@ proc parseOptions() : ClusteringOptions =
                            out_type : output_format)
 proc main() = 
   let opt = parseOptions()
-  if not existsDir(opt.output_dir):
+  if not dirExists(opt.output_dir):
     createDir(opt.output_dir)
   var bam : Bam
   discard open(bam,opt.file,index=true)
-  discard spliceSitesTableFromBam(bam, "chrI", true)
-
+  var (strand_spliced_table, strand_nonspliced_table) = collapsedSummariesFromBam(bam, "chrI", true)
+  for strand, spliced_table in strand_spliced_table.mpairs:
+    spliced_table.sort(cmpSpliced)
+    var isoform_node_index = 0'u32
+    isoform_node_index.setBit(31'u8)
+    var ssgraph : SpliceSiteGraph
+    for sss in spliced_table.keys:
+      var isoform_adjacency_index = uint32(ssgraph.adjacencies.len)
+      ssgraph.adjacencies.add(@[])
+      for (donor,acceptor) in sss:
+        # echo donor, "\t", acceptor
+        if uint32(donor) notin ssgraph.ss_to_index:
+          ssgraph.ss_to_index[uint32(donor)] = uint32(ssgraph.adjacencies.len)
+          ssgraph.adjacencies.add(@[isoform_adjacency_index])
+        else:
+          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(donor)]].add(isoform_adjacency_index)
+        if uint32(acceptor) notin ssgraph.ss_to_index:
+          ssgraph.ss_to_index[uint32(acceptor)] = uint32(ssgraph.adjacencies.len)
+          ssgraph.adjacencies.add(@[isoform_adjacency_index])
+        else:
+          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(acceptor)]].add(isoform_adjacency_index)
+        ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(donor)])
+        ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(acceptor)])
+      isoform_node_index += 1
+    echo ssgraph.adjacencies
 main()
