@@ -6,7 +6,6 @@ import parseopt
 import strutils
 import strformat
 import tables
-import heapqueue
 import threadpool_simple as tps
 import hts
 import sets
@@ -23,6 +22,8 @@ type
   SpliceSiteGraph = object
     adjacencies : seq[seq[uint32]]
     ss_to_index : Table[uint32, uint32]
+    index_to_index : Table[uint32,uint32]
+    previously_visited : seq[uint32]
 
 proc conduitClusterVersion() : string =
   return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
@@ -36,8 +37,14 @@ proc writeClusterHelp() =
   echo "Options (defaults in parentheses):"
   echo "  Clustering mode:"
 #TODO - Figure out if there's any computationally reasonable way to do ss tolerance?
+#IDEA - Reduce to unique ss locations (weighted by depth?)
+#IDEA - Reduce ss to corresponding peaks of splice sites to group splice sites together easier.
+#IDEA - Calculate peaks at sections of the genome w/ # of ss > some threshold
+#IDEA - Find local maxima, correct splice sites to discovered local maxima
+#IDEA - Optionally allow for reference genome based correction
+#IDEA - Optionally allow for reference genome annotation based splice site definition for collapsing
 #  echo "    -s, --splice-site-tolerance (15)"
-#  echo "        Allow tolerance"
+#  echo "        Allow tolerance in splice site collapsing step"
   echo "    --ss (default)"
   echo "        Cluster reads with at least one splice site in common"
   echo "    --overlap"
@@ -276,6 +283,33 @@ proc parseOptions() : ClusteringOptions =
                            output_dir : output_dir,
                            prefix : prefix,
                            out_type : output_format)
+
+proc correctToKDEmaxes() = 
+
+proc bfs(ssgraph : ptr SpliceSiteGraph, cluster_number : uint32, starting_node : uint32) : seq[uint32] = 
+  var to_visit : seq[uint32]
+  ssgraph[].previously_visited[starting_node] = cluster_number
+  to_visit.add(starting_node)
+  while to_visit.len != 0:
+    let u = to_visit.pop()
+    result.add(u)
+    for adj in ssgraph[].adjacencies[u]:
+      if ssgraph[].previously_visited[adj] == 0:
+        ssgraph[].previously_visited[adj] = cluster_number
+        to_visit.add(adj)
+
+proc findIsoformClusters(ssgraph : ptr SpliceSiteGraph) : seq[seq[uint32]] =
+  var cluster_counter = 1'u32
+  for isoform_adjacency_index in ssgraph[].index_to_index.keys:
+    if ssgraph[].previously_visited[isoform_adjacency_index] == 0:
+      var clustered_isoforms : seq[uint32]
+      let clustered_nodes = bfs(ssgraph,cluster_counter, isoform_adjacency_index)
+      for node_id in clustered_nodes:
+        if node_id in ssgraph[].index_to_index:
+          clustered_isoforms.add(ssgraph[].index_to_index[node_id])
+      cluster_counter += 1
+      result.add(clustered_isoforms)
+
 proc main() = 
   let opt = parseOptions()
   if not dirExists(opt.output_dir):
@@ -285,26 +319,32 @@ proc main() =
   var (strand_spliced_table, strand_nonspliced_table) = collapsedSummariesFromBam(bam, "chrI", true)
   for strand, spliced_table in strand_spliced_table.mpairs:
     spliced_table.sort(cmpSpliced)
-    var isoform_node_index = 0'u32
-    isoform_node_index.setBit(31'u8)
+    ### Populate SpliceSiteGraph
     var ssgraph : SpliceSiteGraph
+    var isoform_node_index = 0'u32
+    # isoform_node_index.setBit(31'u8)
     for sss in spliced_table.keys:
       var isoform_adjacency_index = uint32(ssgraph.adjacencies.len)
       ssgraph.adjacencies.add(@[])
+      ssgraph.previously_visited.add(0)
+      ssgraph.index_to_index[isoform_adjacency_index] = isoform_node_index
+      isoform_node_index += 1
       for (donor,acceptor) in sss:
         # echo donor, "\t", acceptor
         if uint32(donor) notin ssgraph.ss_to_index:
           ssgraph.ss_to_index[uint32(donor)] = uint32(ssgraph.adjacencies.len)
           ssgraph.adjacencies.add(@[isoform_adjacency_index])
+          ssgraph.previously_visited.add(0)
         else:
           ssgraph.adjacencies[ssgraph.ss_to_index[uint32(donor)]].add(isoform_adjacency_index)
         if uint32(acceptor) notin ssgraph.ss_to_index:
           ssgraph.ss_to_index[uint32(acceptor)] = uint32(ssgraph.adjacencies.len)
           ssgraph.adjacencies.add(@[isoform_adjacency_index])
+          ssgraph.previously_visited.add(0)
         else:
           ssgraph.adjacencies[ssgraph.ss_to_index[uint32(acceptor)]].add(isoform_adjacency_index)
         ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(donor)])
         ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(acceptor)])
-      isoform_node_index += 1
-    echo ssgraph.adjacencies
+    ### Fetch clusters
+    echo findIsoformClusters(addr ssgraph)
 main()
