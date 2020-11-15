@@ -21,7 +21,7 @@ proc calculateKDEmaxima(weighted_positions : seq[(uint32,uint32)], calculation_w
   for j, (pos, weight) in weighted_positions:
     let offset = int(pos) - int(start_pos)
     var low_region_idx = offset - int(calculation_window)
-    var low_early_cutoff,high_early_cutoff = 0
+    var low_early_cutoff = 0
     var high_region_idx = offset + int(calculation_window)
     if low_region_idx < 0:
       low_early_cutoff = abs(low_region_idx)

@@ -9,6 +9,9 @@ import tables
 import threadpool_simple as tps
 import hts
 import sets
+import genomeKDE
+import algorithm
+import poGraphUtils
 
 type
   ClusteringOptions = object
@@ -22,11 +25,13 @@ type
   SpliceSiteGraph = object
     adjacencies : seq[seq[uint32]]
     ss_to_index : Table[uint32, uint32]
-    index_to_index : Table[uint32,uint32]
+    index_to_index : OrderedTable[uint32,uint32]
     previously_visited : seq[uint32]
 
+#TODO - Possibly change uint32 to uint64 where necessary. Reevaluate before publication.
 proc conduitClusterVersion() : string =
   return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+
 
 proc writeClusterHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -41,7 +46,7 @@ proc writeClusterHelp() =
 #IDEA - Reduce ss to corresponding peaks of splice sites to group splice sites together easier.
 #IDEA - Calculate peaks at sections of the genome w/ # of ss > some threshold
 #IDEA - Find local maxima, correct splice sites to discovered local maxima
-#IDEA - Optionally allow for reference genome based correction
+#IDEA - Optionally allow for reference genome based correction of individual reads
 #IDEA - Optionally allow for reference genome annotation based splice site definition for collapsing
 #  echo "    -s, --splice-site-tolerance (15)"
 #  echo "        Allow tolerance in splice site collapsing step"
@@ -62,15 +67,18 @@ proc writeClusterHelp() =
   echo "    --fa"
   echo "        Output reads in FASTA format"
 
+
 # proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOptions) =
 #   var outfile : File
 #   discard open(outfile,outfilepath,fmWrite)
 #   outfile.close()
 
+
 # proc outputSettings(outfilepath : string,opts : ConduitOptions) = 
 #   var outfile : File
 #   discard open(outfile,outfilepath,fmWrite)
 #   outfile.close()
+
 
 proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (uint64, uint64), seq[(uint64, uint64)]) = 
   if record.flag.unmapped:
@@ -102,6 +110,8 @@ proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (u
 #TODO - Figure out if bitshifting flag for strand makes sense. At u32 assumes no chr larger than 2147483648 bp. Probably safe, just takes time to change the logic.
 proc collapsedSummariesFromBam( bam : Bam,  chromosome : string, stranded : bool = false) : (Table[char, OrderedTable[seq[(uint64, uint64)],seq[string]]], Table[char, OrderedTable[(uint64, uint64),seq[string]]]) = 
   for record in bam.query(chromosome):
+    if record.flag.supplementary or record.flag.secondary: #TODO - Figure out if there's anything to be done w/ secondary / supplmentary alignments - there probably is w/r/t clustering of overlapping splice sites especially but it may take some clever approaches.
+      continue
     let summary = summaryFromBamRecord(record, stranded)
     if summary[2].len == 0:
       if summary[0] in  result[1]:
@@ -120,8 +130,6 @@ proc collapsedSummariesFromBam( bam : Bam,  chromosome : string, stranded : bool
       else:
         result[0][summary[0]] = [(summary[2], @[record.qname])].toOrderedTable
 
-# proc cmpSpliced(a,b : (char,seq[(uint64,uint64)])) : int =
-
 
 proc cmpSpliced(a,b : (seq[(uint64,uint64)], seq[string])) : int =
   for i in 0..<min(a[0].len,b[0].len):
@@ -130,8 +138,10 @@ proc cmpSpliced(a,b : (seq[(uint64,uint64)], seq[string])) : int =
       return
   result = system.cmp(a[0].len,b[0].len)
 
+
 proc cmpNonSpliced(a,b : ((char,(uint64,uint64)), seq[string])) : int =
   result = system.cmp(a[0],b[0])
+
 
 proc parseOptions() : ClusteringOptions = 
   var file : string
@@ -284,7 +294,6 @@ proc parseOptions() : ClusteringOptions =
                            prefix : prefix,
                            out_type : output_format)
 
-proc correctToKDEmaxes() = 
 
 proc bfs(ssgraph : ptr SpliceSiteGraph, cluster_number : uint32, starting_node : uint32) : seq[uint32] = 
   var to_visit : seq[uint32]
@@ -298,6 +307,7 @@ proc bfs(ssgraph : ptr SpliceSiteGraph, cluster_number : uint32, starting_node :
         ssgraph[].previously_visited[adj] = cluster_number
         to_visit.add(adj)
 
+
 proc findIsoformClusters(ssgraph : ptr SpliceSiteGraph) : seq[seq[uint32]] =
   var cluster_counter = 1'u32
   for isoform_adjacency_index in ssgraph[].index_to_index.keys:
@@ -308,7 +318,68 @@ proc findIsoformClusters(ssgraph : ptr SpliceSiteGraph) : seq[seq[uint32]] =
         if node_id in ssgraph[].index_to_index:
           clustered_isoforms.add(ssgraph[].index_to_index[node_id])
       cluster_counter += 1
-      result.add(clustered_isoforms)
+      result.add(clustered_isoforms.sorted)
+
+
+proc getWeightedSpliceJunctionLocations(sstable : ptr OrderedTable[seq[(uint64, uint64)],seq[string]]) : (seq[(uint32,uint32)],seq[(uint32,uint32)]) = 
+  var donor_table : OrderedTable[uint32,uint32]
+  var acceptor_table : OrderedTable[uint32,uint32]
+  for sss, read_ids in sstable[].pairs:
+    let weight = uint32(read_ids.len)
+    for (donor,acceptor) in sss:
+      if uint32(donor) in donor_table:
+        donor_table[uint32(donor)] += weight
+      else:
+        donor_table[uint32(donor)] = weight
+      if uint32(acceptor) in acceptor_table:
+        acceptor_table[uint32(acceptor)] += weight
+      else:
+        acceptor_table[uint32(acceptor)] = weight
+  for ss, weight in donor_table.pairs:
+    result[0].add((ss,weight))
+  for ss, weight in acceptor_table.pairs:
+    result[1].add((ss,weight))
+  echo result
+
+
+proc writeFASTArecordToFile(outfile : File, record : Record, wrap_len : int = 75) = 
+  var sequence : string
+  record.sequence(sequence)
+  outfile.write(&">{record.qname}\n")
+  for i in 0..<(sequence.len div wrap_len):
+    outfile.write(&"{sequence[i*wrap_len..(i+1)*wrap_len - 1]}\n")
+  if sequence.len mod wrap_len != 0 :
+    outfile.write(&"{sequence[wrap_len*(sequence.len div wrap_len)..^1]}\n")
+
+proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string,cluster_prefix : string,starting_count : int) : int =
+  var open_files : Table[int, File]
+  var written_reads : CountTable[int]
+  for record in bam.query(query):
+    if record.flag.supplementary or record.flag.secondary:
+      continue
+    if record.qname notin read_id_to_cluster[]:
+      continue
+    let cluster_id = read_id_to_cluster[][record.qname]
+    if cluster_id notin open_files:
+      var file : File
+      discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",fmWrite)
+      result += 1
+      # echo &"Opening cluster file {cluster_id + starting_count}"
+      open_files[cluster_id] = file
+      file.writeFASTArecordToFile(record)
+    else:
+      # echo &"Appending to cluster file {cluster_id + starting_count}"
+      open_files[cluster_id].writeFASTArecordToFile(record)
+    written_reads.inc(cluster_id)
+    echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
+    if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
+      # echo &"Closing cluster file {cluster_id + starting_count}"
+      open_files[cluster_id].close
+      open_files.del(cluster_id)
+  for cluster_id, open_file in open_files.pairs: #Just in case
+    echo &"WARNING - missing reads in output somehow - {cluster_id}"
+    open_file.close
+
 
 proc main() = 
   let opt = parseOptions()
@@ -317,6 +388,8 @@ proc main() =
   var bam : Bam
   discard open(bam,opt.file,index=true)
   var (strand_spliced_table, strand_nonspliced_table) = collapsedSummariesFromBam(bam, "chrI", true)
+  bam.close
+  var output_file_count = 0
   for strand, spliced_table in strand_spliced_table.mpairs:
     spliced_table.sort(cmpSpliced)
     ### Populate SpliceSiteGraph
@@ -346,5 +419,36 @@ proc main() =
         ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(donor)])
         ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(acceptor)])
     ### Fetch clusters
-    echo findIsoformClusters(addr ssgraph)
+    let isoform_clusters = findIsoformClusters(addr ssgraph)
+    # echo isoform_clusters
+    var cluster_counter = 0
+    var subcluster_counter = 0
+    var splice_table_counter = 0
+    var cluster_sizes : CountTable[int]
+    var read_id_to_cluster : Table[string, int]
+    for read_ids in spliced_table.values:
+      for read_id in read_ids:
+        read_id_to_cluster[read_id] = cluster_counter
+      cluster_sizes.inc(cluster_counter,read_ids.len)
+      # echo int(isoform_clusters[cluster_counter][subcluster_counter]), "\t", splice_table_counter
+      assert int(isoform_clusters[cluster_counter][subcluster_counter]) == splice_table_counter
+      if subcluster_counter == isoform_clusters[cluster_counter].len - 1:
+        subcluster_counter = 0
+        cluster_counter += 1
+      else:
+        subcluster_counter += 1
+      splice_table_counter += 1
+    # echo cluster_to_read_id
+
+    #Write cluster FASTA/Q files:
+    echo cluster_sizes
+    var bam : Bam
+    discard open(bam,opt.file,index=true)
+    output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count)
+    #TODO - add logic to write FASTQs
+    #TODO - move all the FASTA procs & stuff to its own .nim file
+    #TODO - move all the FASTQ procs & stuff to it's own .nim file
+    #TODO - add option to 'correct' reads based on reference genome
+    bam.close
+
 main()
