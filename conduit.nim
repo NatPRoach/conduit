@@ -290,44 +290,8 @@ proc outputSettings(outfilepath : string,opts : ConduitOptions) =
   outfile.write(&"    bowtie2 max alignments : {opts.max_alignments}\n")
   outfile.close()
 
-proc splitFASTA(infilepath,outfilepath_prefix : string, split_num : int = 200) : (int,int) =
-  # Takes in a fasta file with more reads than some arbitrary number split_num
-  # produces fasta files split into sizes of that size or smaller. Similar to RATTLE implementation in that to avoid size biases the sampling is performed with an offset.
-  var infile : File
-  discard open(infile,infilepath,fmRead)
-  var records : seq[FastaRecord]
-  var read_id : string
-  var sequence : string
-  var count = 0
-  while true:
-    try:
-      let line = infile.readLine()
-      if line[0] == '>':
-        if count != 0:
-          records.add(FastaRecord( read_id : read_id, sequence : sequence))
-          sequence = ""
-        count += 1
-        read_id = line.strip(leading=true,trailing=false,chars = {'>'}).strip(leading=false,trailing=true,chars = {'\n'})
-      else:
-        sequence = sequence & line.strip(leading=false,trailing=true,chars = {'\n'})
-    except EOFError:
-      records.add(FastaRecord( read_id : read_id, sequence : sequence))
-      break
-  infile.close()
-  let num_outfiles = int(records.len mod split_num != 0) + (records.len div split_num)
-  if num_outfiles > 1:
-    for i in 0..<num_outfiles:
-      var outfile : File
-      discard open(outfile,&"{outfilepath_prefix}_subfasta{i}.fa",fmWrite)
-      for j in 0..<split_num:
-        let idx = i + (j * num_outfiles)
-        if idx < records.len:
-          outfile.write(">",records[idx].read_id,"\n")
-          outfile.writeLine(records[idx].sequence)
-      outfile.close()
-  return (num_outfiles,records.len)
 
-proc mergeFiles(infilepaths : openArray[string],outfilepath : string,delete_old_files = false) = 
+proc mergeFiles(infilepaths : openArray[string], outfilepath : string, delete_old_files : bool = false) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for infilepath in infilepaths:
@@ -339,42 +303,6 @@ proc mergeFiles(infilepaths : openArray[string],outfilepath : string,delete_old_
     removeFiles(infilepaths)
   outfile.close()
 
-proc splitFASTA2(infilepath,outfilepath_prefix : string, split_num : int = 200) : (int,int) =
-  # Takes in a fasta file with more reads than some arbitrary number split_num
-  # produces fasta files split into sizes of that size or smaller. Different from RATTLE implementation in that size bias is not considered and linear blocks of sequences are extracted
-  var infile : File
-  discard open(infile,infilepath,fmRead)
-  var records : seq[FastaRecord]
-  var read_id : string
-  var sequence : string
-  var count = 0
-  while true:
-    try:
-      let line = infile.readLine()
-      if line[0] == '>':
-        if count != 0:
-          records.add(FastaRecord( read_id : read_id, sequence : sequence))
-          sequence = ""
-        count += 1
-        read_id = line.strip(leading=true,trailing=false,chars = {'>'}).strip(leading=false,trailing=true,chars = {'\n'})
-      else:
-        sequence = sequence & line.strip(leading=false,trailing=true,chars = {'\n'})
-    except EOFError:
-      records.add(FastaRecord( read_id : read_id, sequence : sequence))
-      break
-  infile.close()
-  let num_outfiles = int(records.len mod split_num != 0) + (records.len div split_num)
-  if num_outfiles > 1:
-    for i in 0..<num_outfiles:
-      var outfile : File
-      discard open(outfile,&"{outfilepath_prefix}_subfasta{i}.fa",fmWrite)
-      for j in 0..<split_num:
-        let idx = (i*split_num) + j
-        if idx < records.len:
-          outfile.write(">",records[idx].read_id,"\n")
-          outfile.writeLine(records[idx].sequence)
-      outfile.close()
-  return (num_outfiles,records.len)
 
 proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple

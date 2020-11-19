@@ -7,7 +7,6 @@ import tables
 import sets
 import math
 import heapqueue
-# import neo
 import hts
 
 type
@@ -153,7 +152,7 @@ proc collapseLinearStretches( po2 : TrimmedPOGraph) : TrimmedPOGraph =
                         end_nodes : new_end_nodes)
 
 proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] = @[],collapse : bool = false) : seq[string] = 
-  #Logic for jsOutput and htmlOutput procs largely borrowed and modified from the Simpson lab simple Partial Order Alignment python implementation: https://github.com/ljdursi/poapy
+  #Logic for jsOutput and htmlOutput procs largely borrowed, modified, and converted from the Simpson lab simple Partial Order Alignment python implementation: https://github.com/ljdursi/poapy
   var path : seq[uint32]
   if highlight_path1.len != 0:
     path = highlight_path1
@@ -226,13 +225,9 @@ proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] 
     let k = po.node_indexes[('f',uint32(i))]
     if k in po.deleted_nodes:
       continue
-    # if (k < 17000'u32 or k > 17300'u32) and k notin highlight_path1 and k notin highlight_path2:
-    #   continue 
     for edge in po.edges[k]:
       if edge in po.deleted_nodes:
         continue
-      # if (edge < 17000'u32 or edge > 17300'u32) and edge notin highlight_path1 and edge notin highlight_path2:
-      #   continue 
       var highlight : string
       if not((k,edge) in written_set):
         if (k,edge) in highlight_edges1:
@@ -247,10 +242,6 @@ proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] 
         lines.add(&"    {f}from: {k}, to: {edge}{highlight}, label: '{po.weights[(k,edge)]}',     font: {f}align: 'middle'{e}, value: {po.weights[(k,edge)]}, arrows:\'to\'{e},")
         written_set.incl((k,edge))
     if po.nodes[i].align_ring_partner != -1:
-      # echo "FUCKING HERE999"
-      # echo k, " - ", po.nodes[i].align_ring_partner
-      # if (k,uint32(po.nodes[i].align_ring_partner)) notin written_set:
-        # written_set.incl((k,uint32(po.nodes[i].align_ring_partner)))
       lines.add(&"    {f}from: {k}, to: {po.nodes[i].align_ring_partner},color: \'grey\'{e},")
   lines[^1] = lines[^1][0..^1]
   lines.add("];\n")
@@ -281,10 +272,10 @@ proc writeCorrectedReads*( po : TrimmedPOGraph,outfile : File) =
     outfile.write(">",read.name,&"_{read.support}","\n")
     outfile.writeLine(sequence.join())
 
-proc writeCorrectedReads*( records : seq[FastaRecord],outfile : File) = 
-  for record in records:
-    outfile.write(">",record.read_id,"\n")
-    outfile.writeLine(record.sequence)
+# proc writeCorrectedReads*( records : seq[FastaRecord],outfile : File) = 
+#   for record in records:
+#     outfile.write(">",record.read_id,"\n")
+#     outfile.writeLine(record.sequence)
 
 proc initPOGraph*( file : File) : POGraph = 
   for _ in 0..2:
@@ -355,26 +346,6 @@ proc initPOGraph*( file : File) : POGraph =
   # echo weights
   return POGraph(nodes:nodes,reads:reads,edges:edges,og_nodes:uint32(nodes.len),weights:weights)
 
-proc parseFasta*(file : File) : seq[FastaRecord] = 
-  var records : seq[FastaRecord]
-  var read_id : string
-  var sequence : string
-  var count = 0
-  while true:
-    try:
-      let line = file.readLine()
-      if line[0] == '>':
-        if count != 0:
-          records.add(FastaRecord( read_id : read_id, sequence : sequence))
-          sequence = ""
-        count += 1
-        read_id = line.strip(leading=true,trailing=false,chars = {'>'}).strip(leading=false,trailing=true,chars = {'\n'})
-      else:
-        sequence = sequence & line.strip(leading=false,trailing=true,chars = {'\n'})
-    except EOFError:
-      records.add(FastaRecord( read_id : read_id, sequence : sequence))
-      break
-  return records
 
 proc writePOGraph*( po : TrimmedPOGraph, outfile : File,graphname : string ="default") = 
   outfile.write("VERSION=UNTITLEDCORRECTIONALGORITHM.0.1\n")
@@ -537,7 +508,7 @@ proc alignPaths( x : seq[uint32], y : seq[uint32]) : seq[uint8] =
     elif x[i] < y[j]:
       alignment.add(1'u8)
       i += 1
-    else: # x[i] > y[j]
+    else:  # x[i] > y[j]
       alignment.add(2'u8)
       j += 1
     if i == x.len or j == y.len:

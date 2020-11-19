@@ -467,8 +467,6 @@ proc main() =
     discard open(bam,opt.file,index=true)
     output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count)
     #TODO - add logic to write FASTQs
-    #TODO - move all the FASTA procs & stuff to its own .nim file
-    #TODO - move all the FASTQ procs & stuff to it's own .nim file
     #TODO - add option to 'correct' reads based on reference genome
     bam.close
 

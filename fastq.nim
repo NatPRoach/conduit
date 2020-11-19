@@ -6,6 +6,7 @@ type
     sequence* : string
     qualities* : string
 
+
 proc convertFASTQfileToFASTAfile*(infilepath,outfilepath:string) = 
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
@@ -34,15 +35,19 @@ proc convertFASTQfileToFASTAfile*(infilepath,outfilepath:string) =
   infile.close()
   outfile.close()
 
+
 proc convertFASTQtoFASTA*(record : FastqRecord) : FastaRecord = 
   result.read_id = record.read_id
   result.sequence = record.sequence
+
 
 proc convertFASTQtoFASTA*(records : openArray[FastqRecord]) : seq[FastaRecord] =
   for record in records:
     result.add(convertFASTQtoFASTA(record))
 
-proc parseFASTQ(infile : File) : seq[FastqRecord] = 
+
+#TODO - Need to do this in a way where it's an iterator instead. This is loading the entire file in to memory, which is fine for small cluster files but will use huge memory at scale
+proc parseFASTQ*(infile : File) : seq[FastqRecord] = 
   while true:
     try:
       let line1 = infile.readLine()
