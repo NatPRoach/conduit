@@ -239,50 +239,6 @@ proc createDirs(dirs : openArray[string]) =
 proc returnFalse() : bool {.thread.} = 
   return false
 
-proc convertFASTQtoFASTA(infilepath,outfilepath:string) = 
-  var infile,outfile : File
-  discard open(infile,infilepath,fmRead)
-  discard open(outfile,outfilepath,fmWrite)
-  var read_ids : HashSet[string]
-  while true:
-    try:
-      let line1 = infile.readLine()
-      try:
-        assert line1[0] == '@'
-      except AssertionError:
-        echo "File not in FASTQ format"
-        raise
-      if line1 notin read_ids:
-        read_ids.incl(line1)
-        outfile.write(&">{line1[1..^1]}\n")
-        outfile.write(&"{infile.readLine().replace(sub='U',by='T')}\n")
-        discard infile.readLine()
-        discard infile.readLine()
-      else:
-        discard infile.readLine()
-        discard infile.readLine()
-        discard infile.readLine()
-    except EOFError:
-      break
-  infile.close()
-  outfile.close()
-
-proc convertUtoTinFASTA(infilepath,outfilepath:string) =
-  var infile,outfile : File
-  discard open(infile,infilepath,fmRead)
-  discard open(outfile,outfilepath,fmWrite)
-  while true:
-    try:
-      let line = infile.readLine()
-      if line[0] == '>':
-        outfile.write(&"{line}\n")
-      else:
-        outfile.write(&"{line.replace(sub='U',by='T')}\n")
-    except EOFError:
-      break
-  infile.close()
-  outfile.close()
-
 proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOptions) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
@@ -420,32 +376,6 @@ proc splitFASTA2(infilepath,outfilepath_prefix : string, split_num : int = 200) 
       outfile.close()
   return (num_outfiles,records.len)
 
-# proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16)) {.thread.} =
-#   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta) = intuple 
-#   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
-#   var fasta_file : string
-#   if format == "fasta":
-#     fasta_file = infilepath
-#   elif format == "fastq":
-#     fasta_file = &"{outdir}{trim}.tmp.fa"
-#     convertFASTQtoFASTA(infilepath,fasta_file)
-#   var seq_file : PFile = fopen(cstring(fasta_file), "r")
-#   # echo matrix_filepath
-#   # echo cstring(matrix_filepath)
-#   # let matrix_filepath : cstring = "../poaV2/myNUC3.4.4.mat"
-#   var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-#   if format == "fastq":
-#     removeFile(fasta_file)
-  
-#   var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
-#   var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-#   let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,trim)
-#   let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
-#   var outFASTAfile : File
-#   discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-#   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
-#   outFASTAfile.close()
-
 proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple
   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
@@ -535,148 +465,6 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     outFASTAfile.close()
 
 
-# proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
-#   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple
-#   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
-#   var fasta_file : string
-#   if format == "fasta":
-#     if u2t:
-#       fasta_file = &"{outdir}{trim}.tmp.fa"
-#       convertUtoTinFASTA(infilepath,fasta_file)
-#     else:
-#       fasta_file = infilepath
-#   elif format == "fastq":
-#     fasta_file = &"{outdir}{trim}.tmp.fa"
-#     convertFASTQtoFASTA(infilepath,fasta_file)
-#   var last_num_reads = 0
-#   var split_num = 200
-#   var (num_fastas,num_reads) = splitFASTA2(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
-#   var delete_fasta_flag = false
-#   if format == "fastq" or u2t or num_fastas > 1:
-#     delete_fasta_flag = true
-#   if num_fastas > 1:
-#     removeFile(fasta_file)
-#     # Cacluate representative reads for each subfasta, store each in separate consensus fasta file
-#     for i in 0..<num_fastas:
-#       let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
-#       var outFASTAfile : File
-#       discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-#       let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
-#       var seq_file : PFile = fopen(cstring(tmp_fasta))
-#       var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-#       removeFile(tmp_fasta)
-#       var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-#       var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-#       let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
-#       poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
-#       outFASTAfile.close()
-#     fasta_file = &"{outdir}{trim}.tmp_consensus0.fa"
-#   while num_fastas > 1:
-#     for i in 0..<(num_fastas div 2):
-#       # Merge subfastas:
-#       let subfastapath1 = &"{outdir}{trim}.tmp_consensus{2*i}.fa"
-#       let subfastapath2 = &"{outdir}{trim}.tmp_consensus{2*i + 1}.fa"
-#       let tmp_fasta = &"{outdir}{trim}.tmp_merged_subfasta{i}.fa"
-#       mergeFiles([subfastapath1,subfastapath2],tmp_fasta, delete_old_files = true)
-#       #Calculate POGraph for merged subfastas:
-#       let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
-#       var outFASTAfile : File
-#       discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-#       var seq_file : PFile = fopen(cstring(tmp_fasta))
-#       var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-#       removeFile(tmp_fasta)
-#       var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-#       # Decompose graph into representative paths
-#       var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-#       let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
-#       # Output those path to out outfile
-#       poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
-#       outFASTAfile.close()
-#     if bool(num_fastas mod 2):
-#       #uneven split, merge last subfasta with last merged subfasta
-#       let idx1 = num_fastas - 1
-#       let idx2 = (num_fastas div 2) - 1
-#       let last_fasta = &"{outdir}{trim}.tmp_consensus{idx1}.fa"
-#       let last_merge = &"{outdir}{trim}.tmp_consensus{idx2}.fa"
-#       let tmp_file =   &"{outdir}{trim}.tmp_final_merge.fa"
-#       mergeFiles([last_fasta,last_merge],tmp_file, delete_old_files = true)
-#       moveFile(tmp_file,last_merge)
-#     num_fastas = num_fastas div 2
-
-#   # if num_reads == last_num_reads:
-#   #   for i in 0..<num_fastas:
-#   #     let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
-#   #     removeFile(tmp_fasta)
-#   var seq_file : PFile = fopen(cstring(fasta_file), "r")
-#   var po2 = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-#   if delete_fasta_flag:
-#     removeFile(fasta_file)
-#   var trim_po2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
-#   var representative_paths = poGraphUtils.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
-#   let consensus_po = poGraphUtils.buildConsensusPO(addr po2, representative_paths,trim)
-#   let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
-#   var outFASTAfile : File
-#   discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-#   poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
-#   outFASTAfile.close()
-
-# proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
-#   let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple
-#   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
-#   var fasta_file : string
-#   if format == "fasta":
-#     if u2t:
-#       fasta_file = &"{outdir}{trim}.tmp.fa"
-#       convertUtoTinFASTA(infilepath,fasta_files)
-#     else:
-#       fasta_file = infilepath
-#   elif format == "fastq":
-#     fasta_file = &"{outdir}{trim}.tmp.fa"
-#     convertFASTQtoFASTA(infilepath,fasta_file)
-#   var last_num_reads = 0
-#   var split_num = 200
-#   var (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
-#   var delete_fasta_flag = false
-#   if format == "fastq" or u2t or num_fastas > 1:
-#     delete_fasta_flag = true
-#   while num_fastas > 1 and num_reads != last_num_reads: #num_fastas > 1
-#     if format == "fastq":
-#       removeFile(fasta_file)
-#     let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus.fa"
-#     var outFASTAfile : File
-#     discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-#     for i in 0..<num_fastas:
-#       #Calculate subclusters
-#       let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
-#       var seq_file : PFile = fopen(cstring(tmp_fasta))
-#       var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-#       removeFile(tmp_fasta)
-#       var trim_po = poParser.convertPOGraphtoTrimmedPOGraph(po)
-#       var representative_paths = poParser.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-#       let consensus_po = poParser.buildConsensusPO(addr po, representative_paths,&"{trim}.tmp_subfasta{i}")
-#       poParser.writeCorrectedReads(consensus_po,outFASTAfile)
-#     outFASTAfile.close()
-#     fasta_file = outFASTAfilepath
-#     last_num_reads = num_reads
-#     split_num = split_num * 2 #As consensus sequences are collapsed, we should generate fewer spurious edges and nodes with more reads, should be able to handle more reads faster.
-#     (num_fastas,num_reads) = splitFASTA(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
-#   if num_reads == last_num_reads:
-#     for i in 0..<num_fastas:
-#       let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
-#       removeFile(tmp_fasta)
-#   var seq_file : PFile = fopen(cstring(fasta_file), "r")
-#   var po2 = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-#   if delete_fasta_flag:
-#     removeFile(fasta_file)
-#   var trim_po2 = poParser.convertPOGraphtoTrimmedPOGraph(po2)
-#   var representative_paths = poParser.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
-#   let consensus_po = poParser.buildConsensusPO(addr po2, representative_paths,trim)
-#   let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
-#   var outFASTAfile : File
-#   discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-#   poParser.writeCorrectedReads(consensus_po,outFASTAfile)
-#   outFASTAfile.close()
-
 proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} =
   let (tmp_dir, trim, matrix_filepath, iter,isoform_delta,ends_delta) = intuple
   let last_fasta_dir = &"{tmp_dir}{iter-1}{os.DirSep}fasta{os.DirSep}"
@@ -731,7 +519,6 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
   writeCorrectedReads(corrected,outfile)
   outfile.close()
 
-# proc runStringencyFilter() {.thread.}
 
 proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath : string) = 
   var outfile : File

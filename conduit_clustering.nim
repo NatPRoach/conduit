@@ -111,6 +111,7 @@ proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (u
 proc collapsedSummariesFromBam( bam : Bam,  chromosome : string, stranded : bool = false) : (Table[char, OrderedTable[seq[(uint64, uint64)],seq[string]]], Table[char, OrderedTable[(uint64, uint64),seq[string]]]) = 
   for record in bam.query(chromosome):
     if record.flag.supplementary or record.flag.secondary: #TODO - Figure out if there's anything to be done w/ secondary / supplmentary alignments - there probably is w/r/t clustering of overlapping splice sites especially but it may take some clever approaches.
+      echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
       continue
     let summary = summaryFromBamRecord(record, stranded)
     if summary[2].len == 0:
@@ -341,21 +342,12 @@ proc getWeightedSpliceJunctionLocations(sstable : ptr OrderedTable[seq[(uint64, 
     result[1].add((ss,weight))
   echo result
 
-
-proc writeFASTArecordToFile(outfile : File, record : Record, wrap_len : int = 75) = 
-  var sequence : string
-  record.sequence(sequence)
-  outfile.write(&">{record.qname}\n")
-  for i in 0..<(sequence.len div wrap_len):
-    outfile.write(&"{sequence[i*wrap_len..(i+1)*wrap_len - 1]}\n")
-  if sequence.len mod wrap_len != 0 :
-    outfile.write(&"{sequence[wrap_len*(sequence.len div wrap_len)..^1]}\n")
-
-proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string,cluster_prefix : string,starting_count : int) : int =
+proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string, cluster_prefix : string, starting_count : int) : int =
   var open_files : Table[int, File]
   var written_reads : CountTable[int]
   for record in bam.query(query):
     if record.flag.supplementary or record.flag.secondary:
+      echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
       continue
     if record.qname notin read_id_to_cluster[]:
       continue
@@ -376,8 +368,37 @@ proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], c
       # echo &"Closing cluster file {cluster_id + starting_count}"
       open_files[cluster_id].close
       open_files.del(cluster_id)
-  for cluster_id, open_file in open_files.pairs: #Just in case
-    echo &"WARNING - missing reads in output somehow - {cluster_id}"
+  for cluster_id, open_file in open_files.pairs: # Just in case of secondary / supplementary alignments
+    open_file.close
+
+
+proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string, cluster_prefix : string, starting_count : int, fai : Fai) : int =
+  var open_files : Table[int, File]
+  var written_reads : CountTable[int]
+  for record in bam.query(query):
+    if record.flag.supplementary or record.flag.secondary:
+      echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
+      continue
+    if record.qname notin read_id_to_cluster[]:
+      continue
+    let cluster_id = read_id_to_cluster[][record.qname]
+    if cluster_id notin open_files:
+      var file : File
+      discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",fmWrite)
+      result += 1
+      # echo &"Opening cluster file {cluster_id + starting_count}"
+      open_files[cluster_id] = file
+      file.writeFASTArecordToFile(record)
+    else:
+      # echo &"Appending to cluster file {cluster_id + starting_count}"
+      open_files[cluster_id].writeFASTArecordToFile(record)
+    written_reads.inc(cluster_id)
+    echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
+    if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
+      # echo &"Closing cluster file {cluster_id + starting_count}"
+      open_files[cluster_id].close
+      open_files.del(cluster_id)
+  for cluster_id, open_file in open_files.pairs: # Just in case of secondary / supplementary alignments
     open_file.close
 
 

@@ -39,11 +39,6 @@ type
     min_length : uint64
     fastq : bool
     stranded : bool
-
-  FastqRecord* = object
-    read_id* : string
-    sequence* : string
-    qualities* : string
   
   GTFTranscript* = object
     chr* : string
@@ -232,34 +227,6 @@ proc writeCallOverlappingHelp() =
   echo "  <introns1.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
   echo "  <introns2.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
   echo "  <shared_introns.txt>        The introns in common between the two files"
-
-
-proc parseFASTQ(infile : File) : seq[FastqRecord] = 
-  while true:
-    try:
-      let line1 = infile.readLine()
-      try:
-        assert line1[0] == '@'
-      except AssertionError:
-        echo "File not in FASTQ format"
-        raise
-      let read_id = line1[1..^1]
-      let sequence = infile.readLine().replace(sub='U',by='T')
-      discard infile.readLine()
-      let quals = infile.readLine()
-      result.add(FastqRecord( read_id   : read_id,
-                              sequence  : sequence,
-                              qualities : quals))
-    except EOFError:
-      break
-
-proc convertFASTQtoFASTA(record : FastqRecord) : FastaRecord = 
-  result.read_id = record.read_id
-  result.sequence = record.sequence
-
-proc convertFASTQtoFASTA(records : openArray[FastqRecord]) : seq[FastaRecord] =
-  for record in records:
-    result.add(convertFASTQtoFASTA(record))
 
 proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] = 
   ##
@@ -1085,8 +1052,7 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
   infile.close()
   outfile.close()
 
-# proc parseGTF*(infile) : HashSet[(string,char,uint64,uint64,seq[(uint64,uint64)])] = 
-proc parseGTF1*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] = 
+proc parseGTF*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] = 
   var exons : Table[string,seq[(string,char,uint64,uint64)]]
   try:
     while true:
@@ -1142,15 +1108,15 @@ proc parseGTF1*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
 proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,outfilepath : string) =
   var infile, ref1file, ref2file, outfile : File
   discard open(ref1file,reference1_infilepath,fmRead)
-  let ref1set = parseGTF1(ref1file)
+  let ref1set = parseGTF(ref1file)
   ref1file.close
   
   discard open(ref2file,reference2_infilepath,fmRead)
-  let ref2set = parseGTF1(ref2file)
+  let ref2set = parseGTF(ref2file)
   ref2file.close
   
   discard open(infile,infilepath,fmRead)
-  let inset = parseGTF1(infile)
+  let inset = parseGTF(infile)
   infile.close
 
   let novel = (inset - ref1set) - ref2set
