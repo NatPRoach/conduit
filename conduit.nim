@@ -193,7 +193,7 @@ proc writeHybridHelp() =
   echo "        Do not enforce that every base / edge in each final reported isoform is supported by an Illumina read"
   echo "    --stringent-tolerance (100)"
   echo "        Number of bases at the end of each isoform that do not have to have Illumina reads supporting them when run in --stringent mode; ignored when run with --no-stringents"
-  # echo "    --scaffold-minimum (1)" #TODO
+  # echo "    --scaffold-minimum (1)" # TODO
   # echo "        Minimum number of scaffolding reads supporting an isoform necessary to report the isoform in the final output"
   echo "  Ouput:"
   echo "    -o, --output-dir <path> (conduit/)"
@@ -210,12 +210,12 @@ proc writeHybridHelp() =
   echo "        Align Illumina reads to ONT scaffolds in local alignment mode"
   echo "    -k,--bowtie2-max-alignments (50)"
   echo "        Maximum number of alignments per Illumina read to be used in final polishing step"
-  # echo "    --bowtie2-path (bowtie2)" #TODO
+  # echo "    --bowtie2-path (bowtie2)" # TODO
   echo "  SAMtools:"
   echo "    --samtools-thread-memory (768 MiB)"
   echo "        Memory amount to use per SAMtools thread"
   echo "        Specified either in bytes or with a K, M, or G suffix"
-  # echo "    --samtools-path (samtools)" #TODO
+  # echo "    --samtools-path (samtools)" # TODO
   echo "  Miscellaneous:"
   echo "    -h, --help"
   echo "        Display this help message and exit"
@@ -225,8 +225,8 @@ proc writeHybridHelp() =
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
   echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
-  # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." #TODO
-  # echo "              If CPU number cannot be detected, the default of 4 threads will be used. #TODO
+  # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." # TODO
+  # echo "              If CPU number cannot be detected, the default of 4 threads will be used. # TODO
 
 proc removeFiles(files : openArray[string]) =
   for file in files:

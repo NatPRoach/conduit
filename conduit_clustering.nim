@@ -12,6 +12,9 @@ import sets
 import genomeKDE
 import algorithm
 import poGraphUtils
+import fasta
+import fastq
+
 
 type
   ClusteringOptions = object
@@ -28,7 +31,7 @@ type
     index_to_index : OrderedTable[uint32,uint32]
     previously_visited : seq[uint32]
 
-#TODO - Possibly change uint32 to uint64 where necessary. Reevaluate before publication.
+# TODO - Possibly change uint32 to uint64 where necessary. Reevaluate before publication.
 proc conduitClusterVersion() : string =
   return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
@@ -40,24 +43,31 @@ proc writeClusterHelp() =
   echo "  ./conduit_cluster [options] input.bam"
   echo ""
   echo "Options (defaults in parentheses):"
+  echo "  Correction:"
+  echo "    -r, --reference path/to/reference"
+  echo "        Used to providing a FASTA reference with corresponding .fai index"
+  echo "        If provided reads will be 'corrected' to sequence corresponding to their genomic alignment before output into cluster files."
+  echo "        Forces outputing reads in FASTA format (--fa) as the original quality scores become meaningless after this correction"
+  echo ""
   echo "  Clustering mode:"
-#TODO - Figure out if there's any computationally reasonable way to do ss tolerance?
-#IDEA - Reduce to unique ss locations (weighted by depth?)
-#IDEA - Reduce ss to corresponding peaks of splice sites to group splice sites together easier.
-#IDEA - Calculate peaks at sections of the genome w/ # of ss > some threshold
-#IDEA - Find local maxima, correct splice sites to discovered local maxima
-#IDEA - Optionally allow for reference genome based correction of individual reads
-#IDEA - Optionally allow for reference genome annotation based splice site definition for collapsing
+# TODO - Figure out if there's any computationally reasonable way to do ss tolerance?
+# IDEA - Reduce to unique ss locations (weighted by depth?)
+# IDEA - Reduce ss to corresponding peaks of splice sites to group splice sites together easier.
+# IDEA - Calculate peaks at sections of the genome w/ # of ss > some threshold
+# IDEA - Find local maxima, correct splice sites to discovered local maxima
+# IDEA - Optionally allow for reference genome based correction of individual reads
+# IDEA - Optionally allow for reference genome annotation based splice site definition for collapsing
 #  echo "    -s, --splice-site-tolerance (15)"
 #  echo "        Allow tolerance in splice site collapsing step"
-  echo "    --ss (default)"
+  echo "    --ss (default, only option at the moment)"
   echo "        Cluster reads with at least one splice site in common"
-  echo "    --overlap"
-  echo "        Cluster reads with at least one base of overlap in alignment"
+  # echo "    --overlap"
+  # echo "        Cluster reads with at least one base of overlap in alignment"
   echo "    -z (default)"
   echo "        Cluster reads with zero introns by overlap"
   echo "    -d"
   echo "        Do not cluster reads with zero introns by overlap"
+  echo ""
   echo "  Output:"
   echo "    -o, --output-dir <path> (clusters/)"
   echo "    -p, --prefix (cluster_)"
@@ -107,10 +117,10 @@ proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (u
   result = (strand,(alignment_start,alignment_end),splice_sites)
 
 
-#TODO - Figure out if bitshifting flag for strand makes sense. At u32 assumes no chr larger than 2147483648 bp. Probably safe, just takes time to change the logic.
+# TODO - Figure out if bitshifting flag for strand makes sense. At u32 assumes no chr larger than 2147483648 bp. Probably safe, just takes time to change the logic.
 proc collapsedSummariesFromBam( bam : Bam,  chromosome : string, stranded : bool = false) : (Table[char, OrderedTable[seq[(uint64, uint64)],seq[string]]], Table[char, OrderedTable[(uint64, uint64),seq[string]]]) = 
   for record in bam.query(chromosome):
-    if record.flag.supplementary or record.flag.secondary: #TODO - Figure out if there's anything to be done w/ secondary / supplmentary alignments - there probably is w/r/t clustering of overlapping splice sites especially but it may take some clever approaches.
+    if record.flag.supplementary or record.flag.secondary:  # TODO - Figure out if there's anything to be done w/ secondary / supplmentary alignments - there probably is w/r/t clustering of overlapping splice sites especially but it may take some clever approaches.
       echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
       continue
     let summary = summaryFromBamRecord(record, stranded)
@@ -372,26 +382,45 @@ proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], c
     open_file.close
 
 
+proc correctBamRecordWithGenome(record : Record, fai : Fai) : FastaRecord = 
+  let summary = summaryFromBamRecord(record, true)
+  var nt_sequence : string
+  var start_base = summary[1][0]
+  var end_base = -1
+  for donor,acceptor in summary[2]:
+    end_base = donor
+    nt_sequence.add(fai.get(record.chrom,start_base,end_base))
+    start_base = acceptor
+  end_base = summary[1][1]
+  nt_sequence.add(fai.get(record.chrom,start_base,end_base))
+  if summary[0] == '-':
+    nt_sequence = nt_sequence.revComp
+  result = FastaRecord( read_id : record.qname, sequence : nt_sequence)
+
 proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string, cluster_prefix : string, starting_count : int, fai : Fai) : int =
   var open_files : Table[int, File]
   var written_reads : CountTable[int]
   for record in bam.query(query):
     if record.flag.supplementary or record.flag.secondary:
-      echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
+      echo "WARNING - At the moment secondary / supplementary alignments are not supported"
       continue
-    if record.qname notin read_id_to_cluster[]:
+    if record.flag.unmapped:
+      echo "WARNING - Unmapped read detected, skipping"
       continue
-    let cluster_id = read_id_to_cluster[][record.qname]
+    let fasta_record = correctBamRecordWithGenome(record, fai)
+    if fasta_record.read_id notin read_id_to_cluster[]:
+      continue
+    let cluster_id = read_id_to_cluster[][fasta_record.read_id]
     if cluster_id notin open_files:
       var file : File
       discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",fmWrite)
       result += 1
       # echo &"Opening cluster file {cluster_id + starting_count}"
       open_files[cluster_id] = file
-      file.writeFASTArecordToFile(record)
+      file.writeFASTArecordToFile(fasta_record)
     else:
       # echo &"Appending to cluster file {cluster_id + starting_count}"
-      open_files[cluster_id].writeFASTArecordToFile(record)
+      open_files[cluster_id].writeFASTArecordToFile(fasta_record)
     written_reads.inc(cluster_id)
     echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
     if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
@@ -465,7 +494,12 @@ proc main() =
     echo cluster_sizes
     var bam : Bam
     discard open(bam,opt.file,index=true)
-    output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count)
+    if opt.reference != "":
+      var fai : Fai
+      discard open(fai,opt.reference)
+      output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count,fai)
+    else:
+      output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count)
     #TODO - add logic to write FASTQs
     #TODO - add option to 'correct' reads based on reference genome
     bam.close
