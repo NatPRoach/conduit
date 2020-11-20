@@ -7,6 +7,8 @@ import tables
 import sets
 import poGraphUtils
 import algorithm
+import fasta
+import fastq
 
 type
   BLASTmatch* = object
@@ -692,9 +694,9 @@ proc compareExactTranslations*(reference_infilepath : string, translation_infile
   var r_infile, t_infile : File
   discard open(r_infile,reference_infilepath,fmRead)
   discard open(t_infile,translation_infilepath,fmRead)
-  let r_records = poGraphUtils.parseFasta(r_infile)
+  let r_records = parseFasta(r_infile)
   r_infile.close()
-  let t_records = poGraphUtils.parseFasta(t_infile)
+  let t_records = parseFasta(t_infile)
   t_infile.close()
   var r_proteins,t_proteins : HashSet[string]
   for record in r_records:
@@ -717,7 +719,7 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   var match_set : HashSet[string]
   var ref_infile : File
   discard open(ref_infile,reference_infilepath,fmRead)
-  let reference_records = poGraphUtils.parseFasta(ref_infile)
+  let reference_records = parseFasta(ref_infile)
   ref_infile.close()
   for record in reference_records:
     reference_id_set.incl(record.read_id)
@@ -1171,7 +1173,8 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
     if record.read_id in novel_loci:
       new_records.add(record)
   infile.close
-  writeCorrectedReads(new_records,outfile)
+  # writeCorrectedReads(new_records,outfile)
+  writeFASTArecordsToFile(outfile,new_records)
   outfile.close
 
 proc parseOptions() : UtilOptions = 
@@ -1392,7 +1395,7 @@ proc main() =
           infile.close()
           translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
         else:
-          let records = poGraphUtils.parseFasta(infile)
+          let records = parseFasta(infile)
           infile.close()
           translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
       of "strandTranscripts":
@@ -1403,7 +1406,7 @@ proc main() =
           infile.close()
           strandTranscripts(records,opt.outfilepath)
         else:
-          let records = poGraphUtils.parseFasta(infile)
+          let records = parseFasta(infile)
           infile.close()
           strandTranscripts(records,opt.outfilepath)
       of "bed2gtf":

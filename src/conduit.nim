@@ -12,6 +12,8 @@ import hts
 import sets
 import poaV2/header
 import poaV2/poa
+import fasta
+import fastq
 
 {.experimental.}
 
@@ -316,7 +318,7 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
       fasta_file = infilepath
   elif format == "fastq":
     fasta_file = &"{outdir}{trim}.tmp.fa"
-    convertFASTQtoFASTA(infilepath,fasta_file)
+    convertFASTQFiletoFASTAfile(infilepath,fasta_file)
   var split_num = 200
   var (num_fastas,_) = splitFASTA2(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
   var total_fastas = num_fastas
@@ -414,7 +416,8 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   var records = getFastaRecordsFromTrimmedPOGraph(addr trim_po, representative_paths, read_supports, trim)
   var outfile : File
   discard open(outfile,this_fasta_filepath,fmWrite)
-  writeCorrectedReads(records,outfile)
+  writeFASTArecordsToFile(outfile,records)
+  # writeCorrectedReads(records,outfile)
   outfile.close()
   result = sameFileContent(last_fasta_filepath,this_fasta_filepath)
   removeFile(last_fasta_filepath)
@@ -444,7 +447,8 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
       corrected.add(FastaRecord(read_id : read.read_id, sequence : getSequenceFromPath(trim_po,trim_po.reads[0].corrected_path)))
   var outfile : File
   discard open(outfile,this_fasta_filepath,fmWrite)
-  writeCorrectedReads(corrected,outfile)
+  writeFASTArecordsToFile(outfile,corrected)
+  # writeCorrectedReads(corrected,outfile)
   outfile.close()
 
 

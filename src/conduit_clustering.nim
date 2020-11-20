@@ -12,6 +12,7 @@ import sets
 import genomeKDE
 import algorithm
 import poGraphUtils
+import conduitUtils
 import fasta
 import fastq
 
@@ -24,6 +25,7 @@ type
     output_dir : string
     prefix : string
     out_type : string
+    reference : string
   
   SpliceSiteGraph = object
     adjacencies : seq[seq[uint32]]
@@ -91,11 +93,10 @@ proc writeClusterHelp() =
   echo "        Output reads in FASTA format"
 
 proc summaryFromBamRecord( record : Record,
-                           stranded : bool = false)
-                          :
-                          (char,
-                           (uint64, uint64),
-                           seq[(uint64, uint64)]) = 
+                           stranded : bool = false) :
+                            ( char,
+                              (uint64, uint64),
+                              seq[(uint64, uint64)] ) = 
   if record.flag.unmapped:
       return
   let alignment_start = uint64(record.start)
@@ -197,6 +198,9 @@ proc parseOptions() : ClusteringOptions =
   var prefix = &"cluster_"
   var prefix_flag = false
 
+  var reference_filepath = ""
+  var reference_filepath_flag = false
+
   var run_flag = true
   var help_flag = false
   var version_flag = false
@@ -262,6 +266,17 @@ proc parseOptions() : ClusteringOptions =
             else:
               output_format_flag = true
               output_format = "fasta"
+          of "r", "reference":
+            if not reference_filepath_flag:
+              reference_filepath_flag = true
+              if val != "":
+                reference_filepath = val
+              else:
+                last = "reference"
+            else:
+              echo "ERROR - two references provided"
+              help_flag = true
+              break
           of "o", "output-dir":
             if not output_dir_flag:
               output_dir_flag = true
@@ -304,6 +319,8 @@ proc parseOptions() : ClusteringOptions =
             output_dir = key
           of "prefix":
             prefix = key
+          of "reference":
+            reference_filepath = key
           of "":
             if not file_flag:
               file = key
@@ -327,7 +344,8 @@ proc parseOptions() : ClusteringOptions =
                            cluster_zero_introns : single_exon,
                            output_dir : output_dir,
                            prefix : prefix,
-                           out_type : output_format)
+                           out_type : output_format,
+                           reference : reference_filepath)
 
 
 proc bfs(ssgraph : ptr SpliceSiteGraph,
@@ -382,6 +400,7 @@ proc getWeightedSpliceJunctionLocations(
     result[1].add((ss,weight))
   echo result
 
+
 proc writeFASTAsFromBAM(bam : Bam,
                         read_id_to_cluster : ptr Table[string,int],
                         cluster_sizes : ptr CountTable[int],
@@ -406,10 +425,11 @@ proc writeFASTAsFromBAM(bam : Bam,
       result += 1
       # echo &"Opening cluster file {cluster_id + starting_count}"
       open_files[cluster_id] = file
-      file.writeFASTArecordToFile(record)
+      # file.writeFASTArecordToFile(record)
+      file.writeBamRecordToFASTAfile(record)
     else:
       # echo &"Appending to cluster file {cluster_id + starting_count}"
-      open_files[cluster_id].writeFASTArecordToFile(record)
+      open_files[cluster_id].writeBamRecordToFASTAfile(record)
     written_reads.inc(cluster_id)
     echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
     if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
@@ -424,13 +444,13 @@ proc writeFASTAsFromBAM(bam : Bam,
 proc correctBamRecordWithGenome(record : Record, fai : Fai) : FastaRecord = 
   let summary = summaryFromBamRecord(record, true)
   var nt_sequence : string
-  var start_base = summary[1][0]
+  var start_base = int(summary[1][0])
   var end_base = -1
-  for donor,acceptor in summary[2]:
-    end_base = donor
+  for (donor,acceptor) in summary[2]:
+    end_base = int(donor)
     nt_sequence.add(fai.get(record.chrom,start_base,end_base))
-    start_base = acceptor
-  end_base = summary[1][1]
+    start_base = int(acceptor)
+  end_base = int(summary[1][1])
   nt_sequence.add(fai.get(record.chrom,start_base,end_base))
   if summary[0] == '-':
     nt_sequence = nt_sequence.revComp
