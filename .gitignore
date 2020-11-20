@@ -5,19 +5,21 @@
 !*/
 
 # Whitelist gitignore, scripts, and figures
+!.gitmodules
 !.gitignore
 !CONDUIT.png
 !**.py
 !**.R
 !**.bsh
 !**.nim
+!**.nimble
 !**.md
 !**.c
 !**.h
 !**.rst
 !**.html
 !Makefile
-!poaV2/Makefile
 !LICENSE
+!poaV2/Makefile
 !poaV2/LICENSE
 !poaV2/myNUC3.4.4.mat

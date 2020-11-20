@@ -7,7 +7,7 @@ import strformat
 import poGraphUtils
 import tables
 import heapqueue
-import threadpool_simple as tps
+import threadpools/threadpool_simple as tps
 import hts
 import sets
 import poaV2/header

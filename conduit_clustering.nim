@@ -6,7 +6,7 @@ import parseopt
 import strutils
 import strformat
 import tables
-import threadpool_simple as tps
+import threadpools/threadpool_simple as tps
 import hts
 import sets
 import genomeKDE
