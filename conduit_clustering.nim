@@ -31,9 +31,15 @@ type
     index_to_index : OrderedTable[uint32,uint32]
     previously_visited : seq[uint32]
 
-# TODO - Possibly change uint32 to uint64 where necessary. Reevaluate before publication.
+# TODO -   Clean up line wrapping where necessary (make it readable)
+# TODO - but also conform to nim style guide length restrictions
+# TODO - where possible
+
+# TODO -   Possibly change uint32 to uint64 where necessary.
+# TODO - Reevaluate before publication.
 proc conduitClusterVersion() : string =
-  return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+  return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu," &
+    " https://github.com/NatPRoach/conduit/ )"
 
 
 proc writeClusterHelp() = 
@@ -45,18 +51,25 @@ proc writeClusterHelp() =
   echo "Options (defaults in parentheses):"
   echo "  Correction:"
   echo "    -r, --reference path/to/reference"
-  echo "        Used to providing a FASTA reference with corresponding .fai index"
-  echo "        If provided reads will be 'corrected' to sequence corresponding to their genomic alignment before output into cluster files."
-  echo "        Forces outputing reads in FASTA format (--fa) as the original quality scores become meaningless after this correction"
+  echo "        Used to providing a FASTA reference with corresponding .fai" &
+    " index"
+  echo "        If provided reads will be 'corrected' to sequence corresponding"
+  echo "        to their genomic alignment before output into cluster files."
+  echo "        Forces outputing reads in FASTA format (--fa) as the original"
+  echo "        quality scores become meaningless after this correction"
   echo ""
   echo "  Clustering mode:"
-# TODO - Figure out if there's any computationally reasonable way to do ss tolerance?
-# IDEA - Reduce to unique ss locations (weighted by depth?)
-# IDEA - Reduce ss to corresponding peaks of splice sites to group splice sites together easier.
-# IDEA - Calculate peaks at sections of the genome w/ # of ss > some threshold
-# IDEA - Find local maxima, correct splice sites to discovered local maxima
-# IDEA - Optionally allow for reference genome based correction of individual reads
-# IDEA - Optionally allow for reference genome annotation based splice site definition for collapsing
+# TODO -
+#[ Figure out if there's any computationally reasonable way to do ss tolerance?
+   Reduce to unique ss locations (weighted by depth?)
+   Reduce ss to corresponding peaks of splice sites to
+     group splice sites together easier.
+   Calculate peaks at sections of the genome w/ # of ss > some threshold
+   Find local maxima, correct splice sites to discovered local maxima
+   Optionally allow for reference genome based correction
+     of individual reads
+   Optionally allow for reference genome annotation based splice site
+     definition for collapsing ]#
 #  echo "    -s, --splice-site-tolerance (15)"
 #  echo "        Allow tolerance in splice site collapsing step"
   echo "    --ss (default, only option at the moment)"
@@ -77,20 +90,12 @@ proc writeClusterHelp() =
   echo "    --fa"
   echo "        Output reads in FASTA format"
 
-
-# proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOptions) =
-#   var outfile : File
-#   discard open(outfile,outfilepath,fmWrite)
-#   outfile.close()
-
-
-# proc outputSettings(outfilepath : string,opts : ConduitOptions) = 
-#   var outfile : File
-#   discard open(outfile,outfilepath,fmWrite)
-#   outfile.close()
-
-
-proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (uint64, uint64), seq[(uint64, uint64)]) = 
+proc summaryFromBamRecord( record : Record,
+                           stranded : bool = false)
+                          :
+                          (char,
+                           (uint64, uint64),
+                           seq[(uint64, uint64)]) = 
   if record.flag.unmapped:
       return
   let alignment_start = uint64(record.start)
@@ -99,7 +104,9 @@ proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (u
   let flag = record.flag
   var strand : char
   var splice_sites : seq[(uint64, uint64)]
-  if  ( not stranded ) or flag.has_flag(16'u16): # If we're not stranded treat everything as if it's (-) strand, else check for the actual strand
+  # If we're not stranded treat everything as if it's (-) strand
+  # else check for the actual strand
+  if  ( not stranded ) or flag.has_flag(16'u16):
     strand = '-'
   else:
     strand = '+'
@@ -116,12 +123,29 @@ proc summaryFromBamRecord( record : Record, stranded : bool = false) : (char, (u
   let alignment_end = ref_position
   result = (strand,(alignment_start,alignment_end),splice_sites)
 
-
-# TODO - Figure out if bitshifting flag for strand makes sense. At u32 assumes no chr larger than 2147483648 bp. Probably safe, just takes time to change the logic.
-proc collapsedSummariesFromBam( bam : Bam,  chromosome : string, stranded : bool = false) : (Table[char, OrderedTable[seq[(uint64, uint64)],seq[string]]], Table[char, OrderedTable[(uint64, uint64),seq[string]]]) = 
+# TODO -
+#[Figure out if bitshifting flag for strand makes sense.
+At u32 assumes no chr larger than 2147483648 bp.
+# Probably safe, just takes time to change the logic. ]#
+proc collapsedSummariesFromBam( bam : Bam,
+                                chromosome : string,
+                                stranded : bool = false) :
+                                (Table[char,
+                                       OrderedTable[seq[(uint64, uint64)],
+                                                    seq[string]]],
+                                 Table[char,
+                                       OrderedTable[(uint64, uint64),
+                                                    seq[string]]]) = 
   for record in bam.query(chromosome):
-    if record.flag.supplementary or record.flag.secondary:  # TODO - Figure out if there's anything to be done w/ secondary / supplmentary alignments - there probably is w/r/t clustering of overlapping splice sites especially but it may take some clever approaches.
-      echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
+    # TODO -
+    #[ Figure out if there's anything to be done w/ secondary / 
+       supplmentary alignments - there probably is w/r/t clustering of
+       overlapping splice sites especially but it may take some clever
+       approaches.
+    ]#
+    if record.flag.supplementary or record.flag.secondary:
+      echo &"WARNING - At the moment secondary / supplementary alignments " &
+        "are not supported"
       continue
     let summary = summaryFromBamRecord(record, stranded)
     if summary[2].len == 0:
@@ -306,7 +330,9 @@ proc parseOptions() : ClusteringOptions =
                            out_type : output_format)
 
 
-proc bfs(ssgraph : ptr SpliceSiteGraph, cluster_number : uint32, starting_node : uint32) : seq[uint32] = 
+proc bfs(ssgraph : ptr SpliceSiteGraph,
+         cluster_number : uint32,
+         starting_node : uint32) : seq[uint32] = 
   var to_visit : seq[uint32]
   ssgraph[].previously_visited[starting_node] = cluster_number
   to_visit.add(starting_node)
@@ -324,7 +350,9 @@ proc findIsoformClusters(ssgraph : ptr SpliceSiteGraph) : seq[seq[uint32]] =
   for isoform_adjacency_index in ssgraph[].index_to_index.keys:
     if ssgraph[].previously_visited[isoform_adjacency_index] == 0:
       var clustered_isoforms : seq[uint32]
-      let clustered_nodes = bfs(ssgraph,cluster_counter, isoform_adjacency_index)
+      let clustered_nodes = bfs(ssgraph,
+                                cluster_counter,
+                                isoform_adjacency_index)
       for node_id in clustered_nodes:
         if node_id in ssgraph[].index_to_index:
           clustered_isoforms.add(ssgraph[].index_to_index[node_id])
@@ -332,7 +360,9 @@ proc findIsoformClusters(ssgraph : ptr SpliceSiteGraph) : seq[seq[uint32]] =
       result.add(clustered_isoforms.sorted)
 
 
-proc getWeightedSpliceJunctionLocations(sstable : ptr OrderedTable[seq[(uint64, uint64)],seq[string]]) : (seq[(uint32,uint32)],seq[(uint32,uint32)]) = 
+proc getWeightedSpliceJunctionLocations(
+        sstable : ptr OrderedTable[seq[(uint64, uint64)],seq[string]]) :
+        (seq[(uint32,uint32)],seq[(uint32,uint32)]) = 
   var donor_table : OrderedTable[uint32,uint32]
   var acceptor_table : OrderedTable[uint32,uint32]
   for sss, read_ids in sstable[].pairs:
@@ -352,19 +382,27 @@ proc getWeightedSpliceJunctionLocations(sstable : ptr OrderedTable[seq[(uint64, 
     result[1].add((ss,weight))
   echo result
 
-proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string, cluster_prefix : string, starting_count : int) : int =
+proc writeFASTAsFromBAM(bam : Bam,
+                        read_id_to_cluster : ptr Table[string,int],
+                        cluster_sizes : ptr CountTable[int],
+                        query : string,
+                        cluster_prefix : string,
+                        starting_count : int) : int =
   var open_files : Table[int, File]
   var written_reads : CountTable[int]
   for record in bam.query(query):
     if record.flag.supplementary or record.flag.secondary:
-      echo &"WARNING - At the moment secondary / supplementary alignments are not supported"
+      echo &"WARNING - At the moment secondary / supplementary alignments " &
+        "are not supported"
       continue
     if record.qname notin read_id_to_cluster[]:
       continue
     let cluster_id = read_id_to_cluster[][record.qname]
     if cluster_id notin open_files:
       var file : File
-      discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",fmWrite)
+      discard open(file,
+                   &"{cluster_prefix}{cluster_id + starting_count}.fa",
+                   fmWrite)
       result += 1
       # echo &"Opening cluster file {cluster_id + starting_count}"
       open_files[cluster_id] = file
@@ -378,7 +416,8 @@ proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], c
       # echo &"Closing cluster file {cluster_id + starting_count}"
       open_files[cluster_id].close
       open_files.del(cluster_id)
-  for cluster_id, open_file in open_files.pairs: # Just in case of secondary / supplementary alignments
+  # Just in case of secondary / supplementary alignments
+  for cluster_id, open_file in open_files.pairs:
     open_file.close
 
 
@@ -397,12 +436,19 @@ proc correctBamRecordWithGenome(record : Record, fai : Fai) : FastaRecord =
     nt_sequence = nt_sequence.revComp
   result = FastaRecord( read_id : record.qname, sequence : nt_sequence)
 
-proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], cluster_sizes : ptr CountTable[int], query : string, cluster_prefix : string, starting_count : int, fai : Fai) : int =
+proc writeFASTAsFromBAM(bam : Bam,
+                        read_id_to_cluster : ptr Table[string,int],
+                        cluster_sizes : ptr CountTable[int],
+                        query : string,
+                        cluster_prefix : string,
+                        starting_count : int,
+                        fai : Fai) : int =
   var open_files : Table[int, File]
   var written_reads : CountTable[int]
   for record in bam.query(query):
     if record.flag.supplementary or record.flag.secondary:
-      echo "WARNING - At the moment secondary / supplementary alignments are not supported"
+      echo "WARNING - At the moment secondary / supplementary alignments " &
+        "are not supported"
       continue
     if record.flag.unmapped:
       echo "WARNING - Unmapped read detected, skipping"
@@ -413,7 +459,8 @@ proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], c
     let cluster_id = read_id_to_cluster[][fasta_record.read_id]
     if cluster_id notin open_files:
       var file : File
-      discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",fmWrite)
+      discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",
+        fmWrite)
       result += 1
       # echo &"Opening cluster file {cluster_id + starting_count}"
       open_files[cluster_id] = file
@@ -427,7 +474,8 @@ proc writeFASTAsFromBAM(bam : Bam, read_id_to_cluster : ptr Table[string,int], c
       # echo &"Closing cluster file {cluster_id + starting_count}"
       open_files[cluster_id].close
       open_files.del(cluster_id)
-  for cluster_id, open_file in open_files.pairs: # Just in case of secondary / supplementary alignments
+  # Just in case of secondary / supplementary alignments
+  for cluster_id, open_file in open_files.pairs:
     open_file.close
 
 
@@ -437,7 +485,8 @@ proc main() =
     createDir(opt.output_dir)
   var bam : Bam
   discard open(bam,opt.file,index=true)
-  var (strand_spliced_table, strand_nonspliced_table) = collapsedSummariesFromBam(bam, "chrI", true)
+  var (strand_spliced_table, strand_nonspliced_table) =
+    collapsedSummariesFromBam(bam, "chrI", true)
   bam.close
   var output_file_count = 0
   for strand, spliced_table in strand_spliced_table.mpairs:
@@ -459,15 +508,20 @@ proc main() =
           ssgraph.adjacencies.add(@[isoform_adjacency_index])
           ssgraph.previously_visited.add(0)
         else:
-          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(donor)]].add(isoform_adjacency_index)
+          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(donor)]].add(
+            isoform_adjacency_index)
         if uint32(acceptor) notin ssgraph.ss_to_index:
-          ssgraph.ss_to_index[uint32(acceptor)] = uint32(ssgraph.adjacencies.len)
+          ssgraph.ss_to_index[uint32(acceptor)] = uint32(
+            ssgraph.adjacencies.len)
           ssgraph.adjacencies.add(@[isoform_adjacency_index])
           ssgraph.previously_visited.add(0)
         else:
-          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(acceptor)]].add(isoform_adjacency_index)
-        ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(donor)])
-        ssgraph.adjacencies[isoform_adjacency_index].add(ssgraph.ss_to_index[uint32(acceptor)])
+          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(acceptor)]].add(
+            isoform_adjacency_index)
+        ssgraph.adjacencies[isoform_adjacency_index].add(
+          ssgraph.ss_to_index[uint32(donor)])
+        ssgraph.adjacencies[isoform_adjacency_index].add(
+          ssgraph.ss_to_index[uint32(acceptor)])
     ### Fetch clusters
     let isoform_clusters = findIsoformClusters(addr ssgraph)
     # echo isoform_clusters
@@ -480,8 +534,10 @@ proc main() =
       for read_id in read_ids:
         read_id_to_cluster[read_id] = cluster_counter
       cluster_sizes.inc(cluster_counter,read_ids.len)
-      # echo int(isoform_clusters[cluster_counter][subcluster_counter]), "\t", splice_table_counter
-      assert int(isoform_clusters[cluster_counter][subcluster_counter]) == splice_table_counter
+      # echo int(isoform_clusters[cluster_counter][subcluster_counter]),
+      #   "\t", splice_table_counter
+      assert int(isoform_clusters[cluster_counter][subcluster_counter]) ==
+        splice_table_counter
       if subcluster_counter == isoform_clusters[cluster_counter].len - 1:
         subcluster_counter = 0
         cluster_counter += 1
@@ -497,9 +553,20 @@ proc main() =
     if opt.reference != "":
       var fai : Fai
       discard open(fai,opt.reference)
-      output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count,fai)
+      output_file_count += writeFASTAsFromBAM(bam,
+                                              addr read_id_to_cluster,
+                                              addr cluster_sizes,
+                                              "chrI",
+                                              "clusters_out/cluster_",
+                                              output_file_count,
+                                              fai)
     else:
-      output_file_count += writeFASTAsFromBAM(bam, addr read_id_to_cluster, addr cluster_sizes, "chrI","clusters_out/cluster_",output_file_count)
+      output_file_count += writeFASTAsFromBAM(bam,
+                                              addr read_id_to_cluster,
+                                              addr cluster_sizes,
+                                              "chrI",
+                                              "clusters_out/cluster_",
+                                              output_file_count)
     #TODO - add logic to write FASTQs
     #TODO - add option to 'correct' reads based on reference genome
     bam.close

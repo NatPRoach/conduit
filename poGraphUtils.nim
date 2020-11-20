@@ -8,6 +8,7 @@ import sets
 import math
 import heapqueue
 import hts
+import fasta
 
 type
   Read* = object
@@ -61,6 +62,7 @@ type
     node_support_list : seq[uint32]
 
 #TODO: clean up redundancies, remove dead code blocks
+#TODO: Nim style guide conformity
 #TODO: break up this into several .nim files, each with a more descriptive / accurate name
 #TODO: remove unused functions
 
@@ -151,7 +153,9 @@ proc collapseLinearStretches( po2 : TrimmedPOGraph) : TrimmedPOGraph =
                         source_nodes : po.source_nodes,
                         end_nodes : new_end_nodes)
 
-proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] = @[],collapse : bool = false) : seq[string] = 
+proc jsOutput( po:TrimmedPOGraph,
+               highlight_path1,highlight_path2 : seq[uint32] = @[],
+               collapse : bool = false) : seq[string] = 
   #Logic for jsOutput and htmlOutput procs largely borrowed, modified, and converted from the Simpson lab simple Partial Order Alignment python implementation: https://github.com/ljdursi/poapy
   var path : seq[uint32]
   if highlight_path1.len != 0:
@@ -247,7 +251,10 @@ proc jsOutput( po:TrimmedPOGraph, highlight_path1,highlight_path2 : seq[uint32] 
   lines.add("];\n")
   return lines
 
-proc htmlOutput( po:TrimmedPOGraph, outfile : File, highlight_path1,highlight_path2 : seq[uint32] = @[],collapse = false) = 
+proc htmlOutput( po:TrimmedPOGraph,
+                 outfile : File,
+                 highlight_path1,highlight_path2 : seq[uint32] = @[],
+                 collapse = false) = 
   let open = '{'
   let close = '}'
   let header = "<!doctype html>\n<html>\n<head>\n<title>POA Graph Alignment</title>\n<script type=\"text/javascript\" src=\"https://visjs.github.io/vis-network/standalone/umd/vis-network.min.js\"></script>\n<script type=\"text/javascript\" src=\"https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.5.3/jspdf.min.js\"></script>\n</head>\n<body>\n<button id=\"downloadPDF\">Download PDF</button>\n<div id=\"mynetwork\"></div>\n<script type=\"text/javascript\">\n// create a network\n"
@@ -347,7 +354,9 @@ proc initPOGraph*( file : File) : POGraph =
   return POGraph(nodes:nodes,reads:reads,edges:edges,og_nodes:uint32(nodes.len),weights:weights)
 
 
-proc writePOGraph*( po : TrimmedPOGraph, outfile : File,graphname : string ="default") = 
+proc writePOGraph*( po : TrimmedPOGraph,
+                    outfile : File,
+                    graphname : string = "default") = 
   outfile.write("VERSION=UNTITLEDCORRECTIONALGORITHM.0.1\n")
   outfile.write(&"NAME={graphname}\n")
   outfile.write("TITLE=untitled\n")

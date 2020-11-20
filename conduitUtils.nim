@@ -10,24 +10,24 @@ import algorithm
 
 type
   BLASTmatch* = object
-    query_name : string
-    query_len : uint
-    match_names : seq[string]
-    match_lens : seq[uint]
-    scores : seq[seq[float]]
-    evals : seq[seq[float]]
-    identities_numerators : seq[seq[uint]]
-    identities_denominators : seq[seq[uint]]
-    identities_percentages : seq[seq[float]]
-    positives_numerators : seq[seq[uint]]
-    positives_denominators : seq[seq[uint]]
-    positives_percentages : seq[seq[float]]
-    gap_numerators : seq[seq[uint]]
-    gap_denominators : seq[seq[uint]]
-    gap_percentages : seq[seq[float]]
-    query_seqs : seq[seq[string]]
-    conss_seqs : seq[seq[string]]
-    sbjct_seqs : seq[seq[string]]
+    query_name* : string
+    query_len* : uint
+    match_names* : seq[string]
+    match_lens* : seq[uint]
+    scores* : seq[seq[float]]
+    evals* : seq[seq[float]]
+    identities_numerators* : seq[seq[uint]]
+    identities_denominators* : seq[seq[uint]]
+    identities_percentages* : seq[seq[float]]
+    positives_numerators* : seq[seq[uint]]
+    positives_denominators* : seq[seq[uint]]
+    positives_percentages* : seq[seq[float]]
+    gap_numerators* : seq[seq[uint]]
+    gap_denominators* : seq[seq[uint]]
+    gap_percentages* : seq[seq[float]]
+    query_seqs* : seq[seq[string]]
+    conss_seqs* : seq[seq[string]]
+    sbjct_seqs* : seq[seq[string]]
   
   UtilOptions = object
     mode : string
