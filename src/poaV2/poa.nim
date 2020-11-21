@@ -16,26 +16,37 @@ proc toString(str: seq[char]): string =
   for ch in str:
     add(result, ch)
 
-proc fopen*(filename : cstring, mode : cstring = "r") : PFile {.importc: "fopen", header: "<stdio.h>".}
+proc fopen*(filename : cstring,
+            mode : cstring = "r") : PFile
+            {.importc: "fopen", header: "<stdio.h>".}
 
-proc matrix_scoring_function*(i: cint;
-                              j: cint;
-                              seq_x: ptr LPOLetterT;
-                              seq_y: ptr LPOLetterT;
-                              m: ptr ResidueScoreMatrixT): LPOScoreT {.importc: "matrix_scoring_function".}
+proc matrix_scoring_function*(i: cint,
+                              j: cint,
+                              seq_x: ptr LPOLetterT,
+                              seq_y: ptr LPOLetterT,
+                              m: ptr ResidueScoreMatrixT) :
+                              LPOScoreT {.importc: "matrix_scoring_function".}
 
-proc free_return_result(lpo_result : LPOReturnResultT ) {.importc: "free_return_result".}
+proc free_return_result(lpo_result : LPOReturnResultT )
+                        {.importc: "free_return_result".}
 
-proc build_lpo_from_fasta(seq_file : PFile;
-               score_matrix_filepath : cstring;
-               use_global_alignment : cint;
-               scoring_function : proc (a1 : cint; a2 : cint; a3 : ptr LPOLetterT; a4 : ptr LPOLetterT; a5 : ptr ResidueScoreMatrixT) : LPOScoreT) : LPOReturnResultT {.importc : "build_lpo_from_fasta".}
+proc build_lpo_from_fasta(seq_file : PFile,
+               score_matrix_filepath : cstring,
+               use_global_alignment : cint,
+               scoring_function : proc (a1 : cint,
+                                        a2 : cint,
+                                        a3 : ptr LPOLetterT,
+                                        a4 : ptr LPOLetterT,
+                                        a5 : ptr ResidueScoreMatrixT) : 
+                                          LPOScoreT) : LPOReturnResultT 
+                                          {.importc : "build_lpo_from_fasta".}
 
 ###########################################################
 ###---------  Utility functions to interface   ---------###
 ###########################################################
 
-proc convertPOFormats(lpoReturnResult : LPOReturnResultT, weight_support : bool = false) : POGraph =
+proc convertPOFormats(lpoReturnResult : LPOReturnResultT,
+                      weight_support : bool = false) : POGraph =
   let lpo = lpoReturnResult.lpoSeqs
   let matrix = lpoReturnResult.matrix
   let numReads = lpo.nsourceSeq
@@ -102,10 +113,15 @@ proc convertPOFormats(lpoReturnResult : LPOReturnResultT, weight_support : bool 
                  edges : edges,
                  weights : weights,
                  og_nodes : uint32(numNodes))
-proc getPOGraphFromFasta*(seq_file : PFile;
-                         score_matrix_filepath : cstring;
-                         use_global_alignment : cint;
-                         scoring_function : proc (a1 : cint; a2 : cint; a3 : ptr LPOLetterT; a4 : ptr LPOLetterT; a5 : ptr ResidueScoreMatrixT) : LPOScoreT,
+proc getPOGraphFromFasta*(seq_file : PFile,
+                         score_matrix_filepath : cstring,
+                         use_global_alignment : cint,
+                         scoring_function : proc(a1 : cint,
+                                                a2 : cint,
+                                                a3 : ptr LPOLetterT,
+                                                a4 : ptr LPOLetterT,
+                                                a5 : ptr ResidueScoreMatrixT) :
+                                                LPOScoreT,
                          weight_support : bool = false) : POGraph =
   let lpoReturnResult = build_lpo_from_fasta(seq_file,
                                                score_matrix_filepath,

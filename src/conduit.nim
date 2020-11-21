@@ -7,8 +7,8 @@ import strformat
 import poGraphUtils
 import tables
 import heapqueue
-import threadpools/threadpool_simple as tps
 import hts
+import threadpools/threadpool_simple as tps
 import sets
 import poaV2/header
 import poaV2/poa
@@ -46,24 +46,43 @@ type
     maxAlignments : uint64
 
 #Minor TODOs:
-#TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
+#[TODO - convert from passing tuple back to passing vars individually 
+         relic of older threading approach ]#
 
 #Major TODOs (Future release versions?):
-#TODO - Add clustering tool that runs with the benefit of a reference genome ( Cluster based on splice junctions / or overlap of alignments )
-#TODO - Move filtering step to a graph based polishing step, the linear step has a problem of too low coverage or too many isoforms leading to isoforms not being completely covered by illumina reads when they should be.
-#TODO - Add less stringent filtering step that extracts out the longest contiguous region covered by Illumina reads (with ends tolerance?) should be easy to do and reduce # of false negatives.
-#TODO - Add support for duplicate read ID's that doesn't break everything.
-#TODO - Add option to output both sensitive and stringent isoform sets in the same run
-#TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does and just add a decompress step for generating temp files.
-#TODO - Add output indicating completion percentage for each iteration. Use https://github.com/euantorano/progress.nim ?
-#TODO - Add mode that continues polishing where a previous run left off
-#TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage to the rewrite is it makes doing clever things with the poa easier down the line. (Unless we did SIMD poa, which would require learning nim SIMD, and probably step on Eyras Lab's toes)
-#TODO - Clustering mode for when you DO have a reference genome? Or is that too similar to Stringtie2 to be worth doing? -- Probably too similar?
-#TODO - Break poParser into smaller .nim files with more accurate and descriptive names
-#TODO - Figure out if there's anything to be done about the left-aligned problem inherent to the partial order graph based correction? (thereby allowing us to get rid of linear polishing step)
-#TODO - Add option to output .po files (or a new format, a multi-po file) to explain the relationships between isoforms.
-#TODO - Add quantification output for each isoform / gene
-#TODO - Add options that allow you to specify the path to the bowtie2 and samtools binaries
+#[TODO - Add clustering tool that runs with the benefit of a reference genome
+         (Cluster based on splice junctions / or overlap of alignments) ]#
+#[TODO - Move filtering step to a graph based polishing step, the linear step
+         has a problem of too low coverage or too many isoforms leading to
+         isoforms not being completely covered by illumina reads when they
+         should be. ]#
+#[TODO - Add less stringent filtering step that extracts out the longest
+         contiguous region covered by Illumina reads (with ends tolerance?)
+         should be easy to do and reduce # of false negatives. ]#
+#[TODO - Add support for duplicate read ID's that doesn't break everything. ]#
+#[TODO - Add option to output both sensitive and stringent isoform sets in the
+         same run ]#
+#[TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does 
+         and just add a decompress step for generating temp files. ]#
+#[TODO - Add output indicating completion percentage for each iteration. Use 
+         https://github.com/euantorano/progress.nim ? ]#
+#[TODO - Add mode that continues polishing where a previous run left off ]#
+#[TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage 
+         to the rewrite is it makes doing clever things with the poa easier down
+         the line. (Unless we did SIMD poa, which would require learning nim
+         SIMD, and probably step on Eyras Lab's toes) ]#
+#[TODO - Clustering mode for when you DO have a reference genome? Or is that 
+         too similar to Stringtie2 to be worth doing? -- Probably too similar?]#
+#[TODO - Break poParser into smaller .nim files with more accurate and
+         descriptive names ]#
+#[TODO - Figure out if there's anything to be done about the left-aligned
+         problem inherent to the partial order graph based correction? 
+         (thereby allowing us to get rid of linear polishing step) ]#
+#[TODO - Add option to output .po files (or a new format, a multi-po file) to 
+         explain the relationships between isoforms. ]#
+#[TODO - Add quantification output for each isoform / gene ]#
+#[TODO - Add options that allow you to specify the path to the bowtie2 and 
+         samtools binaries ]#
 
 
 proc conduitVersion() : string =
@@ -1144,11 +1163,18 @@ proc main() =
 
     let directoryNumber = opt.maxIterations + uint64(opt.finalPolish)
     for i in 0..directoryNumber:
-      createDirs([&"{opt.tmpDir}{i}{os.DirSep}", &"{opt.tmpDir}{i}{os.DirSep}fasta{os.DirSep}"])
+      createDirs([&"{opt.tmpDir}{i}{os.DirSep}",
+                  &"{opt.tmpDir}{i}{os.DirSep}fasta{os.DirSep}"])
 
     let p = tps.newThreadPool(int(opt.threadNum))
     for file in opt.files:
-      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmpDir}0/", opt.scoreMatrixPath, opt.nanoporeFormat, uint16(opt.isoformDelta), uint16(opt.endsDelta),opt.u2t))
+      p.spawn runPOAandCollapsePOGraph(
+        (file,
+         &"{opt.tmpDir}0/",
+         opt.scoreMatrixPath,
+         opt.nanoporeFormat,
+         uint16(opt.isoformDelta),
+         uint16(opt.endsDelta),opt.u2t))
     p.sync()
     iterTimes.add(getTime())
     var lastCorrection : Table[int,int]
@@ -1165,25 +1191,59 @@ proc main() =
         lastConsensus = &"{opt.tmpDir}conduit_consensuses_iter{iter-1}.fa"
 
       removeFile(lastConsensus)
-      combineFilesIntermediate(lastFastaDir,opt.trims,lastConsensus,lastCorrection)
+      combineFilesIntermediate(lastFastaDir,
+                               opt.trims,
+                               lastConsensus,
+                               lastCorrection)
 
       let indexPrefix = &"{lastDir}bowtie2_index"
-      echo execProcess("bowtie2-build", args =["--threads",&"{opt.threadNum}", lastConsensus, indexPrefix],options={poUsePath})
+      echo execProcess("bowtie2-build",
+                       args =["--threads",
+                              &"{opt.threadNum}",
+                              lastConsensus,
+                              indexPrefix],
+                       options={poUsePath})
       
       removeFile(lastConsensus)
       if opt.intermediates:
-        combineFilesFinal(opt.tmpDir,iter-1,opt.trims,lastConsensus,lastCorrection)
+        combineFilesFinal(opt.tmpDir,
+                          iter-1,
+                          opt.trims,
+                          lastConsensus,
+                          lastCorrection)
       
       let sam = &"{lastDir}alignments.sam"
-      let arguments = getBowtie2options(opt,indexPrefix,sam)
-      echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
+      let arguments = getBowtie2options(opt,
+                                        indexPrefix,
+                                        sam)
+      echo execProcess("bowtie2",
+                       args = arguments,
+                       options={poUsePath,
+                                poStdErrToStdOut})
       
       let bam = &"{lastDir}alignments.bam"
       # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}", options={poEvalCommand,poUsePath})
-      echo execProcess("samtools", args=["sort", "-@", &"{opt.threadNum}", "-o", bam, "-m", opt.samtoolsMemory, sam], options={poUsePath,poStdErrToStdOut})
-      echo execProcess("samtools", args=["index", bam],options={poUsePath,poStdErrToStdOut})
+      echo execProcess("samtools",
+                       args=["sort",
+                             "-@",
+                             &"{opt.threadNum}",
+                             "-o",
+                             bam,
+                             "-m",
+                             opt.samtoolsMemory,
+                             sam],
+                       options={poUsePath,
+                                poStdErrToStdOut})
+      echo execProcess("samtools",
+                       args=["index", bam],options={poUsePath,poStdErrToStdOut})
       
-      removeFiles([sam, &"{indexPrefix}.1.bt2", &"{indexPrefix}.2.bt2", &"{indexPrefix}.3.bt2", &"{indexPrefix}.4.bt2", &"{indexPrefix}.rev.1.bt2", &"{indexPrefix}.rev.2.bt2"])
+      removeFiles([sam,
+                   &"{indexPrefix}.1.bt2",
+                   &"{indexPrefix}.2.bt2",
+                   &"{indexPrefix}.3.bt2",
+                   &"{indexPrefix}.4.bt2",
+                   &"{indexPrefix}.rev.1.bt2",
+                   &"{indexPrefix}.rev.2.bt2"])
 
       let p = tps.newThreadPool(int(opt.threadNum))
       var converged = newSeq[tps.FlowVar[bool]](opt.trims.len)
@@ -1211,31 +1271,73 @@ proc main() =
       else:
         lastConsensus = &"{opt.tmpDir}conduit_consensuses_iter{iter-1}.fa"
       removeFile(lastConsensus)
-      combineFilesFinal(opt.tmpDir, iter-1, opt.trims, lastConsensus, lastCorrection)
+      combineFilesFinal(opt.tmpDir,
+                        iter-1,
+                        opt.trims,
+                        lastConsensus,
+                        lastCorrection)
 
       let indexPrefix = &"{lastDir}bowtie2_index"
-      echo execProcess("bowtie2-build", args =["--threads",&"{opt.threadNum}", lastConsensus, indexPrefix],options={poUsePath})
+      echo execProcess("bowtie2-build",
+                       args =["--threads",
+                              &"{opt.threadNum}",
+                              lastConsensus,
+                              indexPrefix],
+                       options={poUsePath})
       
       if not opt.intermediates:
         removeFile(lastConsensus)
 
       let sam = &"{lastDir}alignments.sam"
-      let arguments = getBowtie2options(opt,indexPrefix,sam,finalPolish = true)
-      echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
+      let arguments = getBowtie2options(opt,
+                                        indexPrefix,
+                                        sam,
+                                        finalPolish = true)
+      echo execProcess("bowtie2",
+                       args = arguments,
+                       options={poUsePath,
+                                poStdErrToStdOut})
       
       let bam = &"{lastDir}alignments.bam"
       # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}", options={poEvalCommand,poUsePath})
-      echo execProcess("samtools", args=["sort", "-@", &"{opt.threadNum}", "-o", bam, "-m", opt.samtoolsMemory, sam], options={poUsePath,poStdErrToStdOut})
-      echo execProcess("samtools", args=["index", bam],options={poUsePath,poStdErrToStdOut})
+      echo execProcess("samtools",
+                        args=["sort",
+                              "-@",
+                              &"{opt.threadNum}",
+                              "-o",
+                              bam,
+                              "-m",
+                              opt.samtoolsMemory,
+                              sam],
+                              options={poUsePath,
+                                       poStdErrToStdOut})
+      echo execProcess("samtools",
+                       args=["index",
+                             bam],
+                       options={poUsePath,
+                                poStdErrToStdOut})
       
-      removeFiles([sam, &"{indexPrefix}.1.bt2", &"{indexPrefix}.2.bt2", &"{indexPrefix}.3.bt2", &"{indexPrefix}.4.bt2", &"{indexPrefix}.rev.1.bt2", &"{indexPrefix}.rev.2.bt2"])
+      removeFiles([sam,
+                   &"{indexPrefix}.1.bt2",
+                   &"{indexPrefix}.2.bt2",
+                   &"{indexPrefix}.3.bt2",
+                   &"{indexPrefix}.4.bt2",
+                   &"{indexPrefix}.rev.1.bt2",
+                   &"{indexPrefix}.rev.2.bt2"])
 
       let p = tps.newThreadPool(int(opt.threadNum))
       for i,trim in opt.trims:
         var convergedIter = iter - 1
         if i in lastCorrection:
           convergedIter = uint64(lastCorrection[i])
-        p.spawn runLinearBasedIlluminaCorrection((opt.tmpDir,trim,convergedIter,iter,uint16(opt.isoformDelta),opt.stringent,opt.stringentTolerance))
+        p.spawn runLinearBasedIlluminaCorrection(
+          (opt.tmpDir,
+           trim,
+           convergedIter,
+           iter,
+           uint16(opt.isoformDelta),
+           opt.stringent,
+           opt.stringentTolerance))
       p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
