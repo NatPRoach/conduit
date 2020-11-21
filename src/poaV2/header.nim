@@ -18,13 +18,13 @@ type
 ## * NEEDED FOR seq_util.h
 
 # type
-#   ResidueScore_T* = LPOScore_T
+#   ResidueScoreT* = LPOScoreT
 
 const
   RESIDUE_SCORE_DEFINED* = true
 
 ## * linked list for storing source origin (sequence position)
-##  from which this letter was derived
+## * from which this letter was derived
 
 type
   LPOLetterSourceS* {.bycopy,extern:"LPOLetterSource_S".} = object
@@ -38,7 +38,7 @@ type
   LPOLetterSourceT* = LPOLetterSourceS
 
 ## * linked list for connecting an LPOLetter to either right
-##  or left
+## * or left
 
 when not defined(USE_WEIGHTED_LINKS):
   type
@@ -62,7 +62,7 @@ type
   LPOLetterLinkT* = LPOLetterLinkS
 
 ## * the chunk size for allocating additional
-##     letters in an LPOLetter_T array
+## *    letters in an LPOLetter_T array
 
 const
   LPO_LETTER_BUFFER_CHUNK* = 64
@@ -71,12 +71,13 @@ const
 
 type
   LPOLetterS* {.bycopy,extern:"LPOLetter_S".} = object
-    left*: LPOLetterLinkT      ## * ADJACENT LETTER(S) TO THE LEFT
-    right*: LPOLetterLinkT     ## * ADJACENT LETTER(S) TO THE RIGHT
-    source*: LPOLetterSourceT  ## * SOURCE SEQ POSITION(S)
-    alignRing*: LPOLetterRefT ## * CIRCULAR LIST OF ALIGNED POSITIONS
-    ringId*: LPOLetterRefT    ## * MINIMUM INDEX OF ALL POSITIONS ON THE RING
-    score*: cfloat              ## * SCORE FOR BALANCING PARTIAL ORDER EFFECTS ON MATRIX NEUTRALITY
+    left*: LPOLetterLinkT       ## * ADJACENT LETTER(S) TO THE LEFT
+    right*: LPOLetterLinkT      ## * ADJACENT LETTER(S) TO THE RIGHT
+    source*: LPOLetterSourceT   ## * SOURCE SEQ POSITION(S)
+    alignRing*: LPOLetterRefT   ## * CIRCULAR LIST OF ALIGNED POSITIONS
+    ringId*: LPOLetterRefT      ## * MINIMUM INDEX OF ALL POSITIONS ON THE RING
+    score*: cfloat              ## * SCORE FOR BALANCING PARTIAL ORDER EFFECTS 
+                                ## * ON MATRIX NEUTRALITY
     letter*: char               ## * THE ACTUAL RESIDUE CODE!
 
   LPOLetterT* = LPOLetterS
@@ -186,7 +187,6 @@ type
 ## ---------------------------------------------------------------
 ## ---------------------------------------------------------------
 ##
-
 const
   POA_MAX_ALLOC* = 300000000
 
@@ -215,7 +215,7 @@ type
     gapPenaltyX*: ptr array[32,ResidueScoreT]
     gapPenaltyY*: ptr array[32,ResidueScoreT]
     maxGapLength*: cint
-    nfreq*: cint               ##  STORE FREQUENCIES OF AMINO ACIDS FOR BALANCING MATRIX...
+    nfreq*: cint    ##  STORE FREQUENCIES OF AMINO ACIDS FOR BALANCING MATRIX...
     freqSymbol*: array[MATRIX_SYMBOL_MAX, char]
     freq*: array[MATRIX_SYMBOL_MAX, cfloat]
 
