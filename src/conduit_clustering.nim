@@ -1,38 +1,35 @@
 import os
-import bitops
-import times
-import osproc
 import parseopt
-import strutils
 import strformat
 import tables
-import threadpools/threadpool_simple as tps
 import hts
-import sets
-import genomeKDE
 import algorithm
-import poGraphUtils
+# import times
+
 import na
 import fasta
 import fastq
+# import genomeKDE
+# import threadpools/threadpool_simple as tps
+
 
 type
   ClusteringOptions = object
     file : string
     mode : char
-    cluster_zero_introns : bool
-    output_dir : string
+    clusterZeroIntrons : bool
+    outputDir : string
     prefix : string
-    out_type : string
+    outType : string
     reference : string
     run : bool
-    exit_code : int
+    exitCode : int
   
   SpliceSiteGraph = object
     adjacencies : seq[seq[uint32]]
-    ss_to_index : Table[uint32, uint32]
-    index_to_index : OrderedTable[uint32,uint32]
-    previously_visited : seq[uint32]
+    ssToIndex : Table[uint32, uint32]
+    indexToIndex : OrderedTable[uint32,uint32]
+    previouslyVisited : seq[uint32]
 
 # TODO -   Clean up line wrapping where necessary (make it readable)
 # TODO - but also conform to nim style guide length restrictions
@@ -102,12 +99,12 @@ proc summaryFromBamRecord( record : Record,
                               seq[(uint64, uint64)] ) = 
   if record.flag.unmapped:
       return
-  let alignment_start = uint64(record.start)
-  var ref_position = uint64(alignment_start)
+  let alignmentStart = uint64(record.start)
+  var refPosition = uint64(alignmentStart)
   let cigar = record.cigar
   let flag = record.flag
   var strand : char
-  var splice_sites : seq[(uint64, uint64)]
+  var spliceSites : seq[(uint64, uint64)]
   # If we're not stranded treat everything as if it's (-) strand
   # else check for the actual strand
   if  ( not stranded ) or flag.has_flag(16'u16):
@@ -117,15 +114,15 @@ proc summaryFromBamRecord( record : Record,
   for op in cigar:
     case int(op.op):
       of 0, 2, 7, 8:
-        ref_position += uint64(op.len)
+        refPosition += uint64(op.len)
       of 3:
-        let start = ref_position
-        ref_position += uint64(op.len)
-        splice_sites.add((start,ref_position))
+        let start = refPosition
+        refPosition += uint64(op.len)
+        spliceSites.add((start,refPosition))
       else:
         discard
-  let alignment_end = ref_position
-  result = (strand,(alignment_start,alignment_end),splice_sites)
+  let alignmentEnd = refPosition
+  result = (strand,(alignmentStart,alignmentEnd),spliceSites)
 
 # TODO -
 #[Figure out if bitshifting flag for strand makes sense.
@@ -184,30 +181,30 @@ proc cmpNonSpliced(a,b : ((char,(uint64,uint64)), seq[string])) : int =
 
 proc parseClusteringOptions() : ClusteringOptions = 
   var file : string
-  var file_flag = false
+  var fileFlag = false
 
-  var output_format = "fastq"
-  var output_format_flag = false
+  var outputFormat = "fastq"
+  var outputFormatFlag = false
 
-  var cluster_mode = 's'
-  var cluster_mode_flag = false
+  var clusterMode = 's'
+  var clusterModeFlag = false
 
-  var single_exon = true
-  var single_exon_flag = false
+  var singleExon = true
+  var singleExonFlag = false
 
-  var output_dir = &"clusters{os.DirSep}"
-  var output_dir_flag = false
+  var outputDir = &"clusters{os.DirSep}"
+  var outputDirFlag = false
 
   var prefix = &"cluster_"
-  var prefix_flag = false
+  var prefixFlag = false
 
-  var reference_filepath = ""
-  var reference_filepath_flag = false
+  var referenceFilepath = ""
+  var referenceFilepathFlag = false
 
-  var run_flag = true
-  var help_flag = false
-  var version_flag = false
-  var exit_code = QuitFailure
+  var runFlag = true
+  var helpFlag = false
+  var versionFlag = false
+  var exitCode = QuitFailure
 
   var last = ""
 
@@ -218,101 +215,101 @@ proc parseClusteringOptions() : ClusteringOptions =
       of cmdShortOption, cmdLongOption:
         if last != "":
           echo &"ERROR - Option {last} provided without an argument"
-          run_flag = false
+          runFlag = false
           break
         
         case key:
           of "ss":
-            if cluster_mode_flag and ( cluster_mode != 's' ):
+            if clusterModeFlag and ( clusterMode != 's' ):
               echo "ERROR - Conflicting flags --ss and --overlap"
-              help_flag = true
+              helpFlag = true
               break
             else:
-              cluster_mode_flag = true
-              cluster_mode = 's'
+              clusterModeFlag = true
+              clusterMode = 's'
           of "overlap":
-            if cluster_mode_flag and ( cluster_mode != 'o' ):
+            if clusterModeFlag and ( clusterMode != 'o' ):
               echo "ERROR - Conflicting flags --ss and --overlap"
-              help_flag = true
+              helpFlag = true
               break
             else:
-              cluster_mode_flag = true
-              cluster_mode = 'o'
+              clusterModeFlag = true
+              clusterMode = 'o'
           of "z":
-            if single_exon_flag and not single_exon:
+            if singleExonFlag and not singleExon:
               echo "ERROR - Conflicting flags -z and -d"
-              help_flag = true
+              helpFlag = true
               break
             else:
-              single_exon_flag = true
-              single_exon = true
+              singleExonFlag = true
+              singleExon = true
           of "d":
-            if single_exon_flag and single_exon:
+            if singleExonFlag and singleExon:
               echo "ERROR - Conflicting flags -z and -d"
-              help_flag = true
+              helpFlag = true
               break
             else:
-              single_exon_flag = true
-              single_exon = false
+              singleExonFlag = true
+              singleExon = false
           of "fq":
-            if output_format_flag and output_format != "fastq":
+            if outputFormatFlag and outputFormat != "fastq":
               echo "ERROR - Conflicting flags --fq and --fa"
-              help_flag = true
+              helpFlag = true
               break
             else:
-              output_format_flag = true
-              output_format = "fastq"
+              outputFormatFlag = true
+              outputFormat = "fastq"
           of "fa":
-            if output_format_flag and output_format != "fasta":
+            if outputFormatFlag and outputFormat != "fasta":
               echo "ERROR - Conflicting flags --fq and --fa"
-              help_flag = true
+              helpFlag = true
               break
             else:
-              output_format_flag = true
-              output_format = "fasta"
+              outputFormatFlag = true
+              outputFormat = "fasta"
           of "r", "reference":
-            if not reference_filepath_flag:
-              reference_filepath_flag = true
+            if not referenceFilepathFlag:
+              referenceFilepathFlag = true
               if val != "":
-                reference_filepath = val
+                referenceFilepath = val
               else:
                 last = "reference"
             else:
               echo "ERROR - two references provided"
-              help_flag = true
+              helpFlag = true
               break
           of "o", "output-dir":
-            if not output_dir_flag:
-              output_dir_flag = true
+            if not outputDirFlag:
+              outputDirFlag = true
               if val != "":
-                output_dir = val
+                outputDir = val
               else:
                 last = "output"
             else:
               echo "ERROR - two output dirs provided"
-              help_flag = true
+              helpFlag = true
               break
           of "p", "prefix":
-            if not prefix_flag:
-              prefix_flag = true
+            if not prefixFlag:
+              prefixFlag = true
               if val != "":
-                output_dir = val
+                outputDir = val
               else:
                 last = "output"
             else:
               echo "ERROR - two output dirs provided"
-              help_flag = true
+              helpFlag = true
               break
           of "h", "help":
-            help_flag = true
-            run_flag = false
-            exit_code = QuitSuccess
+            helpFlag = true
+            runFlag = false
+            exitCode = QuitSuccess
             break
           of "v", "version":
-            help_flag = false
-            version_flag = true
-            run_flag = false
-            exit_code = QuitSuccess
+            helpFlag = false
+            versionFlag = true
+            runFlag = false
+            exitCode = QuitSuccess
             break
           else:
             var dash = ""
@@ -324,175 +321,175 @@ proc parseClusteringOptions() : ClusteringOptions =
       of cmdArgument:
         case last:
           of "output":
-            output_dir = key
+            outputDir = key
           of "prefix":
             prefix = key
           of "reference":
-            reference_filepath = key
+            referenceFilepath = key
           of "":
-            if not file_flag:
+            if not fileFlag:
               file = key
             else:
-              file_flag = true
+              fileFlag = true
               echo "ERROR - multiple files provided"
               break
           else:
             echo &"ERROR - unknown option {last} provided"
-            run_flag = false
+            runFlag = false
             break
         last = ""
 
   if file == "":
     echo "ERROR - clustering requires an input BAM file"
-    help_flag = true
-    run_flag = false
-    exit_code = QuitFailure
+    helpFlag = true
+    runFlag = false
+    exitCode = QuitFailure
 
-  if help_flag:
+  if helpFlag:
     writeClusterHelp()
-  if version_flag:
+  if versionFlag:
     echo conduitClusterVersion()
 
   return ClusteringOptions(file : file,
-                           mode : cluster_mode,
-                           cluster_zero_introns : single_exon,
-                           output_dir : output_dir,
+                           mode : clusterMode,
+                           clusterZeroIntrons : singleExon,
+                           outputDir : outputDir,
                            prefix : prefix,
-                           out_type : output_format,
-                           reference : reference_filepath,
-                           run : run_flag,
-                           exit_code : exit_code)
+                           outType : outputFormat,
+                           reference : referenceFilepath,
+                           run : runFlag,
+                           exitCode : exitCode)
 
 
 proc bfs(ssgraph : ptr SpliceSiteGraph,
          cluster_number : uint32,
          starting_node : uint32) : seq[uint32] = 
-  var to_visit : seq[uint32]
-  ssgraph[].previously_visited[starting_node] = cluster_number
-  to_visit.add(starting_node)
-  while to_visit.len != 0:
-    let u = to_visit.pop()
+  var toVisit : seq[uint32]
+  ssgraph[].previouslyVisited[starting_node] = cluster_number
+  toVisit.add(starting_node)
+  while toVisit.len != 0:
+    let u = toVisit.pop()
     result.add(u)
     for adj in ssgraph[].adjacencies[u]:
-      if ssgraph[].previously_visited[adj] == 0:
-        ssgraph[].previously_visited[adj] = cluster_number
-        to_visit.add(adj)
+      if ssgraph[].previouslyVisited[adj] == 0:
+        ssgraph[].previouslyVisited[adj] = cluster_number
+        toVisit.add(adj)
 
 
 proc findIsoformClusters(ssgraph : ptr SpliceSiteGraph) : seq[seq[uint32]] =
-  var cluster_counter = 1'u32
-  for isoform_adjacency_index in ssgraph[].index_to_index.keys:
-    if ssgraph[].previously_visited[isoform_adjacency_index] == 0:
-      var clustered_isoforms : seq[uint32]
-      let clustered_nodes = bfs(ssgraph,
-                                cluster_counter,
-                                isoform_adjacency_index)
-      for node_id in clustered_nodes:
-        if node_id in ssgraph[].index_to_index:
-          clustered_isoforms.add(ssgraph[].index_to_index[node_id])
-      cluster_counter += 1
-      result.add(clustered_isoforms.sorted)
+  var clusterCounter = 1'u32
+  for isoformAdjacencyIndex in ssgraph[].indexToIndex.keys:
+    if ssgraph[].previouslyVisited[isoformAdjacencyIndex] == 0:
+      var clusteredIsoforms : seq[uint32]
+      let clusteredNodes = bfs(ssgraph,
+                                clusterCounter,
+                                isoformAdjacencyIndex)
+      for node_id in clusteredNodes:
+        if node_id in ssgraph[].indexToIndex:
+          clusteredIsoforms.add(ssgraph[].indexToIndex[node_id])
+      clusterCounter += 1
+      result.add(clusteredIsoforms.sorted)
 
 
 proc getWeightedSpliceJunctionLocations(
         sstable : ptr OrderedTable[seq[(uint64, uint64)],seq[string]]) :
         (seq[(uint32,uint32)],seq[(uint32,uint32)]) = 
-  var donor_table : OrderedTable[uint32,uint32]
-  var acceptor_table : OrderedTable[uint32,uint32]
+  var donorTable : OrderedTable[uint32,uint32]
+  var acceptorTable : OrderedTable[uint32,uint32]
   for sss, read_ids in sstable[].pairs:
     let weight = uint32(read_ids.len)
     for (donor,acceptor) in sss:
-      if uint32(donor) in donor_table:
-        donor_table[uint32(donor)] += weight
+      if uint32(donor) in donorTable:
+        donorTable[uint32(donor)] += weight
       else:
-        donor_table[uint32(donor)] = weight
-      if uint32(acceptor) in acceptor_table:
-        acceptor_table[uint32(acceptor)] += weight
+        donorTable[uint32(donor)] = weight
+      if uint32(acceptor) in acceptorTable:
+        acceptorTable[uint32(acceptor)] += weight
       else:
-        acceptor_table[uint32(acceptor)] = weight
-  for ss, weight in donor_table.pairs:
+        acceptorTable[uint32(acceptor)] = weight
+  for ss, weight in donorTable.pairs:
     result[0].add((ss,weight))
-  for ss, weight in acceptor_table.pairs:
+  for ss, weight in acceptorTable.pairs:
     result[1].add((ss,weight))
   echo result
 
 
 proc writeFASTXsFromBAM(bam : Bam,
-                        read_id_to_cluster : ptr Table[string,int],
-                        cluster_sizes : ptr CountTable[int],
+                        readIdToCluster : ptr Table[string,int],
+                        clusterSizes : ptr CountTable[int],
                         query : string,
                         cluster_prefix : string,
                         starting_count : int,
                         output_type : string) : int =
-  var open_files : Table[int, File]
-  var written_reads : CountTable[int]
+  var openFiles : Table[int, File]
+  var writtenReads : CountTable[int]
   for record in bam.query(query):
     if record.flag.supplementary or record.flag.secondary:
       echo &"WARNING - At the moment secondary / supplementary alignments " &
         "are not supported"
       continue
-    if record.qname notin read_id_to_cluster[]:
+    if record.qname notin readIdToCluster[]:
       continue
-    let cluster_id = read_id_to_cluster[][record.qname]
-    if cluster_id notin open_files:
+    let clusterId = readIdToCluster[][record.qname]
+    if clusterId notin openFiles:
       var file : File
       if output_type == "fasta":
         discard open(file,
-                     &"{cluster_prefix}{cluster_id + starting_count}.fa",
+                     &"{cluster_prefix}{clusterId + starting_count}.fa",
                      fmWrite)
       elif output_type == "fastq":
         discard open(file,
-                     &"{cluster_prefix}{cluster_id + starting_count}.fq",
+                     &"{cluster_prefix}{clusterId + starting_count}.fq",
                      fmWrite)
       result += 1
-      # echo &"Opening cluster file {cluster_id + starting_count}"
-      open_files[cluster_id] = file
+      # echo &"Opening cluster file {clusterId + starting_count}"
+      openFiles[clusterId] = file
       # file.writeFASTArecordToFile(record)
       if output_type == "fasta":
         file.writeBamRecordToFASTAfile(record)
       elif output_type == "fastq":
         file.writeBamRecordToFASTQfile(record)
     else:
-      # echo &"Appending to cluster file {cluster_id + starting_count}"
+      # echo &"Appending to cluster file {clusterId + starting_count}"
       if output_type == "fasta":
-        open_files[cluster_id].writeBamRecordToFASTAfile(record)
+        openFiles[clusterId].writeBamRecordToFASTAfile(record)
       elif output_type == "fastq":
-        open_files[cluster_id].writeBamRecordToFASTAfile(record)
-    written_reads.inc(cluster_id)
-    echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
-    if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
-      # echo &"Closing cluster file {cluster_id + starting_count}"
-      open_files[cluster_id].close
-      open_files.del(cluster_id)
+        openFiles[clusterId].writeBamRecordToFASTAfile(record)
+    writtenReads.inc(clusterId)
+    echo writtenReads[clusterId], "\t", clusterSizes[][clusterId]
+    if writtenReads[clusterId] == clusterSizes[][clusterId]:
+      # echo &"Closing cluster file {clusterId + starting_count}"
+      openFiles[clusterId].close
+      openFiles.del(clusterId)
   # Just in case of secondary / supplementary alignments
-  for cluster_id, open_file in open_files.pairs:
+  for clusterId, open_file in openFiles.pairs:
     open_file.close
 
 
 proc correctBamRecordWithGenome(record : Record, fai : Fai) : FastaRecord = 
   let summary = summaryFromBamRecord(record, true)
-  var nt_sequence : string
-  var start_base = int(summary[1][0])
-  var end_base = -1
+  var ntSequence : string
+  var startBase = int(summary[1][0])
+  var endBase = -1
   for (donor,acceptor) in summary[2]:
-    end_base = int(donor)
-    nt_sequence.add(fai.get(record.chrom,start_base,end_base))
-    start_base = int(acceptor)
-  end_base = int(summary[1][1])
-  nt_sequence.add(fai.get(record.chrom,start_base,end_base))
+    endBase = int(donor)
+    ntSequence.add(fai.get(record.chrom,startBase,endBase))
+    startBase = int(acceptor)
+  endBase = int(summary[1][1])
+  ntSequence.add(fai.get(record.chrom,startBase,endBase))
   if summary[0] == '-':
-    nt_sequence = nt_sequence.revComp
-  result = FastaRecord( read_id : record.qname, sequence : nt_sequence)
+    ntSequence = ntSequence.revComp
+  result = FastaRecord( readId : record.qname, sequence : ntSequence)
 
 proc writeFASTAsFromBAM(bam : Bam,
-                        read_id_to_cluster : ptr Table[string,int],
-                        cluster_sizes : ptr CountTable[int],
+                        readIdToCluster : ptr Table[string,int],
+                        clusterSizes : ptr CountTable[int],
                         query : string,
                         cluster_prefix : string,
                         starting_count : int,
                         fai : Fai) : int =
-  var open_files : Table[int, File]
-  var written_reads : CountTable[int]
+  var openFiles : Table[int, File]
+  var writtenReads : CountTable[int]
   for record in bam.query(query):
     if record.flag.supplementary or record.flag.secondary:
       echo "WARNING - At the moment secondary / supplementary alignments " &
@@ -501,124 +498,124 @@ proc writeFASTAsFromBAM(bam : Bam,
     if record.flag.unmapped:
       echo "WARNING - Unmapped read detected, skipping"
       continue
-    let fasta_record = correctBamRecordWithGenome(record, fai)
-    if fasta_record.read_id notin read_id_to_cluster[]:
+    let fastaRecord = correctBamRecordWithGenome(record, fai)
+    if fastaRecord.readId notin readIdToCluster[]:
       continue
-    let cluster_id = read_id_to_cluster[][fasta_record.read_id]
-    if cluster_id notin open_files:
+    let clusterId = readIdToCluster[][fastaRecord.readId]
+    if clusterId notin openFiles:
       var file : File
-      discard open(file,&"{cluster_prefix}{cluster_id + starting_count}.fa",
+      discard open(file,&"{cluster_prefix}{clusterId + starting_count}.fa",
         fmWrite)
       result += 1
-      # echo &"Opening cluster file {cluster_id + starting_count}"
-      open_files[cluster_id] = file
-      file.writeFASTArecordToFile(fasta_record)
+      # echo &"Opening cluster file {clusterId + starting_count}"
+      openFiles[clusterId] = file
+      file.writeFASTArecordToFile(fastaRecord)
     else:
-      # echo &"Appending to cluster file {cluster_id + starting_count}"
-      open_files[cluster_id].writeFASTArecordToFile(fasta_record)
-    written_reads.inc(cluster_id)
-    echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
-    if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
-      # echo &"Closing cluster file {cluster_id + starting_count}"
-      open_files[cluster_id].close
-      open_files.del(cluster_id)
+      # echo &"Appending to cluster file {clusterId + starting_count}"
+      openFiles[clusterId].writeFASTArecordToFile(fastaRecord)
+    writtenReads.inc(clusterId)
+    echo writtenReads[clusterId], "\t", clusterSizes[][clusterId]
+    if writtenReads[clusterId] == clusterSizes[][clusterId]:
+      # echo &"Closing cluster file {clusterId + starting_count}"
+      openFiles[clusterId].close
+      openFiles.del(clusterId)
   # Just in case of secondary / supplementary alignments
-  for cluster_id, open_file in open_files.pairs:
+  for clusterId, open_file in openFiles.pairs:
     open_file.close
 
 
 proc main() = 
   let opt = parseClusteringOptions()
   if not opt.run:
-    quit(opt.exit_code)
-  if not dirExists(opt.output_dir):
-    createDir(opt.output_dir)
+    quit(opt.exitCode)
+  if not dirExists(opt.outputDir):
+    createDir(opt.outputDir)
   var bam : Bam
   discard open(bam,opt.file,index=true)
   #TODO - iterate over chromosomes, chunks of chromosomes
   #TODO - multithread? - see how the memory and time looks like then decide
-  var (strand_spliced_table, strand_nonspliced_table) =
+  var (strandSplicedTable, strandNonsplicedTable) =
     collapsedSummariesFromBam(bam, "chrI", true)
   bam.close
-  var output_file_count = 0
-  for strand, spliced_table in strand_spliced_table.mpairs:
+  var outputFileCount = 0
+  for strand, spliced_table in strandSplicedTable.mpairs:
     spliced_table.sort(cmpSpliced)
     ### Populate SpliceSiteGraph
     var ssgraph : SpliceSiteGraph
-    var isoform_node_index = 0'u32
-    # isoform_node_index.setBit(31'u8)
+    var isoformNodeIndex = 0'u32
+    # isoformNodeIndex.setBit(31'u8)
     for sss in spliced_table.keys:
-      var isoform_adjacency_index = uint32(ssgraph.adjacencies.len)
+      var isoformAdjacencyIndex = uint32(ssgraph.adjacencies.len)
       ssgraph.adjacencies.add(@[])
-      ssgraph.previously_visited.add(0)
-      ssgraph.index_to_index[isoform_adjacency_index] = isoform_node_index
-      isoform_node_index += 1
+      ssgraph.previouslyVisited.add(0)
+      ssgraph.indexToIndex[isoformAdjacencyIndex] = isoformNodeIndex
+      isoformNodeIndex += 1
       for (donor,acceptor) in sss:
         # echo donor, "\t", acceptor
-        if uint32(donor) notin ssgraph.ss_to_index:
-          ssgraph.ss_to_index[uint32(donor)] = uint32(ssgraph.adjacencies.len)
-          ssgraph.adjacencies.add(@[isoform_adjacency_index])
-          ssgraph.previously_visited.add(0)
+        if uint32(donor) notin ssgraph.ssToIndex:
+          ssgraph.ssToIndex[uint32(donor)] = uint32(ssgraph.adjacencies.len)
+          ssgraph.adjacencies.add(@[isoformAdjacencyIndex])
+          ssgraph.previouslyVisited.add(0)
         else:
-          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(donor)]].add(
-            isoform_adjacency_index)
-        if uint32(acceptor) notin ssgraph.ss_to_index:
-          ssgraph.ss_to_index[uint32(acceptor)] = uint32(
+          ssgraph.adjacencies[ssgraph.ssToIndex[uint32(donor)]].add(
+            isoformAdjacencyIndex)
+        if uint32(acceptor) notin ssgraph.ssToIndex:
+          ssgraph.ssToIndex[uint32(acceptor)] = uint32(
             ssgraph.adjacencies.len)
-          ssgraph.adjacencies.add(@[isoform_adjacency_index])
-          ssgraph.previously_visited.add(0)
+          ssgraph.adjacencies.add(@[isoformAdjacencyIndex])
+          ssgraph.previouslyVisited.add(0)
         else:
-          ssgraph.adjacencies[ssgraph.ss_to_index[uint32(acceptor)]].add(
-            isoform_adjacency_index)
-        ssgraph.adjacencies[isoform_adjacency_index].add(
-          ssgraph.ss_to_index[uint32(donor)])
-        ssgraph.adjacencies[isoform_adjacency_index].add(
-          ssgraph.ss_to_index[uint32(acceptor)])
+          ssgraph.adjacencies[ssgraph.ssToIndex[uint32(acceptor)]].add(
+            isoformAdjacencyIndex)
+        ssgraph.adjacencies[isoformAdjacencyIndex].add(
+          ssgraph.ssToIndex[uint32(donor)])
+        ssgraph.adjacencies[isoformAdjacencyIndex].add(
+          ssgraph.ssToIndex[uint32(acceptor)])
     ### Fetch clusters
-    let isoform_clusters = findIsoformClusters(addr ssgraph)
-    # echo isoform_clusters
-    var cluster_counter = 0
-    var subcluster_counter = 0
-    var splice_table_counter = 0
-    var cluster_sizes : CountTable[int]
-    var read_id_to_cluster : Table[string, int]
+    let isoformClusters = findIsoformClusters(addr ssgraph)
+    # echo isoformClusters
+    var clusterCounter = 0
+    var subclusterCounter = 0
+    var spliceTableCounter = 0
+    var clusterSizes : CountTable[int]
+    var readIdToCluster : Table[string, int]
     for read_ids in spliced_table.values:
-      for read_id in read_ids:
-        read_id_to_cluster[read_id] = cluster_counter
-      cluster_sizes.inc(cluster_counter,read_ids.len)
-      # echo int(isoform_clusters[cluster_counter][subcluster_counter]),
-      #   "\t", splice_table_counter
-      assert int(isoform_clusters[cluster_counter][subcluster_counter]) ==
-        splice_table_counter
-      if subcluster_counter == isoform_clusters[cluster_counter].len - 1:
-        subcluster_counter = 0
-        cluster_counter += 1
+      for readId in read_ids:
+        readIdToCluster[readId] = clusterCounter
+      clusterSizes.inc(clusterCounter,read_ids.len)
+      # echo int(isoformClusters[clusterCounter][subclusterCounter]),
+      #   "\t", spliceTableCounter
+      assert int(isoformClusters[clusterCounter][subclusterCounter]) ==
+        spliceTableCounter
+      if subclusterCounter == isoformClusters[clusterCounter].len - 1:
+        subclusterCounter = 0
+        clusterCounter += 1
       else:
-        subcluster_counter += 1
-      splice_table_counter += 1
+        subclusterCounter += 1
+      spliceTableCounter += 1
     # echo cluster_to_read_id
 
     #Write cluster FASTA/Q files:
-    echo cluster_sizes
+    echo clusterSizes
     var bam : Bam
     discard open(bam,opt.file,index=true)
     if opt.reference != "":
       var fai : Fai
       discard open(fai,opt.reference)
-      output_file_count += writeFASTAsFromBAM(bam,
-                                              addr read_id_to_cluster,
-                                              addr cluster_sizes,
+      outputFileCount += writeFASTAsFromBAM(bam,
+                                              addr readIdToCluster,
+                                              addr clusterSizes,
                                               "chrI",
                                               "clusters_out/cluster_",
-                                              output_file_count,
+                                              outputFileCount,
                                               fai)
     else:
-      output_file_count += writeFASTXsFromBAM(bam,
-                                              addr read_id_to_cluster,
-                                              addr cluster_sizes,
+      outputFileCount += writeFASTXsFromBAM(bam,
+                                              addr readIdToCluster,
+                                              addr clusterSizes,
                                               "chrI",
                                               "clusters_out/cluster_",
-                                              output_file_count,
-                                              opt.out_type)
+                                              outputFileCount,
+                                              opt.outType)
     bam.close
 main()
