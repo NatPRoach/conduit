@@ -32,7 +32,8 @@ enum {
 #define MATRIX_SYMBOL_MAX 16
 typedef struct {
   int nsymbol;
-  char symbol[MATRIX_SYMBOL_MAX];
+  /* Need the extra char to add null terminator */
+  char symbol[MATRIX_SYMBOL_MAX + 1];
   ResidueScore_T score[MATRIX_SYMBOL_MAX][MATRIX_SYMBOL_MAX];
   int best_match[MATRIX_SYMBOL_MAX][MATRIX_SYMBOL_MAX];
   

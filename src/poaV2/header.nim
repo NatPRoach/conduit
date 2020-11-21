@@ -12,8 +12,8 @@ const
   INVALID_LETTER_POSITION* = (-1)
 
 type
-  LPOLetterRef_T* = cint
-  LPOScore_T* = cint
+  LPOLetterRefT* = cint
+  LPOScoreT* = cint
 
 ## * NEEDED FOR seq_util.h
 
@@ -27,30 +27,30 @@ const
 ##  from which this letter was derived
 
 type
-  LPOLetterSource_S* {.bycopy.} = object
-    ## * index of the sequence, referencing the source_seq[] array
+  LPOLetterSourceS* {.bycopy,extern:"LPOLetterSource_S".} = object
+    ## * index of the sequence, referencing the sourceSeq[] array
     iseq*: cint
     ## * index of the corresponding position in that sequence
-    ipos*: LPOLetterRef_T
+    ipos*: LPOLetterRefT
     ## * next node in the linked list
-    more*: ptr LPOLetterSource_S
+    more*: ptr LPOLetterSourceS
 
-  LPOLetterSource_T* = LPOLetterSource_S
+  LPOLetterSourceT* = LPOLetterSourceS
 
 ## * linked list for connecting an LPOLetter to either right
 ##  or left
 
 when not defined(USE_WEIGHTED_LINKS):
   type
-    LPOLetterLink_S* {.bycopy.} = object
+    LPOLetterLinkS* {.bycopy,extern:"LPOLetterLink_S".} = object
       ## * ADJACENT LETTER LINKED TO THIS LETTER
-      ipos*: LPOLetterRef_T    
+      ipos*: LPOLetterRefT    
       ## * next node in the linked list
-      more*: ptr LPOLetterLink_S
+      more*: ptr LPOLetterLinkS
 
 when defined(USE_WEIGHTED_LINKS):
   type
-    LPOLetterLink_S* {.bycopy.} = object
+    LPOLetterLinkS* {.bycopy,extern:"LPOLetterLink_S".} = object
       ## * ADJACENT LETTER LINKED TO THIS LETTER
       ipos*: LPOLetterRef_T
       ## * transition cost for traversing this link
@@ -59,7 +59,7 @@ when defined(USE_WEIGHTED_LINKS):
       more*: ptr LPOLetterLink_S
 
 type
-  LPOLetterLink_T* = LPOLetterLink_S
+  LPOLetterLinkT* = LPOLetterLinkS
 
 ## * the chunk size for allocating additional
 ##     letters in an LPOLetter_T array
@@ -70,16 +70,16 @@ const
 ## * Structure for storing individual LPO Letters
 
 type
-  LPOLetter_S* {.bycopy.} = object
-    left*: LPOLetterLink_T      ## * ADJACENT LETTER(S) TO THE LEFT
-    right*: LPOLetterLink_T     ## * ADJACENT LETTER(S) TO THE RIGHT
-    source*: LPOLetterSource_T  ## * SOURCE SEQ POSITION(S)
-    align_ring*: LPOLetterRef_T ## * CIRCULAR LIST OF ALIGNED POSITIONS
-    ring_id*: LPOLetterRef_T    ## * MINIMUM INDEX OF ALL POSITIONS ON THE RING
+  LPOLetterS* {.bycopy,extern:"LPOLetter_S".} = object
+    left*: LPOLetterLinkT      ## * ADJACENT LETTER(S) TO THE LEFT
+    right*: LPOLetterLinkT     ## * ADJACENT LETTER(S) TO THE RIGHT
+    source*: LPOLetterSourceT  ## * SOURCE SEQ POSITION(S)
+    alignRing*: LPOLetterRefT ## * CIRCULAR LIST OF ALIGNED POSITIONS
+    ringId*: LPOLetterRefT    ## * MINIMUM INDEX OF ALL POSITIONS ON THE RING
     score*: cfloat              ## * SCORE FOR BALANCING PARTIAL ORDER EFFECTS ON MATRIX NEUTRALITY
     letter*: char               ## * THE ACTUAL RESIDUE CODE!
 
-  LPOLetter_T* = LPOLetter_S
+  LPOLetterT* = LPOLetterS
 
 ## * maximum length of a sequence name
 
@@ -91,7 +91,7 @@ const
 const
   SEQUENCE_BUFFER_CHUNK* = 8
 
-## * buffer chunk size for expanding a source_seq[] array
+## * buffer chunk size for expanding a sourceSeq[] array
 
 const
   SOURCE_SEQ_BUFFER_CHUNK* = 16
@@ -100,33 +100,33 @@ const
 ## * storage for quantitative data attached to a sequence
 
 type
-  LPONumericData_S* {.bycopy.} = object
+  LPONumericDataS* {.bycopy,extern:"LPONumericData_S".} = object
     name*: array[SEQUENCE_NAME_MAX, char] ## *
     ## *
     title*: cstring            ## *
     data*: ptr cdouble
 
-  LPONumericData_T* = LPONumericData_S
+  LPONumericDataT* {.bycopy,extern:"LPONumericData_T".} = LPONumericDataS
 
 ## * Structure for storing individual source sequence information,
 ##  stuff like name, title etc.
 
 type
-  LPOSourceInfo_S* {.bycopy.} = object
+  LPOSourceInfoS* {.bycopy,extern:"LPOSourceInfo_S".} = object
     name*: array[SEQUENCE_NAME_MAX, char] ## *
     ## *
     title*: cstring            ## *
     sequence*: cstring         ## *
-    seq_to_po*: ptr cint        ## *
-    po_to_seq*: ptr cint        ## *
-    data*: ptr LPONumericData_T ## *
+    seqToPo*: ptr cint        ## *
+    poToSeq*: ptr cint        ## *
+    data*: ptr LPONumericDataT ## *
     ndata*: cint               ## *
     length*: cint              ## *
     istart*: cint              ## * FOR PURPOSES OF HEAVIEST BUNDLE CALCULATION
     weight*: cint              ## * WHAT BUNDLE IS THIS A MEMBER OF?
-    bundle_id*: cint
+    bundleId*: cint
 
-  LPOSourceInfo_T* = LPOSourceInfo_S
+  LPOSourceInfoT* {.bycopy,extern:"LPOSourceInfo_T".} = LPOSourceInfoS
 
 ## * the NULL bundle-reference
 
@@ -142,18 +142,18 @@ const
 ##   and associated information
 
 type
-  LPOSequence_S* {.bycopy.} = object
+  LPOSequenceS* {.bycopy,extern:"LPOSequence_S".} = object
     length*: cint              ## *
     ## *
-    letter*: ptr LPOLetter_T    ## *
+    letter*: ptr LPOLetterT    ## *
     title*: cstring            ## *
     sequence*: cstring         ## *
     name*: array[SEQUENCE_NAME_MAX, char] ## *
-    nsource_seq*: cint         ## *
-    source_seq*: ptr LPOSourceInfo_T
+    nsourceSeq*: cint         ## *
+    sourceSeq*: ptr LPOSourceInfoT
 
-  LPOSequence_T*{.bycopy.} = LPOSequence_S
-  Sequence_T*{.bycopy.} = LPOSequence_T
+  LPOSequenceT*{.bycopy,extern:"LPOSequence_T".} = LPOSequenceS
+  SequenceT*{.bycopy,extern:"Sequence_T".} = LPOSequenceT
 
 ## *@memo GENERAL FORM IS seq_y[j].left.ipos
 
@@ -166,12 +166,12 @@ template SEQ_Y_RIGHT*(j: untyped): untyped =
 ## *@memo Data structure for analyzing sequence differences in MSA
 
 type
-  LPOLetterCount_S* {.bycopy.} = object
-    is_error* {.bitsize: 2.}: cuint
-    meets_criteria* {.bitsize: 1.}: cuint
-    seq_count* {.bitsize: 29.}: cuint
+  LPOLetterCountS* {.bycopy,extern:"LPOLetterCount_S".} = object
+    isError* {.bitsize: 2.}: cuint
+    meetsCriteria* {.bitsize: 1.}: cuint
+    seqCount* {.bitsize: 29.}: cuint
 
-  LPOLetterCount_T* = LPOLetterCount_S
+  LPOLetterCountT* {.bycopy,extern:"LPOLetterCount_T".} = LPOLetterCountS
 
 ## * classification of sequence differences
 
@@ -192,7 +192,7 @@ const
 
 
 type
-  ResidueScore_T* = cint
+  ResidueScoreT* = cint
     ##  DEFAULT: USE int FOR SCORING
 # const
 #   dont_switch_case* = 0
@@ -203,31 +203,32 @@ const
   MATRIX_SYMBOL_MAX* = 16
 
 type
-  ResidueScoreMatrix_T* {.bycopy.} = object
+  ResidueScoreMatrixT* {.bycopy,extern:"ResidueScoreMatrix_T".} = object
     nsymbol*: cint
-    symbol*: array[MATRIX_SYMBOL_MAX, char]
-    score*: array[MATRIX_SYMBOL_MAX, array[MATRIX_SYMBOL_MAX, ResidueScore_T]]
-    best_match*: array[MATRIX_SYMBOL_MAX, array[MATRIX_SYMBOL_MAX, cint]]
-    gap_penalty_set*: array[2, array[3, ResidueScore_T]]
-    trunc_gap_length*: cint
-    decay_gap_length*: cint
-    gap_penalty_x*: ptr array[32,ResidueScore_T]
-    gap_penalty_y*: ptr array[32,ResidueScore_T]
-    max_gap_length*: cint
+    # Need the extra char to add null terminator to c
+    symbol*: array[MATRIX_SYMBOL_MAX + 1, char]
+    score*: array[MATRIX_SYMBOL_MAX, array[MATRIX_SYMBOL_MAX, ResidueScoreT]]
+    bestMatch*: array[MATRIX_SYMBOL_MAX, array[MATRIX_SYMBOL_MAX, cint]]
+    gapPenaltySet*: array[2, array[3, ResidueScoreT]]
+    truncGapLength*: cint
+    decayGapLength*: cint
+    gapPenaltyX*: ptr array[32,ResidueScoreT]
+    gapPenaltyY*: ptr array[32,ResidueScoreT]
+    maxGapLength*: cint
     nfreq*: cint               ##  STORE FREQUENCIES OF AMINO ACIDS FOR BALANCING MATRIX...
-    freq_symbol*: array[MATRIX_SYMBOL_MAX, char]
+    freqSymbol*: array[MATRIX_SYMBOL_MAX, char]
     freq*: array[MATRIX_SYMBOL_MAX, cfloat]
 
 # type
 #   FILE* {.bycopy.} = object
 
 type
-  LPOReturnResult_S* {.bycopy.} = object
-    sequence : ptr LPOSequence_T
-    lpo_seqs* : ptr LPOSequence_T
-    input_seqs : ptr ptr LPOSequence_T
-    matrix* : ptr ResidueScoreMatrix_T
-    n_input_seqs : cint
+  LPOReturnResultS* {.bycopy,extern:"LPOReturnResult_S".} = object
+    sequence : ptr LPOSequenceT
+    lpoSeqs* : ptr LPOSequenceT
+    inputSeqs : ptr ptr LPOSequenceT
+    matrix* : ptr ResidueScoreMatrixT
+    nInputSeqs : cint
     nseq : cint
 
-  LPOReturnResult_T*{.bycopy.} = LPOReturnResult_S
+  LPOReturnResultT*{.bycopy,extern:"LPOReturnResult_T".} = LPOReturnResultS
