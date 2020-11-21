@@ -251,7 +251,7 @@ proc jsOutput( po:TrimmedPOGraph,
   lines.add("];\n")
   return lines
 
-proc htmlOutput( po:TrimmedPOGraph,
+proc htmlOutput*( po:TrimmedPOGraph,
                  outfile : File,
                  highlight_path1,highlight_path2 : seq[uint32] = @[],
                  collapse = false) = 
