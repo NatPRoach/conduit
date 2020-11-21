@@ -181,6 +181,7 @@ typedef struct { /* ~~d */
 #endif
 
 char *stringptr_cat(stringptr *s1,const char s2[]);
+char *stringptr_cat_pos(stringptr *s1,const char s2[], int *pos);
 char *stringptr_cpy(stringptr *s1,const char s2[]);
 int stringptr_free(stringptr *s);
 
