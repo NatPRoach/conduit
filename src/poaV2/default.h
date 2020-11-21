@@ -240,7 +240,7 @@ int stringptr_free(stringptr *s);
   else if (NULL == ((memptr)=(ATYPE *)calloc((size_t)(N),sizeof(ATYPE))))  { \
     fprintf(stderr,"%s, line %d: *** out of memory \n",__FILE__,__LINE__);                \
     fprintf(stderr,"Unable to meet request: %s[%d]\n",STRINGIFY(memptr),(N));    \
-    fprintf(stderr,"requested %d x %d bytes \n",(N),sizeof(ATYPE));   \
+    fprintf(stderr,"requested %d x %lu bytes \n",(N),sizeof(ATYPE));   \
     MALLOC_FAILURE_ACTION;                                            \
   }
 #endif
@@ -259,7 +259,7 @@ int stringptr_free(stringptr *s);
   else if (NULL == ((memptr)=(ATYPE *)calloc((size_t)(N),sizeof(ATYPE))))  { \
     fprintf(stderr,"%s, line %d: *** out of memory \n",__FILE__,__LINE__);                \
     fprintf(stderr,"Unable to meet request: %s[%d]\n",STRINGIFY(memptr),(N));    \
-    fprintf(stderr,"requested %d x %d bytes \n",(N),sizeof(ATYPE));   \
+    fprintf(stderr,"requested %d x %lu bytes \n",(N),sizeof(ATYPE));   \
     MALLOC_FAILURE_ACTION;                                            \
   }
 #endif
@@ -295,7 +295,7 @@ int stringptr_free(stringptr *s);
     __FILE__,__LINE__);*/ \
   if ((NUM)<=0)   {                            \
     if (MEM0_REQUEST_BAD)  {\
-      fprintf(stderr,"%s, line %d: *** invalid memory request: %s[%d].\n",\
+      fprintf(stderr,"%s, line %d: *** invalid memory request: %s[%lu].\n",\
 	      __FILE__,__LINE__,STRINGIFY(memptr),(NUM));   \
       REALLOC_FAILURE_ACTION;                                             \
     }\
@@ -307,7 +307,7 @@ int stringptr_free(stringptr *s);
     else { \
       fprintf(stderr,"%s, line %d: *** out of memory \n",__FILE__,__LINE__); \
       fprintf(stderr,"Unable to meet request: %s\n",STRINGIFY(memptr));  \
-      fprintf(stderr,"requested %d x %d bytes \n",(NUM),sizeof(ATYPE));   \
+      fprintf(stderr,"requested %d x %lu bytes \n",(NUM),sizeof(ATYPE));   \
       REALLOC_FAILURE_ACTION;                                             \
     } \
   }
@@ -332,7 +332,7 @@ int stringptr_free(stringptr *s);
     else { \
       fprintf(stderr,"%s, line %d: *** out of memory \n",__FILE__,__LINE__); \
       fprintf(stderr,"Unable to meet request: %s\n",STRINGIFY(memptr));  \
-      fprintf(stderr,"requested %d x %d bytes \n",(NUM),sizeof(ATYPE));   \
+      fprintf(stderr,"requested %d x %lu bytes \n",(NUM),sizeof(ATYPE));   \
       REALLOC_FAILURE_ACTION;                                             \
     } \
   }

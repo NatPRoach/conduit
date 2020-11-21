@@ -432,7 +432,8 @@ LPOScore_T align_lpo_po (LPOSequence_T *lposeq_x,
     }
   }
 
-  IF_GUARD(best_x>=len_x || best_y>=len_y,1.1,(ERRTXT,"Bounds exceeded!\nbest_x,best_y:%d,%d\tlen:%d,%d\n",best_x,best_y,len_x,len_y),CRASH);
+  IF_GUARD(best_x>=len_x || best_y>=len_y,1.1,(ERRTXT,"Bounds exceeded!\nbest_x,best_y:%d,%d\tlen:%d,%d\n",best_x,best_y,len_x,len_y),CRASH)
+  ;
 
   /*
     fprintf (stderr, "aligned (%d nodes, %ld edges) to (%d nodes, %ld edges): ", len_x, n_edges_x, len_y, n_edges_y);

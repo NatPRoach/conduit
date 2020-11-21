@@ -64,7 +64,7 @@ char *stringptr_cat(stringptr *s1,const char s2[]) /* ~~g --- */
 
 char *stringptr_cpy(stringptr *s1,const char s2[]) /* ~~g --- */
 {
-  GETMEM(s1->p,strlen(s2)+1,s1->last_alloc,STRINGPTR_BUFFER_CHUNK,char);
+  GETMEM(s1->p,(int) strlen(s2)+1,s1->last_alloc,STRINGPTR_BUFFER_CHUNK,char);
   strcpy(s1->p,s2);
 
   return s1->p;
