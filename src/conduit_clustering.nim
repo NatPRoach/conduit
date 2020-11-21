@@ -46,6 +46,8 @@ proc conduitClusterVersion() : string =
 
 
 proc writeClusterHelp() = 
+  echo "WARNING - CONDUIT clustering is actively being developed and may not"
+  echo "          be accurately reflected by this help text."
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitClusterVersion()
   echo "Usage:"
