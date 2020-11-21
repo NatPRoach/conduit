@@ -102,7 +102,7 @@ proc parseFASTQ*(infile : File) : seq[FastqRecord] =
       break
 
 
-iterator iterFASTQ(infile : File) : FastqRecord =
+iterator iterFASTQ*(infile : File) : FastqRecord =
   while true:
     try:
       let line1 = infile.readLine()

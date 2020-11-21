@@ -19,31 +19,31 @@ import fastq
 
 type
   ConduitOptions = object
-    run_flag : bool
-    final_polish : bool
+    runFlag : bool
+    finalPolish : bool
     intermediates : bool
     mode : string
-    clusters_directory : string
-    nanopore_format : string
-    illumina_format : string
+    clustersDirectory : string
+    nanoporeFormat : string
+    illuminaFormat : string
     u2t : bool
-    bowtie_strand_constraint : string
-    bowtie_alignment_mode : string
-    bowtie_read_inputs : string
-    score_matrix_path : string
-    output_dir : string
-    tmp_dir : string
+    bowtieStrandConstraint : string
+    bowtieAlignmentMode : string
+    bowtieReadInputs : string
+    scoreMatrixPath : string
+    outputDir : string
+    tmpDir : string
     files : seq[string]
     trims : seq[string]
-    isoform_delta : uint64
-    ends_delta : uint64
-    illumina_weight : uint64
-    thread_num : uint64
-    max_iterations : uint64
+    isoformDelta : uint64
+    endsDelta : uint64
+    illuminaWeight : uint64
+    threadNum : uint64
+    maxIterations : uint64
     stringent : bool
-    stringent_tolerance : int
-    samtools_memory : string
-    max_alignments : uint64
+    stringentTolerance : int
+    samtoolsMemory : string
+    maxAlignments : uint64
 
 #Minor TODOs:
 #TODO - convert from passing tuple back to passing vars individually; relic of older threading approach
@@ -83,8 +83,8 @@ proc writeNanoHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
-  echo "  ./conduit nano [options] <clusters_directory>"
-  echo "  <clusters_directory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
+  echo "  ./conduit nano [options] <clustersDirectory>"
+  echo "  <clustersDirectory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
   echo ""
   echo "Options (defaults in parentheses):"
   echo "  Scaffold type:"
@@ -121,8 +121,8 @@ proc writeHybridHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
-  echo "  ./conduit hybrid [options] <clusters_directory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}"
-  echo "  <clusters_directory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
+  echo "  ./conduit hybrid [options] <clustersDirectory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}"
+  echo "  <clustersDirectory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
   echo "                         NOTE: .gz support coming for nanopore scaffold data, but is not an option at this time"
   echo ""
   echo "  Illumina data is aligned with Bowtie2, therefore Illumina data is provided in the same format as Bowtie2, namely:"
@@ -247,7 +247,7 @@ proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOption
   outfile.write("CONDUIT Timing Log:\n")
   for i in 0..<time_seq.len - 2:
     outfile.write(&"Iter {i}: {(time_seq[i + 1] - time_seq[i]).inSeconds} s\n")
-  if opts.final_polish:
+  if opts.finalPolish:
     outfile.write(&"Final Polish: {(time_seq[^1] - time_seq[^2]).inSeconds} s\n")
   outfile.write(&"Total: {(time_seq[^1] - time_seq[0]).inSeconds} s\n")
   outfile.close()
@@ -259,37 +259,37 @@ proc outputSettings(outfilepath : string,opts : ConduitOptions) =
   outfile.write("Working directory:\n")
   outfile.write(&"    {getCurrentDir()}\n")
   outfile.write("Command:\n")
-  let command_params = commandLineParams().join(sep = " ")
-  outfile.write(&"    {getAppFilename()} {command_params}\n")
+  let commandParams = commandLineParams().join(sep = " ")
+  outfile.write(&"    {getAppFilename()} {commandParams}\n")
   outfile.write("CONDUIT Settings:\n")
   outfile.write(&"    mode : {opts.mode}\n")
-  outfile.write(&"    rounds of graph based polishing : {opts.max_iterations}\n")
-  outfile.write(&"    final round of linear polishing : {opts.final_polish}\n")
+  outfile.write(&"    rounds of graph based polishing : {opts.maxIterations}\n")
+  outfile.write(&"    final round of linear polishing : {opts.finalPolish}\n")
   outfile.write(&"    stringent mode : {opts.stringent}\n")
   if opts.stringent:
-    outfile.write(&"    stringent tolerance : {opts.stringent_tolerance}\n")
+    outfile.write(&"    stringent tolerance : {opts.stringentTolerance}\n")
   outfile.write(&"    save intermediates : {opts.intermediates}\n")
-  outfile.write(&"    scaffold directory : {opts.clusters_directory}\n")
-  outfile.write(&"    scaffold file type : {opts.nanopore_format}\n")
+  outfile.write(&"    scaffold directory : {opts.clustersDirectory}\n")
+  outfile.write(&"    scaffold file type : {opts.nanoporeFormat}\n")
   outfile.write(&"    Convert U to T : {opts.u2t}\n")
-  outfile.write(&"    Illumina files : {opts.bowtie_read_inputs}\n")
-  outfile.write(&"    Illumina file type : {opts.illumina_format}\n")
-  outfile.write(&"    isoform delta : {opts.isoform_delta}\n")
-  outfile.write(&"    ends delta : {opts.ends_delta}\n")
-  outfile.write(&"    Illumina weight : {opts.illumina_weight}\n")
-  outfile.write(&"    threads : {opts.thread_num}\n")
-  if opts.score_matrix_path == "":
+  outfile.write(&"    Illumina files : {opts.bowtieReadInputs}\n")
+  outfile.write(&"    Illumina file type : {opts.illuminaFormat}\n")
+  outfile.write(&"    isoform delta : {opts.isoformDelta}\n")
+  outfile.write(&"    ends delta : {opts.endsDelta}\n")
+  outfile.write(&"    Illumina weight : {opts.illuminaWeight}\n")
+  outfile.write(&"    threads : {opts.threadNum}\n")
+  if opts.scoreMatrixPath == "":
     outfile.write( "    score matrix : default\n")
   else:
-    outfile.write(&"    score matrix : {opts.score_matrix_path}\n")
-  outfile.write(&"    output directory : {opts.output_dir}\n")
-  outfile.write(&"    temporary directory : {opts.tmp_dir}\n")
+    outfile.write(&"    score matrix : {opts.scoreMatrixPath}\n")
+  outfile.write(&"    output directory : {opts.outputDir}\n")
+  outfile.write(&"    temporary directory : {opts.tmpDir}\n")
   outfile.write("SAMtools Settings\n")
-  outfile.write(&"    SAMtools thread memory : {opts.samtools_memory}\n")
+  outfile.write(&"    SAMtools thread memory : {opts.samtoolsMemory}\n")
   outfile.write("Bowtie2 Settings:\n")
-  outfile.write(&"    bowtie2 strand constraint : {opts.bowtie_strand_constraint}\n")
-  outfile.write(&"    bowtie2 alignment mode : {opts.bowtie_alignment_mode}\n")
-  outfile.write(&"    bowtie2 max alignments : {opts.max_alignments}\n")
+  outfile.write(&"    bowtie2 strand constraint : {opts.bowtieStrandConstraint}\n")
+  outfile.write(&"    bowtie2 alignment mode : {opts.bowtieAlignmentMode}\n")
+  outfile.write(&"    bowtie2 max alignments : {opts.maxAlignments}\n")
   outfile.close()
 
 
@@ -307,146 +307,146 @@ proc mergeFiles(infilepaths : openArray[string], outfilepath : string, delete_ol
 
 
 proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
-  let (infilepath,outdir,matrix_filepath,format,isoform_delta,ends_delta,u2t) = intuple
+  let (infilepath,outdir,matrixFilepath,format,isoformDelta,endsDelta,u2t) = intuple
   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
-  var fasta_file : string
+  var fastaFile : string
   if format == "fasta":
     if u2t:
-      fasta_file = &"{outdir}{trim}.tmp.fa"
-      convertUtoTinFASTA(infilepath,fasta_file)
+      fastaFile = &"{outdir}{trim}.tmp.fa"
+      convertUtoTinFASTA(infilepath,fastaFile)
     else:
-      fasta_file = infilepath
+      fastaFile = infilepath
   elif format == "fastq":
-    fasta_file = &"{outdir}{trim}.tmp.fa"
-    convertFASTQFiletoFASTAfile(infilepath,fasta_file)
-  var split_num = 200
-  var (num_fastas,_) = splitFASTA2(fasta_file,&"{outdir}{trim}.tmp",split_num = split_num)
-  var total_fastas = num_fastas
-  var delete_fasta_flag = false
-  if format == "fastq" or u2t or num_fastas > 1:
-    delete_fasta_flag = true
-  if num_fastas > 1:
-    removeFile(fasta_file)
+    fastaFile = &"{outdir}{trim}.tmp.fa"
+    convertFASTQfileToFASTAfile(infilepath,fastaFile)
+  var splitNum = 200
+  var (numFastas,_) = splitFASTA2(fastaFile,&"{outdir}{trim}.tmp",splitNum = splitNum)
+  var totalFastas = numFastas
+  var deleteFastaFlag = false
+  if format == "fastq" or u2t or numFastas > 1:
+    deleteFastaFlag = true
+  if numFastas > 1:
+    removeFile(fastaFile)
     # Cacluate representative reads for each subfasta, store each in separate consensus fasta file
-    var merge_queue : HeapQueue[(int, int)]
-    for i in 0..<num_fastas:
+    var mergeQueue : HeapQueue[(int, int)]
+    for i in 0..<numFastas:
       let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
       var outFASTAfile : File
       discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-      let tmp_fasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
-      var seq_file : PFile = fopen(cstring(tmp_fasta))
-      var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-      removeFile(tmp_fasta)
-      var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var (representative_paths,read_supports) = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths, read_supports, &"{trim}.tmp_subfasta{i}")
-      poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
+      let tmpFasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
+      var seqFile : PFile = fopen(cstring(tmpFasta))
+      var po = getPOGraphFromFasta(seqFile,cstring(matrixFilepath),cint(1),matrix_scoring_function)
+      removeFile(tmpFasta)
+      var trimPo = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
+      var (representativePaths,readSupports) = poGraphUtils.getRepresentativePaths3(addr trimPo, psi = isoformDelta, endsDelta = endsDelta)
+      let consensusPo = poGraphUtils.buildConsensusPO(addr po, representativePaths, readSupports, &"{trim}.tmp_subfasta{i}")
+      poGraphUtils.writeCorrectedReads(consensusPo,outFASTAfile)
       outFASTAfile.close()
-      merge_queue.push((consensus_po.reads.len,i))
-    var (_,file_idx1) = merge_queue.pop()
-    var (_,file_idx2) = merge_queue.pop()
+      mergeQueue.push((consensusPo.reads.len,i))
+    var (_,fileIdx1) = mergeQueue.pop()
+    var (_,fileIdx2) = mergeQueue.pop()
     
-    var new_filepath = ""
+    var newFilepath = ""
     while true:
       # Figure out which 2 files we're merging
-      let filepath1 = &"{outdir}{trim}.tmp_consensus{file_idx1}.fa"
-      let filepath2 = &"{outdir}{trim}.tmp_consensus{file_idx2}.fa"
+      let filepath1 = &"{outdir}{trim}.tmp_consensus{fileIdx1}.fa"
+      let filepath2 = &"{outdir}{trim}.tmp_consensus{fileIdx2}.fa"
       
       # Merge the files
-      let new_tmp_filepath = &"{outdir}{trim}.tmp_subfasta{total_fastas}.fa"
-      mergeFiles([filepath1,filepath2], new_tmp_filepath, delete_old_files=true)
+      let newTmpFilepath = &"{outdir}{trim}.tmp_subfasta{totalFastas}.fa"
+      mergeFiles([filepath1,filepath2], newTmpFilepath, delete_old_files=true)
 
       # Decompose the new temp file
-      var seq_file : PFile = fopen(cstring(new_tmp_filepath))
-      var po = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function,weight_support = true)
-      removeFile(new_tmp_filepath)
-      var trim_po = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var (representative_paths,read_supports) = poGraphUtils.getRepresentativePaths3(addr trim_po, psi = isoform_delta, ends_delta = ends_delta)
-      let consensus_po = poGraphUtils.buildConsensusPO(addr po, representative_paths, read_supports, &"{trim}.tmp_subfasta{total_fastas}")
+      var seqFile : PFile = fopen(cstring(newTmpFilepath))
+      var po = getPOGraphFromFasta(seqFile,cstring(matrixFilepath),cint(1),matrix_scoring_function,weight_support = true)
+      removeFile(newTmpFilepath)
+      var trimPo = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
+      var (representativePaths,readSupports) = poGraphUtils.getRepresentativePaths3(addr trimPo, psi = isoformDelta, endsDelta = endsDelta)
+      let consensusPo = poGraphUtils.buildConsensusPO(addr po, representativePaths, readSupports, &"{trim}.tmp_subfasta{totalFastas}")
       
       # Write the decomposition to a new consensus file
-      new_filepath = &"{outdir}{trim}.tmp_consensus{total_fastas}.fa"
-      var new_file : File
-      discard open(new_file,new_filepath,fmWrite)
-      poGraphUtils.writeCorrectedReads(consensus_po,new_file)
-      new_file.close()
+      newFilepath = &"{outdir}{trim}.tmp_consensus{totalFastas}.fa"
+      var newFile : File
+      discard open(newFile,newFilepath,fmWrite)
+      poGraphUtils.writeCorrectedReads(consensusPo,newFile)
+      newFile.close()
       
-      if merge_queue.len > 0:
+      if mergeQueue.len > 0:
         var tmp : int
-        merge_queue.push((consensus_po.reads.len,total_fastas))
-        (tmp,file_idx1) = merge_queue.pop()
-        (tmp,file_idx2) = merge_queue.pop()
-        total_fastas += 1
+        mergeQueue.push((consensusPo.reads.len,totalFastas))
+        (tmp,fileIdx1) = mergeQueue.pop()
+        (tmp,fileIdx2) = mergeQueue.pop()
+        totalFastas += 1
       else:
         break
-    moveFile(new_filepath, &"{outdir}fasta{os.DirSep}{trim}.consensus.fa")
+    moveFile(newFilepath, &"{outdir}fasta{os.DirSep}{trim}.consensus.fa")
   else:
-    var seq_file : PFile = fopen(cstring(fasta_file), "r")
-    var po2 = getPOGraphFromFasta(seq_file,cstring(matrix_filepath),cint(1),matrix_scoring_function)
-    if delete_fasta_flag:
-      removeFile(fasta_file)
-    var trim_po2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
-    var (representative_paths,read_supports) = poGraphUtils.getRepresentativePaths3(addr trim_po2, psi = isoform_delta, ends_delta = ends_delta)
-    let consensus_po = poGraphUtils.buildConsensusPO(addr po2, representative_paths, read_supports, trim)
+    var seqFile : PFile = fopen(cstring(fastaFile), "r")
+    var po2 = getPOGraphFromFasta(seqFile,cstring(matrixFilepath),cint(1),matrix_scoring_function)
+    if deleteFastaFlag:
+      removeFile(fastaFile)
+    var trimPo2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
+    var (representativePaths,readSupports) = poGraphUtils.getRepresentativePaths3(addr trimPo2, psi = isoformDelta, endsDelta = endsDelta)
+    let consensusPo = poGraphUtils.buildConsensusPO(addr po2, representativePaths, readSupports, trim)
     let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
     var outFASTAfile : File
     discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-    poGraphUtils.writeCorrectedReads(consensus_po,outFASTAfile)
+    poGraphUtils.writeCorrectedReads(consensusPo,outFASTAfile)
     outFASTAfile.close()
 
 
 proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} =
-  let (tmp_dir, trim, matrix_filepath, iter,isoform_delta,ends_delta) = intuple
-  let last_fasta_dir = &"{tmp_dir}{iter-1}{os.DirSep}fasta{os.DirSep}"
-  let this_fasta_dir = &"{tmp_dir}{iter}{os.DirSep}fasta{os.DirSep}"
+  let (tmpDir, trim, matrixFilepath, iter,isoformDelta,endsDelta) = intuple
+  let lastFastaDir = &"{tmpDir}{iter-1}{os.DirSep}fasta{os.DirSep}"
+  let thisFastaDir = &"{tmpDir}{iter}{os.DirSep}fasta{os.DirSep}"
 
-  let last_fasta_filepath = &"{last_fasta_dir}{trim}.consensus.fa"
-  var seq_file : PFile = fopen(cstring(last_fasta_filepath), "r")
-  var po = getPOGraphFromFasta(seq_file,matrix_filepath,cint(1),matrix_scoring_function,weight_support = true)
+  let lastFastaFilepath = &"{lastFastaDir}{trim}.consensus.fa"
+  var seqFile : PFile = fopen(cstring(lastFastaFilepath), "r")
+  var po = getPOGraphFromFasta(seqFile,matrixFilepath,cint(1),matrix_scoring_function,weight_support = true)
 
-  let this_fasta_filepath = &"{this_fasta_dir}{trim}.consensus.fa"
+  let thisFastaFilepath = &"{thisFastaDir}{trim}.consensus.fa"
 
-  let bamfilepath = &"{tmp_dir}{iter-1}{os.DirSep}alignments.bam"
+  let bamfilepath = &"{tmpDir}{iter-1}{os.DirSep}alignments.bam"
 
   var bam : Bam
-  var trim_po = convertPOGraphtoTrimmedPOGraph(po)
+  var trimPo = convertPOGraphtoTrimmedPOGraph(po)
   discard open(bam,bamfilepath,index=true)
-  illuminaPolishPOGraph(addr trim_po, bam)
-  var (representative_paths,read_supports) = getRepresentativePaths3(addr trim_po, psi = isoform_delta,ends_delta = ends_delta)
-  var records = getFastaRecordsFromTrimmedPOGraph(addr trim_po, representative_paths, read_supports, trim)
+  illuminaPolishPOGraph(addr trimPo, bam)
+  var (representativePaths,readSupports) = getRepresentativePaths3(addr trimPo, psi = isoformDelta,endsDelta = endsDelta)
+  var records = getFastaRecordsFromTrimmedPOGraph(addr trimPo, representativePaths, readSupports, trim)
   var outfile : File
-  discard open(outfile,this_fasta_filepath,fmWrite)
+  discard open(outfile,thisFastaFilepath,fmWrite)
   writeFASTArecordsToFile(outfile,records)
   # writeCorrectedReads(records,outfile)
   outfile.close()
-  result = sameFileContent(last_fasta_filepath,this_fasta_filepath)
-  removeFile(last_fasta_filepath)
+  result = sameFileContent(lastFastaFilepath,thisFastaFilepath)
+  removeFile(lastFastaFilepath)
 
 proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uint16,bool,int)) {.thread.} = 
-  let (tmp_dir, trim, converged_iter, iter,isoform_delta,stringent,stringent_tolerance) = intuple
-  let last_fasta_dir = &"{tmp_dir}{converged_iter}{os.DirSep}fasta{os.DirSep}"
-  let this_fasta_dir = &"{tmp_dir}{iter}{os.DirSep}fasta{os.DirSep}"
+  let (tmpDir, trim, convergedIter, iter,isoformDelta,stringent,stringentTolerance) = intuple
+  let lastFastaDir = &"{tmpDir}{convergedIter}{os.DirSep}fasta{os.DirSep}"
+  let thisFastaDir = &"{tmpDir}{iter}{os.DirSep}fasta{os.DirSep}"
 
-  let last_fasta_filepath = &"{last_fasta_dir}{trim}.consensus.fa"
-  let this_fasta_filepath = &"{this_fasta_dir}{trim}.consensus.fa"
+  let lastFastaFilepath = &"{lastFastaDir}{trim}.consensus.fa"
+  let thisFastaFilepath = &"{thisFastaDir}{trim}.consensus.fa"
 
-  let bamfilepath = &"{tmp_dir}{iter-1}{os.DirSep}alignments.bam"
+  let bamfilepath = &"{tmpDir}{iter-1}{os.DirSep}alignments.bam"
 
   var infile : File
   var bam : Bam
-  discard open(infile,last_fasta_filepath)
+  discard open(infile,lastFastaFilepath)
   var reads = parseFasta(infile)
   infile.close()
   var corrected : seq[FastaRecord]
   discard open(bam,bamfilepath,index=true)
   for read in reads:
-    var trim_po = getTrimmedGraphFromFastaRecord(read)
-    illuminaPolishPOGraph(addr trim_po, bam,debug=true)
-    discard getRepresentativePaths3(addr trim_po, psi = isoform_delta)
-    if (not stringent) or stringencyCheck(addr trim_po,trim_po.reads[0].corrected_path,stringent_tolerance = stringent_tolerance):
-      corrected.add(FastaRecord(read_id : read.read_id, sequence : getSequenceFromPath(trim_po,trim_po.reads[0].corrected_path)))
+    var trimPo = getTrimmedGraphFromFastaRecord(read)
+    illuminaPolishPOGraph(addr trimPo, bam,debug=true)
+    discard getRepresentativePaths3(addr trimPo, psi = isoformDelta)
+    if (not stringent) or stringencyCheck(addr trimPo,trimPo.reads[0].correctedPath,stringentTolerance = stringentTolerance):
+      corrected.add(FastaRecord(readId : read.readId, sequence : getSequenceFromPath(trimPo,trimPo.reads[0].correctedPath)))
   var outfile : File
-  discard open(outfile,this_fasta_filepath,fmWrite)
+  discard open(outfile,thisFastaFilepath,fmWrite)
   writeFASTArecordsToFile(outfile,corrected)
   # writeCorrectedReads(corrected,outfile)
   outfile.close()
@@ -467,11 +467,11 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster"
   outfile.close()
 
-proc combineFilesIntermediate(indirectory : string, intrims : openArray[string], outfilepath : string, last_correction : Table[int,int]) = 
+proc combineFilesIntermediate(indirectory : string, intrims : openArray[string], outfilepath : string, lastCorrection : Table[int,int]) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
-    if i in last_correction:
+    if i in lastCorrection:
       continue
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if fileExists(filepath):
@@ -484,13 +484,13 @@ proc combineFilesIntermediate(indirectory : string, intrims : openArray[string],
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openArray[string], outfilepath : string, last_correction : Table[int,int]) = 
+proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openArray[string], outfilepath : string, lastCorrection : Table[int,int]) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
     var last = last_num
-    if i in last_correction:
-      last = uint64(last_correction[i]) #TODO convert last_correction to uint64 types.
+    if i in lastCorrection:
+      last = uint64(lastCorrection[i]) #TODO convert lastCorrection to uint64 types.
     let indirectory = &"{tmp_directory}{last}{os.DirSep}fasta{os.DirSep}"
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if fileExists(filepath):
@@ -503,30 +503,30 @@ proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openA
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc getBowtie2options(opt : ConduitOptions, index_prefix, sam : string, final_polish : bool = false) : seq[string] = 
+proc getBowtie2options(opt : ConduitOptions, indexPrefix, sam : string, finalPolish : bool = false) : seq[string] = 
   var arguments : seq[string]
   arguments.add("--xeq")
   arguments.add("--no-unal")
   arguments.add("-p")
-  arguments.add(&"{opt.thread_num}")
-  if final_polish:
+  arguments.add(&"{opt.threadNum}")
+  if finalPolish:
     arguments.add("-k")
-    arguments.add(&"{opt.max_alignments}")
-  arguments.add(opt.bowtie_strand_constraint)
-  arguments.add(opt.bowtie_alignment_mode)
+    arguments.add(&"{opt.maxAlignments}")
+  arguments.add(opt.bowtieStrandConstraint)
+  arguments.add(opt.bowtieAlignmentMode)
   arguments.add("--n-ceil")
   arguments.add("L,0,0")
   arguments.add("-x")
-  arguments.add(index_prefix)
-  for arg in opt.bowtie_read_inputs.split(" "):
+  arguments.add(indexPrefix)
+  for arg in opt.bowtieReadInputs.split(" "):
     arguments.add(arg)
   arguments.add("-S")
   arguments.add(sam)
   return arguments
 
 proc parseOptions() : ConduitOptions = 
-  var clusters_directory = ""
-  var clusters_directory_flag = false
+  var clustersDirectory = ""
+  var clustersDirectoryFlag = false
 
   var mate1s : seq[string]
   var mate2s : seq[string]
@@ -534,73 +534,73 @@ proc parseOptions() : ConduitOptions =
   var interleaved : seq[string]
   var bams : seq[string]
 
-  var illumina_strand="reverse"
-  var illumina_strand_flag = false
+  var illuminaStrand="reverse"
+  var illuminaStrandFlag = false
 
-  var illumina_format="fastq"
-  var illumina_format_flag = false
+  var illuminaFormat="fastq"
+  var illuminaFormatFlag = false
 
-  var nanopore_type="drna"
-  var nanopore_type_flag = false
+  var nanoporeType="drna"
+  var nanoporeTypeFlag = false
 
-  var nanopore_strand="forward"
+  var nanoporeStrand="forward"
   # var nanopore_strand_flag = false
 
-  var nanopore_format="fastq"
-  var nanopore_format_flag = false
+  var nanoporeFormat="fastq"
+  var nanoporeFormatFlag = false
 
   var u2t = true
-  var u2t_flag = false
+  var u2tFlag = false
 
-  var score_matrix_path = ""
-  var score_matrix_path_flag = false
+  var scoreMatrixPath = ""
+  var scoreMatrixPathFlag = false
 
-  var isoform_delta = 35'u64
-  var isoform_delta_flag = false
+  var isoformDelta = 35'u64
+  var isoformDeltaFlag = false
 
-  var ends_delta = 35'u64
-  var ends_delta_flag = false
+  var endsDelta = 35'u64
+  var endsDeltaFlag = false
 
-  var max_iterations = 5'u64
-  var max_iterations_flag = false
+  var maxIterations = 5'u64
+  var maxIterationsFlag = false
 
-  var illumina_weight = 10'u64
-  var illumina_weight_flag = false
+  var illuminaWeight = 10'u64
+  var illuminaWeightFlag = false
 
-  var final_polish = true
-  var final_polish_flag = false
+  var finalPolish = true
+  var finalPolishFlag = false
 
   var stringent = true
-  var stringent_flag = false
+  var stringentFlag = false
 
-  var stringent_tolerance = 100
-  var stringent_tolerance_flag = false
+  var stringentTolerance = 100
+  var stringentToleranceFlag = false
 
-  var output_dir = &"conduit-out{os.DirSep}"
-  var output_dir_flag = false
+  var outputDir = &"conduit-out{os.DirSep}"
+  var outputDirFlag = false
 
   var intermediates = false
-  var intermediates_flag = false
+  var intermediatesFlag = false
 
   var local = false
-  var local_flag = false
+  var localFlag = false
 
-  var max_alignments = 50'u64
-  var max_alignments_flag = false
+  var maxAlignments = 50'u64
+  var maxAlignmentsFlag = false
 
-  var samtools_memory = "768M"
-  var samtools_memory_flag = false
+  var samtoolsMemory = "768M"
+  var samtoolsMemoryFlag = false
 
-  var help_flag = true
-  var version_flag = false
+  var helpFlag = true
+  var versionFlag = false
 
-  var tmp_dir = &"conduit-tmp{os.DirSep}"
-  var tmp_dir_flag = false
+  var tmpDir = &"conduit-tmp{os.DirSep}"
+  var tmpDirFlag = false
 
-  var thread_num = 4'u64
-  var thread_num_flag = false
+  var threadNum = 4'u64
+  var threadNumFlag = false
 
-  var run_flag = true
+  var runFlag = true
 
 
   var i = 0
@@ -614,7 +614,7 @@ proc parseOptions() : ConduitOptions =
       i += 1
       continue
     if i == 1:
-      help_flag = false
+      helpFlag = false
     i += 1
     case mode:
       of "nano", "hybrid":
@@ -624,7 +624,7 @@ proc parseOptions() : ConduitOptions =
           of cmdShortOption, cmdLongOption:
             if last != "":
               echo &"ERROR - Option {last} provided without an argument"
-              run_flag = false
+              runFlag = false
               break
             case key:
               of "1":
@@ -653,294 +653,294 @@ proc parseOptions() : ConduitOptions =
                 else:
                   last = "b"
               of "drna":
-                if not nanopore_type_flag:
-                  nanopore_type_flag = true
+                if not nanoporeTypeFlag:
+                  nanoporeTypeFlag = true
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple scaffold types input, choose one of \"--drna\", \"--cdna-rev-stranded\", or \"--cdna\""
               of "cdna-rev-stranded":
-                if not nanopore_type_flag:
-                  nanopore_type_flag = true
-                  nanopore_type = "cdna"
-                  nanopore_strand = "reverse"
+                if not nanoporeTypeFlag:
+                  nanoporeTypeFlag = true
+                  nanoporeType = "cdna"
+                  nanoporeStrand = "reverse"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple scaffold types input, choose one of \"--drna\", \"--cdna-rev-stranded\", or \"--cdna\""
-                  help_flag = true
+                  helpFlag = true
                   break
               of "cdna":
-                if not nanopore_type_flag:
-                  nanopore_type_flag = true
-                  nanopore_type = "cdna"
-                  nanopore_strand = "unstranded"
+                if not nanoporeTypeFlag:
+                  nanoporeTypeFlag = true
+                  nanoporeType = "cdna"
+                  nanoporeStrand = "unstranded"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple scaffold types input, choose one of \"--drna\", \"--cdna-rev-stranded\", or \"--cdna\""
-                  help_flag = true
+                  helpFlag = true
                   break
               of "sfq":
-                if not nanopore_format_flag:
+                if not nanoporeFormatFlag:
                   #already fastq
-                  nanopore_format_flag = true
+                  nanoporeFormatFlag = true
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple scaffold format input, choose one of FASTA (--sfa) or FASTQ (--sfq)"
-                  help_flag = true
+                  helpFlag = true
                   break
               of "sfa":
-                if not nanopore_format_flag:
+                if not nanoporeFormatFlag:
                   #already fastq
-                  nanopore_format_flag = true
-                  nanopore_format = "fasta"
+                  nanoporeFormatFlag = true
+                  nanoporeFormat = "fasta"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple scaffold format input, choose one of FASTA (--sfa) or FASTQ (--sfq)"
-                  help_flag = true
+                  helpFlag = true
                   break
               of "UtoT":
-                if not u2t_flag:
-                  u2t_flag = true
+                if not u2tFlag:
+                  u2tFlag = true
                 elif not u2t:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --UtoT and --noUtoT both specified"
                   break
               of "noUtoT":
-                if not u2t_flag:
-                  u2t_flag = true
+                if not u2tFlag:
+                  u2tFlag = true
                   u2t = false
                 elif u2t:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --UtoT and --noUtoT both specified"
                   break
               of "m", "score-matrix":
-                if not score_matrix_path_flag:
-                  score_matrix_path_flag = true
+                if not scoreMatrixPathFlag:
+                  scoreMatrixPathFlag = true
                   if val != "":
-                    score_matrix_path = val
+                    scoreMatrixPath = val
                   else:
                     last = "score-matrix"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple score matrices provided"
                   break
               of "u", "unstranded":
-                if not illumina_strand_flag:
-                  illumina_strand_flag = true
-                  illumina_strand = "unstranded"
+                if not illuminaStrandFlag:
+                  illuminaStrandFlag = true
+                  illuminaStrand = "unstranded"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple illumina strand input, choose one of (-u,--unstranded), (-f,--fwd-stranded), (-r,--rev-stranded)"
-                  help_flag = true
+                  helpFlag = true
                   break
               of "f", "fwd-stranded":
-                if not illumina_strand_flag:
-                  illumina_strand_flag = true
-                  illumina_strand = "forward"
+                if not illuminaStrandFlag:
+                  illuminaStrandFlag = true
+                  illuminaStrand = "forward"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple illumina strand input, choose one of (-u,--unstranded), (-f,--fwd-stranded), (-r,--rev-stranded)"
-                  help_flag = true
+                  helpFlag = true
                   break
                 continue
               of "r", "rev-stranded":
-                if not illumina_strand_flag:
-                  illumina_strand_flag = true
+                if not illuminaStrandFlag:
+                  illuminaStrandFlag = true
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple illumina strand input, choose one of (-u,--unstranded), (-f,--fwd-stranded), (-r,--rev-stranded)"
-                  help_flag = true
+                  helpFlag = true
                   break
               of "ifq":
-                if not illumina_format_flag:
-                  illumina_format_flag = true
+                if not illuminaFormatFlag:
+                  illuminaFormatFlag = true
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple illumina format input, choose one of FASTA (--ifa), or FASTQ (--ifq)"
-                  help_flag = true
+                  helpFlag = true
                   break
               of "ifa":
-                if not illumina_format_flag:
-                  illumina_format_flag = true
-                  illumina_format = "fasta"
+                if not illuminaFormatFlag:
+                  illuminaFormatFlag = true
+                  illuminaFormat = "fasta"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple illumina format input, choose one of FASTA (--ifa), or FASTQ (--ifq)"
-                  help_flag = true
+                  helpFlag = true
                   break
               of "d", "isoform-delta":
-                if not isoform_delta_flag:
-                  isoform_delta_flag = true
+                if not isoformDeltaFlag:
+                  isoformDeltaFlag = true
                   if val != "":
-                    isoform_delta = parseUInt(val)
+                    isoformDelta = parseUInt(val)
                   else:
                     last = "isoform-delta"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Isoform delta specified multiple times"
                   break
               of "e", "ends-delta":
-                if not ends_delta_flag:
-                  ends_delta_flag = true
+                if not endsDeltaFlag:
+                  endsDeltaFlag = true
                   if val != "":
-                    ends_delta = parseUInt(val)
+                    endsDelta = parseUInt(val)
                   else:
                     last = "ends-delta"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Ends delta specified multiple times"
                   break
               of "i", "max-iterations":
-                if not max_iterations_flag:
-                  max_iterations_flag = true
+                if not maxIterationsFlag:
+                  maxIterationsFlag = true
                   if val != "":
-                    max_iterations = parseUInt(val)
+                    maxIterations = parseUInt(val)
                   else:
                     last = "max-iterations"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Max iterations specified multiple times"
                   break
               of "w", "illumina-weight":
-                if not illumina_weight_flag:
-                  illumina_weight_flag = true
+                if not illuminaWeightFlag:
+                  illuminaWeightFlag = true
                   if val != "":
-                    illumina_weight = parseUInt(val)
+                    illuminaWeight = parseUInt(val)
                   else:
                     last = "illumina-weight"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Multiple Illumina weights specified"
                   break
               of "final-polish":
-                if not final_polish_flag:
-                  final_polish_flag = true
-                elif not final_polish:
-                  run_flag = false
+                if not finalPolishFlag:
+                  finalPolishFlag = true
+                elif not finalPolish:
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --final-polish and --no-final-polish both specified"
                   break
               of "no-final-polish":
-                if not final_polish_flag:
-                  final_polish_flag = true
-                  final_polish = false
-                elif final_polish:
-                  run_flag = false
+                if not finalPolishFlag:
+                  finalPolishFlag = true
+                  finalPolish = false
+                elif finalPolish:
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --final-polish and --no-final-polish both specified"
                   break
               of "stringent":
-                if not stringent_flag:
-                  stringent_flag = true
+                if not stringentFlag:
+                  stringentFlag = true
                 elif not stringent:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --stringent and --no-stringent both specified"
               of "no-stringent":
-                if not stringent_flag:
-                  stringent_flag = true
+                if not stringentFlag:
+                  stringentFlag = true
                   stringent = false
                 elif stringent:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --stringent and --no-stringent both specified"
               of "stringent-tolerance":
-                if not stringent_tolerance_flag:
-                  stringent_tolerance_flag = true
+                if not stringentToleranceFlag:
+                  stringentToleranceFlag = true
                   if val != "":
-                    stringent_tolerance = parseInt(val)
+                    stringentTolerance = parseInt(val)
                   else:
                     last = "stringent-tolerance"
               of "n", "no-intermediates":
-                if not intermediates_flag:
-                  intermediates_flag = true
+                if not intermediatesFlag:
+                  intermediatesFlag = true
                 elif intermediates:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --no-intermediates and --save-intermediates both specified"
                   break
               of "s", "save-intermediates":
-                if not intermediates_flag:
-                  intermediates_flag = true
+                if not intermediatesFlag:
+                  intermediatesFlag = true
                   intermediates = true
                 elif not intermediates:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Conflicting flags: --no-intermediates and --save-intermediates both specified"
                   break
               of "o", "output-dir":
-                if not output_dir_flag:
-                  output_dir_flag = true
+                if not outputDirFlag:
+                  outputDirFlag = true
                   if val != "":
-                    output_dir = val
+                    outputDir = val
                   else:
                     last = "output-dir"
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Output directory specified multiple times"
                   break
               of "end-to-end":
-                if not local_flag:
-                  local_flag = true
+                if not localFlag:
+                  localFlag = true
                   local = false
                 else:
                   if local:
-                    run_flag = false
+                    runFlag = false
                     echo "ERROR - Conflicting flags: --local and --end-to-end both specified"
                     break
               of "local":
-                if not local_flag:
-                  local_flag = true
+                if not localFlag:
+                  localFlag = true
                   local = true
                 else:
                   if not local:
-                    run_flag = false
+                    runFlag = false
                     echo "ERROR - Conflicting flags: --local and --end-to-end both specified"
                     break
               of "k","bowtie2-max-alignments":
-                if not max_alignments_flag:
-                  max_alignments_flag = true
+                if not maxAlignmentsFlag:
+                  maxAlignmentsFlag = true
                   if val == "":
                     last = "bowtie2-max-alignments"
                   else:
-                    max_alignments = parseUInt(val)
+                    maxAlignments = parseUInt(val)
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Max bowtie2 alignments specified multiple times"
                   break
               of "samtools-thread-memory":
-                if not samtools_memory_flag:
-                  samtools_memory_flag = true
+                if not samtoolsMemoryFlag:
+                  samtoolsMemoryFlag = true
                   if val == "":
                     last = "samtools-thread-memory"
                   else:
-                    samtools_memory = val
+                    samtoolsMemory = val
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR SAMtools thread memory specified multiple times"
                   break
 
               of "t", "threads":
-                if not thread_num_flag:
+                if not threadNumFlag:
                   if val == "":
                     last = "threads"
                   else:
-                    thread_num = parseUInt(val)
+                    threadNum = parseUInt(val)
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Threads specified multiple times"
                   break
               of "tmp-dir":
-                if not tmp_dir_flag:
-                  tmp_dir_flag = true
+                if not tmpDirFlag:
+                  tmpDirFlag = true
                   if val == "":
                     last = "tmp-dir"
                   else:
-                    tmp_dir = val
+                    tmpDir = val
                 else:
-                  run_flag = false
+                  runFlag = false
                   echo "ERROR - Temporary directory specified twice"
                   break
               of "h", "help":
-                help_flag = true
-                run_flag = false
+                helpFlag = true
+                runFlag = false
                 break
               of "v", "version":
-                version_flag = true
-                run_flag = false
+                versionFlag = true
+                runFlag = false
                 break
               else:
                 var dash = ""
@@ -962,53 +962,53 @@ proc parseOptions() : ConduitOptions =
               of "b":
                 bams.add(key)
               of "score-matrix":
-                score_matrix_path = key
+                scoreMatrixPath = key
               of "isoform-delta":
-                isoform_delta = parseUInt(key)
+                isoformDelta = parseUInt(key)
               of "ends-delta":
-                ends_delta = parseUInt(key)
+                endsDelta = parseUInt(key)
               of "max-iterations":
-                max_iterations = parseUInt(key)
+                maxIterations = parseUInt(key)
               of "illumina-weight":
-                illumina_weight = parseUInt(key)
+                illuminaWeight = parseUInt(key)
               of "stringent-tolerance":
-                stringent_tolerance = parseInt(key)
+                stringentTolerance = parseInt(key)
               of "output-dir":
-                output_dir = key
+                outputDir = key
               of "bowtie2-max-alignments":
-                max_alignments = parseUInt(key)
+                maxAlignments = parseUInt(key)
               of "samtools-thread-memory":
-                samtools_memory = key
+                samtoolsMemory = key
               of "threads":
-                thread_num = parseUInt(key)
+                threadNum = parseUInt(key)
               of "tmp-dir":
                 if key[^1] == os.DirSep:
-                  tmp_dir = key
+                  tmpDir = key
                 else:
-                  tmp_dir = key & os.DirSep
+                  tmpDir = key & os.DirSep
               of "":
                 # echo "Argument: ", key
-                if not clusters_directory_flag:
-                  clusters_directory_flag = true
-                  clusters_directory = key
+                if not clustersDirectoryFlag:
+                  clustersDirectoryFlag = true
+                  clustersDirectory = key
                 else:
-                  run_flag = false
-                  echo "ERROR - Argument provided without associated option; please provide one <clusters_directory> only"
+                  runFlag = false
+                  echo "ERROR - Argument provided without associated option; please provide one <clustersDirectory> only"
                   break
               else:
                 echo &"ERROR - unknown option {last} provided"
-                run_flag = false
+                runFlag = false
                 break
             last = ""
       else:
-        help_flag = true
+        helpFlag = true
         break
-  if clusters_directory == "":
+  if clustersDirectory == "":
     echo "ERROR - <clusters directory> must be specified"
-    help_flag = true
-    run_flag = false
+    helpFlag = true
+    runFlag = false
 
-  if help_flag:
+  if helpFlag:
     case mode:
       of "nano":
         writeNanoHelp()
@@ -1017,247 +1017,247 @@ proc parseOptions() : ConduitOptions =
       else:
         echo "ERROR - first argument must specify correction mode, \"nano\" or \"hybrid\""
         writeDefaultHelp()
-  if version_flag:
+  if versionFlag:
     echo conduitVersion()
   var files : seq[string]
-  var bowtie_strand_constraint : string
-  var bowtie_alignment_mode : string
-  var bowtie_read_inputs : string
-  if run_flag and mode == "hybrid":
+  var bowtieStrandConstraint : string
+  var bowtieAlignmentMode : string
+  var bowtieReadInputs : string
+  if runFlag and mode == "hybrid":
     # Determine strand relationship between nanopore and illumina reads:
-    if (nanopore_strand == "forward" and illumina_strand == "reverse") or (nanopore_strand == "reverse" and illumina_strand == "forward"):
-      bowtie_strand_constraint = "--nofw"
-    elif (nanopore_strand == "forward" and illumina_strand == "forward") or (nanopore_strand == "reverse" and illumina_strand == "reverse"):
-      bowtie_strand_constraint = "--norc"
+    if (nanoporeStrand == "forward" and illuminaStrand == "reverse") or (nanoporeStrand == "reverse" and illuminaStrand == "forward"):
+      bowtieStrandConstraint = "--nofw"
+    elif (nanoporeStrand == "forward" and illuminaStrand == "forward") or (nanoporeStrand == "reverse" and illuminaStrand == "reverse"):
+      bowtieStrandConstraint = "--norc"
     
     # Format illumina inputs in a manner readable by Bowtie2
-    var bowtie_mate1_inputs = ""
-    var bowtie_mate2_inputs = ""
-    var bowtie_unpaired_inputs = ""
-    var bowtie_interleaved_inputs = ""
-    var bowtie_bam_inputs = ""
+    var bowtieMate1Inputs = ""
+    var bowtieMate2Inputs = ""
+    var bowtieUnpairedInputs = ""
+    var bowtieInterleavedInputs = ""
+    var bowtieBamInputs = ""
     if mate1s.len != 0:
-      bowtie_mate1_inputs = "-1 " & mate1s.join(",") & " "
+      bowtieMate1Inputs = "-1 " & mate1s.join(",") & " "
     if mate2s.len != 0:
-      bowtie_mate2_inputs = "-2 " & mate2s.join(",") & " "
+      bowtieMate2Inputs = "-2 " & mate2s.join(",") & " "
     if unpaireds.len != 0:
-      bowtie_unpaired_inputs = "-U " & unpaireds.join(",") & " "
+      bowtieUnpairedInputs = "-U " & unpaireds.join(",") & " "
     if interleaved.len != 0:
-      bowtie_interleaved_inputs = "--interleaved " & interleaved.join(",") & " "
+      bowtieInterleavedInputs = "--interleaved " & interleaved.join(",") & " "
     if bams.len != 0:
-      bowtie_bam_inputs = "-b " & bams.join(",") & " "
-    bowtie_read_inputs = &"{bowtie_mate1_inputs}{bowtie_mate2_inputs}{bowtie_unpaired_inputs}{bowtie_interleaved_inputs}{bowtie_bam_inputs}"
-    if bowtie_read_inputs == "":
+      bowtieBamInputs = "-b " & bams.join(",") & " "
+    bowtieReadInputs = &"{bowtieMate1Inputs}{bowtieMate2Inputs}{bowtieUnpairedInputs}{bowtieInterleavedInputs}{bowtieBamInputs}"
+    if bowtieReadInputs == "":
       echo "ERROR - No Illumina data provided"
-      run_flag = false
+      runFlag = false
     
     if local:
-      bowtie_alignment_mode = "--very-sensitive-local"
+      bowtieAlignmentMode = "--very-sensitive-local"
     else:
-      bowtie_alignment_mode = "--very-sensitive"
+      bowtieAlignmentMode = "--very-sensitive"
     
-    if nanopore_format == "fasta":
-      for file in walkFiles(&"{clusters_directory}*.fa"):
+    if nanoporeFormat == "fasta":
+      for file in walkFiles(&"{clustersDirectory}*.fa"):
         files.add(file)
-      for file in walkFiles(&"{clusters_directory}*.fasta"):
-        files.add(file)
-      if files.len == 0:
-        run_flag = false
-        echo &"ERROR - No files of type .fa or .fasta found in <clusters directory> {clusters_directory}"
-        echo "NOTE: We don't currently support .gzip'd or bzip2'd scaffold files, though support for these formats is coming"
-    elif nanopore_format == "fastq":
-      for file in walkFiles(&"{clusters_directory}*.fq"):
-        files.add(file)
-      for file in walkFiles(&"{clusters_directory}*.fastq"):
+      for file in walkFiles(&"{clustersDirectory}*.fasta"):
         files.add(file)
       if files.len == 0:
-        run_flag = false
-        echo &"ERROR - No files of type .fq or .fastq found in <clusters directory> {clusters_directory}"
+        runFlag = false
+        echo &"ERROR - No files of type .fa or .fasta found in <clusters directory> {clustersDirectory}"
         echo "NOTE: We don't currently support .gzip'd or bzip2'd scaffold files, though support for these formats is coming"
-    if isoform_delta > 255'u64 or isoform_delta < 2'u64:
+    elif nanoporeFormat == "fastq":
+      for file in walkFiles(&"{clustersDirectory}*.fq"):
+        files.add(file)
+      for file in walkFiles(&"{clustersDirectory}*.fastq"):
+        files.add(file)
+      if files.len == 0:
+        runFlag = false
+        echo &"ERROR - No files of type .fq or .fastq found in <clusters directory> {clustersDirectory}"
+        echo "NOTE: We don't currently support .gzip'd or bzip2'd scaffold files, though support for these formats is coming"
+    if isoformDelta > 255'u64 or isoformDelta < 2'u64:
       echo "ERROR - Isoform delta must be between 2 and 255"
-      run_flag = false
-    elif isoform_delta < 15'u64:
+      runFlag = false
+    elif isoformDelta < 15'u64:
       echo "WARNING - Low isoform delta values will increase the number of distinct isoforms and dramatically increase runtime"
       echo "          An isoform delta value of 15 or above is reccomended"
-    if ends_delta > 255'u64 or ends_delta < 2'u64:
+    if endsDelta > 255'u64 or endsDelta < 2'u64:
       echo "ERROR - Ends delta must be between 2 and 255"
-      run_flag = false
-    if thread_num < 1'u64:
+      runFlag = false
+    if threadNum < 1'u64:
       echo "ERROR - Must run at least 1 thread"
-      run_flag = false
-    if illumina_weight == 0'u64:
+      runFlag = false
+    if illuminaWeight == 0'u64:
       echo "ERROR - Illumina weight must be greater than 0"
-      run_flag = false
-    elif illumina_weight < 5'u64:
+      runFlag = false
+    elif illuminaWeight < 5'u64:
       echo "WARNING - We reccomend weighing Illumina reads by at least 5x their long-read counterparts"
-    if stringent_tolerance < 3:
+    if stringentTolerance < 3:
       echo "ERROR - Stringent tolerance cannot be less than 3"
-      run_flag = false
-    elif stringent_tolerance < 25:
+      runFlag = false
+    elif stringentTolerance < 25:
       echo "WARNING - Reads map poorly to the ends of long read scaffolds, we reccomend a stringency tolerance of at least 25"
     
   var trims = newSeq[string](files.len)
   for i,infilepath in files:
     trims[i] = infilepath.split(os.DirSep)[^1].split(".")[0]
-  return ConduitOptions(run_flag : run_flag,
-                        final_polish : final_polish,
+  return ConduitOptions(runFlag : runFlag,
+                        finalPolish : finalPolish,
                         intermediates : intermediates,
                         mode : mode,
-                        clusters_directory : clusters_directory,
-                        nanopore_format : nanopore_format,
-                        illumina_format : illumina_format,
+                        clustersDirectory : clustersDirectory,
+                        nanoporeFormat : nanoporeFormat,
+                        illuminaFormat : illuminaFormat,
                         u2t : u2t,
-                        bowtie_strand_constraint : bowtie_strand_constraint,
-                        bowtie_alignment_mode : bowtie_alignment_mode,
-                        bowtie_read_inputs : bowtie_read_inputs,
-                        score_matrix_path : score_matrix_path,
-                        output_dir : &"{output_dir}{os.DirSep}",
-                        tmp_dir : &"{tmp_dir}{os.DirSep}",
+                        bowtieStrandConstraint : bowtieStrandConstraint,
+                        bowtieAlignmentMode : bowtieAlignmentMode,
+                        bowtieReadInputs : bowtieReadInputs,
+                        scoreMatrixPath : scoreMatrixPath,
+                        outputDir : &"{outputDir}{os.DirSep}",
+                        tmpDir : &"{tmpDir}{os.DirSep}",
                         files : files,
                         trims : trims,
-                        isoform_delta : isoform_delta,
-                        ends_delta : ends_delta,
-                        max_iterations : max_iterations,
-                        illumina_weight : illumina_weight,
-                        thread_num : thread_num,
+                        isoformDelta : isoformDelta,
+                        endsDelta : endsDelta,
+                        maxIterations : maxIterations,
+                        illuminaWeight : illuminaWeight,
+                        threadNum : threadNum,
                         stringent : stringent,
-                        stringent_tolerance : stringent_tolerance,
-                        samtools_memory : samtools_memory,
-                        max_alignments : max_alignments)
+                        stringentTolerance : stringentTolerance,
+                        samtoolsMemory : samtoolsMemory,
+                        maxAlignments : maxAlignments)
 
 proc main() =
   let opt = parseOptions()
-  if opt.mode == "hybrid" and opt.run_flag:
+  if opt.mode == "hybrid" and opt.runFlag:
     
-    var iter_times : seq[Time]
-    iter_times.add(getTime())
+    var iterTimes : seq[Time]
+    iterTimes.add(getTime())
 
-    if not dirExists(opt.output_dir):
-      createDir(opt.output_dir)
-    outputSettings(&"{opt.output_dir}CONDUIT.settings", opt)
+    if not dirExists(opt.outputDir):
+      createDir(opt.outputDir)
+    outputSettings(&"{opt.outputDir}CONDUIT.settings", opt)
 
-    var tmp_already_existed = true
-    if not dirExists(opt.tmp_dir):
-      tmp_already_existed = false
-      createDir(opt.tmp_dir)
+    var tmpAlreadyExisted = true
+    if not dirExists(opt.tmpDir):
+      tmpAlreadyExisted = false
+      createDir(opt.tmpDir)
 
-    let directory_number = opt.max_iterations + uint64(opt.final_polish)
-    for i in 0..directory_number:
-      createDirs([&"{opt.tmp_dir}{i}{os.DirSep}", &"{opt.tmp_dir}{i}{os.DirSep}fasta{os.DirSep}"])
+    let directoryNumber = opt.maxIterations + uint64(opt.finalPolish)
+    for i in 0..directoryNumber:
+      createDirs([&"{opt.tmpDir}{i}{os.DirSep}", &"{opt.tmpDir}{i}{os.DirSep}fasta{os.DirSep}"])
 
-    let p = tps.newThreadPool(int(opt.thread_num))
+    let p = tps.newThreadPool(int(opt.threadNum))
     for file in opt.files:
-      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmp_dir}0/", opt.score_matrix_path, opt.nanopore_format, uint16(opt.isoform_delta), uint16(opt.ends_delta),opt.u2t))
+      p.spawn runPOAandCollapsePOGraph((file, &"{opt.tmpDir}0/", opt.scoreMatrixPath, opt.nanoporeFormat, uint16(opt.isoformDelta), uint16(opt.endsDelta),opt.u2t))
     p.sync()
-    iter_times.add(getTime())
-    var last_correction : Table[int,int]
-    for iter in 1..opt.max_iterations:
-      let last_dir = &"{opt.tmp_dir}{iter-1}{os.DirSep}"
-      let last_fasta_dir = &"{last_dir}fasta{os.DirSep}"
+    iterTimes.add(getTime())
+    var lastCorrection : Table[int,int]
+    for iter in 1..opt.maxIterations:
+      let lastDir = &"{opt.tmpDir}{iter-1}{os.DirSep}"
+      let lastFastaDir = &"{lastDir}fasta{os.DirSep}"
 
-      # let cur_dir = &"{opt.tmp_dir}{iter}/"
+      # let cur_dir = &"{opt.tmpDir}{iter}/"
 
-      var last_consensus : string
+      var lastConsensus : string
       if opt.intermediates:
-        last_consensus = &"{opt.output_dir}conduit_consensuses_iter{iter-1}.fa"
+        lastConsensus = &"{opt.outputDir}conduit_consensuses_iter{iter-1}.fa"
       else:
-        last_consensus = &"{opt.tmp_dir}conduit_consensuses_iter{iter-1}.fa"
+        lastConsensus = &"{opt.tmpDir}conduit_consensuses_iter{iter-1}.fa"
 
-      removeFile(last_consensus)
-      combineFilesIntermediate(last_fasta_dir,opt.trims,last_consensus,last_correction)
+      removeFile(lastConsensus)
+      combineFilesIntermediate(lastFastaDir,opt.trims,lastConsensus,lastCorrection)
 
-      let index_prefix = &"{last_dir}bowtie2_index"
-      echo execProcess("bowtie2-build", args =["--threads",&"{opt.thread_num}", last_consensus, index_prefix],options={poUsePath})
+      let indexPrefix = &"{lastDir}bowtie2_index"
+      echo execProcess("bowtie2-build", args =["--threads",&"{opt.threadNum}", lastConsensus, indexPrefix],options={poUsePath})
       
-      removeFile(last_consensus)
+      removeFile(lastConsensus)
       if opt.intermediates:
-        combineFilesFinal(opt.tmp_dir,iter-1,opt.trims,last_consensus,last_correction)
+        combineFilesFinal(opt.tmpDir,iter-1,opt.trims,lastConsensus,lastCorrection)
       
-      let sam = &"{last_dir}alignments.sam"
-      let arguments = getBowtie2options(opt,index_prefix,sam)
+      let sam = &"{lastDir}alignments.sam"
+      let arguments = getBowtie2options(opt,indexPrefix,sam)
       echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
-      let bam = &"{last_dir}alignments.bam"
-      # echo execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath})
-      echo execProcess("samtools", args=["sort", "-@", &"{opt.thread_num}", "-o", bam, "-m", opt.samtools_memory, sam], options={poUsePath,poStdErrToStdOut})
+      let bam = &"{lastDir}alignments.bam"
+      # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}", options={poEvalCommand,poUsePath})
+      echo execProcess("samtools", args=["sort", "-@", &"{opt.threadNum}", "-o", bam, "-m", opt.samtoolsMemory, sam], options={poUsePath,poStdErrToStdOut})
       echo execProcess("samtools", args=["index", bam],options={poUsePath,poStdErrToStdOut})
       
-      removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
+      removeFiles([sam, &"{indexPrefix}.1.bt2", &"{indexPrefix}.2.bt2", &"{indexPrefix}.3.bt2", &"{indexPrefix}.4.bt2", &"{indexPrefix}.rev.1.bt2", &"{indexPrefix}.rev.2.bt2"])
 
-      let p = tps.newThreadPool(int(opt.thread_num))
+      let p = tps.newThreadPool(int(opt.threadNum))
       var converged = newSeq[tps.FlowVar[bool]](opt.trims.len)
       for i,trim in opt.trims:
-        if i in last_correction:
+        if i in lastCorrection:
           converged[i] = p.spawn returnFalse()
           continue
-        converged[i] = p.spawn runGraphBasedIlluminaCorrection((opt.tmp_dir,trim,opt.score_matrix_path,iter,uint16(opt.isoform_delta),uint16(opt.ends_delta)))
+        converged[i] = p.spawn runGraphBasedIlluminaCorrection((opt.tmpDir,trim,opt.scoreMatrixPath,iter,uint16(opt.isoformDelta),uint16(opt.endsDelta)))
       p.sync()
 
       for i,converge in converged:
         if converge.read():
-          last_correction[i] = int(iter)
+          lastCorrection[i] = int(iter)
 
       removeFiles([bam, &"{bam}.bai"])
-      iter_times.add(getTime())
-    if opt.final_polish:
-      let iter = opt.max_iterations + 1
-      let last_dir = &"{opt.tmp_dir}{iter-1}{os.DirSep}"
-      let last_fasta_dir = &"{last_dir}fasta{os.DirSep}"
+      iterTimes.add(getTime())
+    if opt.finalPolish:
+      let iter = opt.maxIterations + 1
+      let lastDir = &"{opt.tmpDir}{iter-1}{os.DirSep}"
+      # let lastFastaDir = &"{lastDir}fasta{os.DirSep}"
       
-      var last_consensus = ""
+      var lastConsensus = ""
       if opt.intermediates:
-        last_consensus = &"{opt.output_dir}conduit_consensuses_iter{iter-1}.fa"
+        lastConsensus = &"{opt.outputDir}conduit_consensuses_iter{iter-1}.fa"
       else:
-        last_consensus = &"{opt.tmp_dir}conduit_consensuses_iter{iter-1}.fa"
-      removeFile(last_consensus)
-      combineFilesFinal(opt.tmp_dir, iter-1, opt.trims, last_consensus, last_correction)
+        lastConsensus = &"{opt.tmpDir}conduit_consensuses_iter{iter-1}.fa"
+      removeFile(lastConsensus)
+      combineFilesFinal(opt.tmpDir, iter-1, opt.trims, lastConsensus, lastCorrection)
 
-      let index_prefix = &"{last_dir}bowtie2_index"
-      echo execProcess("bowtie2-build", args =["--threads",&"{opt.thread_num}", last_consensus, index_prefix],options={poUsePath})
+      let indexPrefix = &"{lastDir}bowtie2_index"
+      echo execProcess("bowtie2-build", args =["--threads",&"{opt.threadNum}", lastConsensus, indexPrefix],options={poUsePath})
       
       if not opt.intermediates:
-        removeFile(last_consensus)
+        removeFile(lastConsensus)
 
-      let sam = &"{last_dir}alignments.sam"
-      let arguments = getBowtie2options(opt,index_prefix,sam,final_polish = true)
+      let sam = &"{lastDir}alignments.sam"
+      let arguments = getBowtie2options(opt,indexPrefix,sam,finalPolish = true)
       echo execProcess("bowtie2", args = arguments, options={poUsePath,poStdErrToStdOut})
       
-      let bam = &"{last_dir}alignments.bam"
-      # echo execProcess(&"samtools sort -@ {opt.thread_num} {sam} > {bam}", options={poEvalCommand,poUsePath})
-      echo execProcess("samtools", args=["sort", "-@", &"{opt.thread_num}", "-o", bam, "-m", opt.samtools_memory, sam], options={poUsePath,poStdErrToStdOut})
+      let bam = &"{lastDir}alignments.bam"
+      # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}", options={poEvalCommand,poUsePath})
+      echo execProcess("samtools", args=["sort", "-@", &"{opt.threadNum}", "-o", bam, "-m", opt.samtoolsMemory, sam], options={poUsePath,poStdErrToStdOut})
       echo execProcess("samtools", args=["index", bam],options={poUsePath,poStdErrToStdOut})
       
-      removeFiles([sam, &"{index_prefix}.1.bt2", &"{index_prefix}.2.bt2", &"{index_prefix}.3.bt2", &"{index_prefix}.4.bt2", &"{index_prefix}.rev.1.bt2", &"{index_prefix}.rev.2.bt2"])
+      removeFiles([sam, &"{indexPrefix}.1.bt2", &"{indexPrefix}.2.bt2", &"{indexPrefix}.3.bt2", &"{indexPrefix}.4.bt2", &"{indexPrefix}.rev.1.bt2", &"{indexPrefix}.rev.2.bt2"])
 
-      let p = tps.newThreadPool(int(opt.thread_num))
+      let p = tps.newThreadPool(int(opt.threadNum))
       for i,trim in opt.trims:
-        var converged_iter = iter - 1
-        if i in last_correction:
-          converged_iter = uint64(last_correction[i])
-        p.spawn runLinearBasedIlluminaCorrection((opt.tmp_dir,trim,converged_iter,iter,uint16(opt.isoform_delta),opt.stringent,opt.stringent_tolerance))
+        var convergedIter = iter - 1
+        if i in lastCorrection:
+          convergedIter = uint64(lastCorrection[i])
+        p.spawn runLinearBasedIlluminaCorrection((opt.tmpDir,trim,convergedIter,iter,uint16(opt.isoformDelta),opt.stringent,opt.stringentTolerance))
       p.sync()
 
       removeFiles([bam, &"{bam}.bai"])
-      # removeDir(last_fasta_dir)
+      # removeDir(lastFastaDir)
     
-      let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
-      if fileExists(final_consensus_path):
-        removeFile(final_consensus_path)
-      var final_fasta_dir = &"{opt.tmp_dir}{directory_number}{os.DirSep}fasta{os.DirSep}"
+      let finalConsensusPath = &"{opt.outputDir}conduit_final_consensuses.fa"
+      if fileExists(finalConsensusPath):
+        removeFile(finalConsensusPath)
+      var finalFastaDir = &"{opt.tmpDir}{directoryNumber}{os.DirSep}fasta{os.DirSep}"
 
-      combineFiles(final_fasta_dir, opt.trims, final_consensus_path)
+      combineFiles(finalFastaDir, opt.trims, finalConsensusPath)
     else:
-      let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
-      if fileExists(final_consensus_path):
-        removeFile(final_consensus_path)
+      let finalConsensusPath = &"{opt.outputDir}conduit_final_consensuses.fa"
+      if fileExists(finalConsensusPath):
+        removeFile(finalConsensusPath)
 
-      combineFilesFinal(opt.tmp_dir, directory_number, opt.trims, final_consensus_path, last_correction)
+      combineFilesFinal(opt.tmpDir, directoryNumber, opt.trims, finalConsensusPath, lastCorrection)
 
     
-    if not tmp_already_existed:
-      removeDir(opt.tmp_dir)
-    iter_times.add(getTime())
-    outputTiming(&"{opt.output_dir}CONDUIT.timing", iter_times, opt)
+    if not tmpAlreadyExisted:
+      removeDir(opt.tmpDir)
+    iterTimes.add(getTime())
+    outputTiming(&"{opt.outputDir}CONDUIT.timing", iterTimes, opt)
   
 main()

@@ -94,7 +94,8 @@ LPOSequence_T *buildup_lpo(LPOSequence_T *new_seq,
 			   int use_aggressive_fusion,
                            int use_global_alignment)
 {
-  int i,max_alloc=0,total_alloc;
+  int i,total_alloc;
+  unsigned long max_alloc=0;
   LPOLetterRef_T *al1=NULL,*al2=NULL;
 
   lpo_index_symbols(new_seq,score_matrix); /* MAKE SURE LPO IS TRANSLATED */
@@ -106,7 +107,7 @@ LPOSequence_T *buildup_lpo(LPOSequence_T *new_seq,
     if (total_alloc>max_alloc) { /* DP RECTANGLE ARRAY SIZE */
       max_alloc=total_alloc;
       if (max_alloc>POA_MAX_ALLOC) {
-	WARN_MSG(TRAP,(ERRTXT,"Exceeded memory bound: %d\n Exiting!\n\n",max_alloc),"$Revision: 1.2.2.9 $");
+	WARN_MSG(TRAP,(ERRTXT,"Exceeded memory bound: %lu\n Exiting!\n\n",max_alloc),"$Revision: 1.2.2.9 $");
 	break; /* JUST RETURN AND FINISH */
       }
     }
@@ -209,7 +210,8 @@ LPOSequence_T *buildup_clipped_lpo(LPOSequence_T *new_seq,
                                    int use_global_alignment)
 {
   int i,ntemp,offset=0,nidentity,length_max=0,match_length=0;
-  int total_alloc,max_alloc=0;
+  int total_alloc;
+  unsigned long max_alloc=0;
   LPOLetterRef_T *al1=NULL,*al2=NULL;
   LPOLetter_T *temp;
   float identity_max=0.,f;
@@ -223,7 +225,7 @@ LPOSequence_T *buildup_clipped_lpo(LPOSequence_T *new_seq,
     if (total_alloc>max_alloc) { /* DP RECTANGLE ARRAY SIZE */
       max_alloc=total_alloc;
       if (max_alloc>POA_MAX_ALLOC) {
-	WARN_MSG(TRAP,(ERRTXT,"Exceeded memory bound: %d\n Exiting!\n\n",max_alloc),"$Revision: 1.2.2.9 $");
+	WARN_MSG(TRAP,(ERRTXT,"Exceeded memory bound: %lu\n Exiting!\n\n",max_alloc),"$Revision: 1.2.2.9 $");
 	break; /* JUST RETURN AND FINISH */
       }
     }
@@ -403,7 +405,8 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
                                        int use_global_alignment,
 				       int preserve_sequence_order)
 {
-  int i,j,k,max_alloc=0,total_alloc,min_counts=0;
+  int i,j,k,total_alloc,min_counts=0;
+  unsigned long max_alloc=0;
   SeqPairScore_T *score=NULL;
   LPOSequence_T *new_seq=NULL;
   FILE *ifile=NULL;
@@ -479,7 +482,7 @@ LPOSequence_T *buildup_progressive_lpo(int nseq,LPOSequence_T **all_seqs,
     if (total_alloc>max_alloc) { /* DP RECTANGLE ARRAY SIZE */
       max_alloc=total_alloc;
       if (max_alloc>POA_MAX_ALLOC) {
-	WARN_MSG(TRAP,(ERRTXT,"Exceeded memory bound: %d\n Exiting!\n\n",max_alloc),"$Revision: 1.2.2.9 $");
+	WARN_MSG(TRAP,(ERRTXT,"Exceeded memory bound: %lu\n Exiting!\n\n",max_alloc),"$Revision: 1.2.2.9 $");
 	break; /* JUST RETURN AND FINISH */
       }
     }

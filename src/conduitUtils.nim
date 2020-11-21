@@ -5,7 +5,6 @@ import strutils
 import strformat
 import tables
 import sets
-import poGraphUtils
 import algorithm
 import fasta
 import fastq
@@ -13,41 +12,41 @@ import na
 
 type
   BLASTmatch* = object
-    query_name* : string
-    query_len* : uint
-    match_names* : seq[string]
-    match_lens* : seq[uint]
+    queryName* : string
+    queryLen* : uint
+    matchNames* : seq[string]
+    matchLens* : seq[uint]
     scores* : seq[seq[float]]
     evals* : seq[seq[float]]
-    identities_numerators* : seq[seq[uint]]
-    identities_denominators* : seq[seq[uint]]
-    identities_percentages* : seq[seq[float]]
-    positives_numerators* : seq[seq[uint]]
-    positives_denominators* : seq[seq[uint]]
-    positives_percentages* : seq[seq[float]]
-    gap_numerators* : seq[seq[uint]]
-    gap_denominators* : seq[seq[uint]]
-    gap_percentages* : seq[seq[float]]
-    query_seqs* : seq[seq[string]]
-    conss_seqs* : seq[seq[string]]
-    sbjct_seqs* : seq[seq[string]]
+    identitiesNumerators* : seq[seq[uint]]
+    identitiesDenominators* : seq[seq[uint]]
+    identitiesPercentages* : seq[seq[float]]
+    positivesNumerators* : seq[seq[uint]]
+    positivesDenominators* : seq[seq[uint]]
+    positivesPercentages* : seq[seq[float]]
+    gapNumerators* : seq[seq[uint]]
+    gapDenominators* : seq[seq[uint]]
+    gapPercentages* : seq[seq[float]]
+    querySeqs* : seq[seq[string]]
+    conssSeqs* : seq[seq[string]]
+    sbjctSeqs* : seq[seq[string]]
   
   UtilOptions = object
     mode : string
-    run_flag : bool
+    runFlag : bool
     infilepath : string
     outfilepath : string
-    reference_infilepath : string
-    reference_infilepath2 : string
-    min_length : uint64
+    referenceInfilepath : string
+    referenceInfilepath2 : string
+    minLength : uint64
     fastq : bool
     stranded : bool
   
   GTFTranscript* = object
     chr* : string
     strand* : char
-    start_idx* : uint64
-    end_idx* : uint64
+    startIdx* : uint64
+    endIdx* : uint64
     introns* : seq[(uint64,uint64)]
 
 
@@ -253,54 +252,54 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
   var infile : File
   discard open(infile,infilepath,fmRead)
   # Discard the header / citation info
-  var query_line : string
-  var first_iter1 = true
+  var queryLine : string
+  var firstIter1 = true
   while true:
-    query_line = infile.readLine()
-    if query_line.len >= 7:
-      if query_line[0..6] == "Query= ":
+    queryLine = infile.readLine()
+    if queryLine.len >= 7:
+      if queryLine[0..6] == "Query= ":
         break
   while true:
     try:
-      if not first_iter1:
-        query_line = infile.readLine() # Query= cluster_10_0 <unknown description>
+      if not firstIter1:
+        queryLine = infile.readLine() # Query= cluster_10_0 <unknown description>
       else:
-        first_iter1 = false
-      # echo query_line
-      if query_line[0..11] == "  Database: ":
+        firstIter1 = false
+      # echo queryLine
+      if queryLine[0..11] == "  Database: ":
         break
-      assert query_line[0..6] == "Query= "
-      var query_name = query_line[7..^1]
+      assert queryLine[0..6] == "Query= "
+      var queryName = queryLine[7..^1]
       while true:
         let next = infile.readLine() # ""
         if next == "":
           break
         else:
-          query_name = query_name & next
+          queryName = queryName & next
 
-      var match_names : seq[string]
-      var match_lens  : seq[uint]
+      var matchNames : seq[string]
+      var matchLens  : seq[uint]
       var evals : seq[seq[float]]
       var scores : seq[seq[float]]
-      var identities_numerators : seq[seq[uint]]
-      var identities_denominators : seq[seq[uint]]
-      var identities_percentages : seq[seq[float]]
-      var positives_numerators : seq[seq[uint]]
-      var positives_denominators : seq[seq[uint]]
-      var positives_percentages : seq[seq[float]]
-      var gap_numerators : seq[seq[uint]]
-      var gap_denominators : seq[seq[uint]]
-      var gap_percentages : seq[seq[float]]
-      var query_seqs : seq[seq[string]]
-      var conss_seqs : seq[seq[string]]
-      var sbjct_seqs : seq[seq[string]]
+      var identitiesNumerators : seq[seq[uint]]
+      var identitiesDenominators : seq[seq[uint]]
+      var identitiesPercentages : seq[seq[float]]
+      var positivesNumerators : seq[seq[uint]]
+      var positivesDenominators : seq[seq[uint]]
+      var positivesPercentages : seq[seq[float]]
+      var gapNumerators : seq[seq[uint]]
+      var gapDenominators : seq[seq[uint]]
+      var gapPercentages : seq[seq[float]]
+      var querySeqs : seq[seq[string]]
+      var conssSeqs : seq[seq[string]]
+      var sbjctSeqs : seq[seq[string]]
       
 
-      let query_length_line = infile.readLine() # "Length=229"
-      # echo query_length_line
-      assert query_length_line[0..6] == "Length="
-      let query_length = parseUInt(query_length_line[7..^1])
-      # echo query_length
+      let queryLengthLine = infile.readLine() # "Length=229"
+      # echo queryLengthLine
+      assert queryLengthLine[0..6] == "Length="
+      let queryLength = parseUInt(queryLengthLine[7..^1])
+      # echo queryLength
       let splitline = infile.readLine()
       if splitline == "":
         # No significant alignments here
@@ -313,20 +312,20 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
         assert infile.readLine() == "Sequences producing significant alignments:                          (Bits)     Value"
         discard infile.readLine() # ""
         var nextline : string
-        var num_seqs = 0
+        var numSeqs = 0
         while true:
           nextline =  infile.readLine()
           if nextline.len == 0:
             continue
           if nextline[0] == '>':
             break
-          num_seqs += 1
-        # echo num_seqs
-        for i in 0..<num_seqs:
+          numSeqs += 1
+        # echo numSeqs
+        for i in 0..<numSeqs:
           # echo "seq num: ", i
           # echo nextline
-          var match_name = nextline[2..^1]
-          var first_iter = true
+          var matchName = nextline[2..^1]
+          var firstIter = true
           while true:
             if nextline.len == 0:
               nextline = infile.readLine()
@@ -335,30 +334,30 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
             if nextline.len >= 7:
               if nextline[0..6] == "Length=":
                 break
-            if first_iter:
-              first_iter = false
+            if firstIter:
+              firstIter = false
             else:
-              match_name = match_name & nextline
+              matchName = matchName & nextline
             nextline = infile.readLine()
-          match_names.add(match_name)
-          # echo "match name - ", match_name
-          let match_length = parseUInt(nextline[7..^1])
-          # echo "match len - ", match_length
-          match_lens.add(match_length)
-          var scores_for_match : seq[float]
-          var evals_for_match : seq[float]
-          var ids_numerators_for_match : seq[uint]
-          var ids_denominators_for_match : seq[uint]
-          var ids_percentages_for_match : seq[float]
-          var pos_numerators_for_match : seq[uint]
-          var pos_denominators_for_match : seq[uint]
-          var pos_percentages_for_match : seq[float]
-          var gap_numerators_for_match : seq[uint]
-          var gap_denominators_for_match : seq[uint]
-          var gap_percentages_for_match : seq[float]
-          var query_seqs_for_match : seq[string]
-          var conss_seqs_for_match : seq[string]
-          var sbjct_seqs_for_match : seq[string]
+          matchNames.add(matchName)
+          # echo "match name - ", matchName
+          let matchLength = parseUInt(nextline[7..^1])
+          # echo "match len - ", matchLength
+          matchLens.add(matchLength)
+          var scoresForMatch : seq[float]
+          var evalsForMatch : seq[float]
+          var idsNumeratorsForMatch : seq[uint]
+          var idsDenominatorsForMatch : seq[uint]
+          var idsPercentagesForMatch : seq[float]
+          var posNumeratorsForMatch : seq[uint]
+          var posDenominatorsForMatch : seq[uint]
+          var posPercentagesForMatch : seq[float]
+          var gapNumeratorsForMatch : seq[uint]
+          var gapDenominatorsForMatch : seq[uint]
+          var gapPercentagesForMatch : seq[float]
+          var querySeqsForMatch : seq[string]
+          var conssSeqsForMatch : seq[string]
+          var sbjctSeqsForMatch : seq[string]
           discard infile.readLine()
           while true:
             nextline = infile.readLine().strip()
@@ -368,51 +367,51 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
               var fields0 = nextline.split(seps={','})
               var fields1 = fields0[0].splitWhitespace()
               let score = parseFloat(fields1[2])
-              scores_for_match.add(score)
+              scoresForMatch.add(score)
               fields1 = fields0[1].strip().splitWhitespace()
               let evalue = parseFloat(fields1[2])
-              evals_for_match.add(evalue)
+              evalsForMatch.add(evalue)
               fields1 = fields0[2].strip().split(seps={':'})
-              let blast_method = fields1[1].strip()
+              # let blastMethod = fields1[1].strip()
               nextline = infile.readLine().strip()
               fields0 = nextline.split(seps={','})
               fields1 = fields0[0].strip().splitWhitespace()
               var fields2 = fields1[2].strip().split(seps={'/'})
-              let ids_numerator = parseUInt(fields2[0])
-              let ids_denominator = parseUInt(fields2[1])
-              let ids_percentage = 100.0 * float(ids_numerator) / float(ids_denominator)
+              let idsNumerator = parseUInt(fields2[0])
+              let idsDenominator = parseUInt(fields2[1])
+              let idsPercentage = 100.0 * float(idsNumerator) / float(idsDenominator)
               
-              ids_numerators_for_match.add(ids_numerator)
-              ids_denominators_for_match.add(ids_denominator)
-              ids_percentages_for_match.add(ids_percentage)
+              idsNumeratorsForMatch.add(idsNumerator)
+              idsDenominatorsForMatch.add(idsDenominator)
+              idsPercentagesForMatch.add(idsPercentage)
 
               fields1 = fields0[1].strip().splitWhitespace()
               fields2 = fields1[2].strip().split(seps={'/'})
-              let pos_numerator = parseUInt(fields2[0])
-              let pos_denominator = parseUInt(fields2[1])
-              let pos_percentage = 100.0 * float(pos_numerator) / float(pos_denominator)
+              let posNumerator = parseUInt(fields2[0])
+              let posDenominator = parseUInt(fields2[1])
+              let posPercentage = 100.0 * float(posNumerator) / float(posDenominator)
 
-              pos_numerators_for_match.add(pos_numerator)
-              pos_denominators_for_match.add(pos_denominator)
-              pos_percentages_for_match.add(pos_percentage)
+              posNumeratorsForMatch.add(posNumerator)
+              posDenominatorsForMatch.add(posDenominator)
+              posPercentagesForMatch.add(posPercentage)
 
               fields1 = fields0[2].strip().splitWhitespace()
               fields2 = fields1[2].strip().split(seps={'/'})
-              let gap_numerator = parseUInt(fields2[0])
-              let gap_denominator = parseUInt(fields2[1])
-              let gap_percentage = 100.0 * float(gap_numerator) / float(gap_denominator)
+              let gapNumerator = parseUInt(fields2[0])
+              let gapDenominator = parseUInt(fields2[1])
+              let gapPercentage = 100.0 * float(gapNumerator) / float(gapDenominator)
 
-              gap_numerators_for_match.add(gap_numerator)
-              gap_denominators_for_match.add(gap_denominator)
-              gap_percentages_for_match.add(gap_percentage)
+              gapNumeratorsForMatch.add(gapNumerator)
+              gapDenominatorsForMatch.add(gapDenominator)
+              gapPercentagesForMatch.add(gapPercentage)
 
               discard infile.readLine() # ""
-              var query_seq : string
-              var sbjct_seq : string
-              var conss_seq : string
-              var query_start_idx : uint
-              var sbjct_start_idx : uint
-              var first_iter = true
+              var querySeq : string
+              var sbjctSeq : string
+              var conssSeq : string
+              var queryStartIdx : uint
+              var sbjctStartIdx : uint
+              var firstIter = true
               while true:
                 nextline = infile.readLine()
                 if nextline == "":
@@ -422,46 +421,46 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
                 let sbjctline = infile.readLine()
                 discard infile.readLine()
                 let queryfields = queryline.strip().splitWhitespace()
-                let conss_subseq = consensusline[12..^1] # Have to do it this way because sometimes there'll be a space at the beginning
+                let conssSubseq = consensusline[12..^1] # Have to do it this way because sometimes there'll be a space at the beginning
                 let sbjctfields = sbjctline.strip().splitWhitespace()
                 # echo queryfields
-                if first_iter:
-                  first_iter = false
-                  query_start_idx = parseUInt(queryfields[1])
-                  sbjct_start_idx = parseUInt(sbjctfields[1])
-                let query_subseq = queryfields[2]
-                let sbjct_subseq = sbjctfields[2]
-                query_seq = query_seq & query_subseq
-                conss_seq = conss_seq & conss_subseq
-                sbjct_seq = sbjct_seq & sbjct_subseq
-              # echo query_seq
-              # echo conss_seq
-              # echo sbjct_seq
-              query_seqs_for_match.add(query_seq)
-              conss_seqs_for_match.add(conss_seq)
-              sbjct_seqs_for_match.add(sbjct_seq)
+                if firstIter:
+                  firstIter = false
+                  queryStartIdx = parseUInt(queryfields[1])
+                  sbjctStartIdx = parseUInt(sbjctfields[1])
+                let querySubseq = queryfields[2]
+                let sbjctSubseq = sbjctfields[2]
+                querySeq = querySeq & querySubseq
+                conssSeq = conssSeq & conssSubseq
+                sbjctSeq = sbjctSeq & sbjctSubseq
+              # echo querySeq
+              # echo conssSeq
+              # echo sbjctSeq
+              querySeqsForMatch.add(querySeq)
+              conssSeqsForMatch.add(conssSeq)
+              sbjctSeqsForMatch.add(sbjctSeq)
               # nextline = infile.readLine()
             else:
               break
           
-          evals.add(evals_for_match)
-          scores.add(scores_for_match)
+          evals.add(evalsForMatch)
+          scores.add(scoresForMatch)
 
-          identities_numerators.add(ids_numerators_for_match)
-          identities_denominators.add(ids_denominators_for_match)
-          identities_percentages.add(ids_percentages_for_match)
+          identitiesNumerators.add(idsNumeratorsForMatch)
+          identitiesDenominators.add(idsDenominatorsForMatch)
+          identitiesPercentages.add(idsPercentagesForMatch)
 
-          positives_numerators.add(pos_numerators_for_match)
-          positives_denominators.add(pos_denominators_for_match)
-          positives_percentages.add(pos_percentages_for_match)
+          positivesNumerators.add(posNumeratorsForMatch)
+          positivesDenominators.add(posDenominatorsForMatch)
+          positivesPercentages.add(posPercentagesForMatch)
 
-          gap_numerators.add(gap_numerators_for_match)
-          gap_denominators.add(gap_denominators_for_match)
-          gap_percentages.add(gap_percentages_for_match)
+          gapNumerators.add(gapNumeratorsForMatch)
+          gapDenominators.add(gapDenominatorsForMatch)
+          gapPercentages.add(gapPercentagesForMatch)
 
-          query_seqs.add(query_seqs_for_match)
-          conss_seqs.add(conss_seqs_for_match)
-          sbjct_seqs.add(sbjct_seqs_for_match)
+          querySeqs.add(querySeqsForMatch)
+          conssSeqs.add(conssSeqsForMatch)
+          sbjctSeqs.add(sbjctSeqsForMatch)
         # assert nextline == ""
       else:
         echo "ERROR PARSING BLASTP OUTPUT"
@@ -480,31 +479,31 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
       discard infile.readLine() # "Effective search space used: 318188442"
       discard infile.readLine() # ""
       discard infile.readLine() # ""
-      result.add(BLASTmatch( query_name : query_name,
-                             query_len : query_length,
-                             match_names : match_names,
-                             match_lens : match_lens,
+      result.add(BLASTmatch( queryName : queryName,
+                             queryLen : queryLength,
+                             matchNames : matchNames,
+                             matchLens : matchLens,
                              evals : evals,
                              scores : scores,
-                             query_seqs : query_seqs,
-                             conss_seqs : conss_seqs,
-                             sbjct_seqs : sbjct_seqs,
-                             identities_numerators : identities_numerators,
-                             identities_denominators : identities_denominators,
-                             identities_percentages : identities_percentages,
-                             positives_numerators : positives_numerators,
-                             positives_denominators : positives_denominators,
-                             positives_percentages : positives_percentages,
-                             gap_numerators : gap_numerators,
-                             gap_denominators : gap_denominators,
-                             gap_percentages : gap_percentages ))
+                             querySeqs : querySeqs,
+                             conssSeqs : conssSeqs,
+                             sbjctSeqs : sbjctSeqs,
+                             identitiesNumerators : identitiesNumerators,
+                             identitiesDenominators : identitiesDenominators,
+                             identitiesPercentages : identitiesPercentages,
+                             positivesNumerators : positivesNumerators,
+                             positivesDenominators : positivesDenominators,
+                             positivesPercentages : positivesPercentages,
+                             gapNumerators : gapNumerators,
+                             gapDenominators : gapDenominators,
+                             gapPercentages : gapPercentages ))
     except EOFError:
       break
   infile.close()
 
 
 proc translateORF*(nts : string,to_stop = true) : string =
-  let translation_table = { "TTT" : 'F',
+  let translationTable = { "TTT" : 'F',
                             "TTC" : 'F',
                             "TTA" : 'L',
                             "TTG" : 'L',
@@ -571,7 +570,7 @@ proc translateORF*(nts : string,to_stop = true) : string =
   var translation : seq[char]
   # assert nts.len mod 3 == 0
   for i in 0..<(nts.len div 3):
-    let aa = translation_table[nts[i*3..((i+1)*3) - 1]]
+    let aa = translationTable[nts[i*3..((i+1)*3) - 1]]
     if aa == '*':
       result = translation.join("")
       break
@@ -590,9 +589,9 @@ proc findAll*(s,sub : string) : seq[int] =
 
 
 proc translateTranscript*(nts : string) : string =
-  let start_codon_indices = findAll(nts,"ATG")
+  let startCodonIndices = findAll(nts,"ATG")
   result = ""
-  for start_codon_index in start_codon_indices:
+  for start_codon_index in startCodonIndices:
     let translation = translateORF(nts[start_codon_index..^1])
     if translation.len > result.len:
       result = translation
@@ -616,7 +615,7 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
       else:
         translation = translation2
     if translation.len >= threshold:
-      outfile.write(&">{transcript.read_id}\n")
+      outfile.write(&">{transcript.readId}\n")
       for i in 0..<(translation.len div wrap_len):
         outfile.write(&"{translation[i*wrap_len..(i+1)*wrap_len - 1]}\n")
       if translation.len mod wrap_len != 0 :
@@ -638,33 +637,33 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
       let bedline = infile.readLine()
       let bedfields = bedline.split(sep='\t')
       let chr = bedfields[0]
-      let start_idx = parseUInt(bedfields[1]) + 1'u
-      let end_idx = parseUInt(bedfields[2])
+      let startIdx = parseUInt(bedfields[1]) + 1'u
+      let endIdx = parseUInt(bedfields[2])
       let txid = bedfields[3]
       let strand = bedfields[5]
       if stranded:
-        outfile.write(&"{chr}\tBLANK\ttranscript\t{start_idx}\t{end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\";\n")
+        outfile.write(&"{chr}\tBLANK\ttranscript\t{startIdx}\t{endIdx}\t.\t{strand}\t.\ttranscript_id \"{txid}\";\n")
       else:
-        outfile.write(&"{chr}\tBLANK\ttranscript\t{start_idx}\t{end_idx}\t.\t.\t.\ttranscript_id \"{txid}\";\n")
-      let block_sizes = bedfields[10].split(sep=',')
-      let block_starts= bedfields[11].split(sep=',')
+        outfile.write(&"{chr}\tBLANK\ttranscript\t{startIdx}\t{endIdx}\t.\t.\t.\ttranscript_id \"{txid}\";\n")
+      let blockSizes = bedfields[10].split(sep=',')
+      let blockStarts= bedfields[11].split(sep=',')
 
       # var exon_count = 1
-      # var reverse_exon_count = block_starts.len
-      for i in 0..<block_starts.len:
-        var new_start_idx, new_end_idx, exon_number : uint
+      # var reverse_exon_count = blockStarts.len
+      for i in 0..<blockStarts.len:
+        var newStartIdx, newEndIdx, exonNumber : uint
         if strand == "+" or not stranded:
-          new_start_idx = start_idx + parseUInt(block_starts[i])
-          new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
-          exon_number = uint(i + 1)
+          newStartIdx = startIdx + parseUInt(blockStarts[i])
+          newEndIdx = startIdx + parseUInt(blockStarts[i]) + parseUInt(blockSizes[i]) - 1
+          exonNumber = uint(i + 1)
         elif strand == "-":
-          new_start_idx = start_idx + parseUInt(block_starts[i])
-          new_end_idx = start_idx + parseUInt(block_starts[i]) + parseUInt(block_sizes[i]) - 1
-          exon_number = uint(block_starts.len - i)
+          newStartIdx = startIdx + parseUInt(blockStarts[i])
+          newEndIdx = startIdx + parseUInt(blockStarts[i]) + parseUInt(blockSizes[i]) - 1
+          exonNumber = uint(blockStarts.len - i)
         if stranded:
-          outfile.write(&"{chr}\tBLANK\texon\t{new_start_idx}\t{new_end_idx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
+          outfile.write(&"{chr}\tBLANK\texon\t{newStartIdx}\t{newEndIdx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exonNumber \"{exonNumber}\"\n")
         else:
-          outfile.write(&"{chr}\tBLANK\texon\t{new_start_idx}\t{new_end_idx}\t.\t.\t.\ttranscript_id \"{txid}\"; exon_number \"{exon_number}\"\n")
+          outfile.write(&"{chr}\tBLANK\texon\t{newStartIdx}\t{newEndIdx}\t.\t.\t.\ttranscript_id \"{txid}\"; exonNumber \"{exonNumber}\"\n")
   except EOFError:
     discard
   infile.close()
@@ -686,7 +685,7 @@ proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : strin
       stranded = upper
     else:
       stranded = rev
-    outfile.write(&">{transcript.read_id}\n")
+    outfile.write(&">{transcript.readId}\n")
     for i in 0..<(stranded.len div wrap_len):
       outfile.write(&"{stranded[i*wrap_len..(i+1)*wrap_len - 1]}\n")
     if stranded.len mod wrap_len != 0 :
@@ -698,22 +697,22 @@ proc strandTranscripts*(transcripts : openArray[FastqRecord],outfilepath : strin
   translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,wrap_len)
 
 
-proc compareExactTranslations*(reference_infilepath : string, translation_infilepath : string) =
-  var r_infile, t_infile : File
-  discard open(r_infile,reference_infilepath,fmRead)
-  discard open(t_infile,translation_infilepath,fmRead)
-  let r_records = parseFasta(r_infile)
-  r_infile.close()
-  let t_records = parseFasta(t_infile)
-  t_infile.close()
-  var r_proteins,t_proteins : HashSet[string]
-  for record in r_records:
-    r_proteins.incl(record.sequence)
-  for record in t_records:
-    t_proteins.incl(record.sequence)
-  let tp = intersection(r_proteins,t_proteins).len
-  let fp = difference(t_proteins,r_proteins).len
-  let fn = difference(r_proteins,t_proteins).len
+proc compareExactTranslations*(referenceInfilepath : string, translation_infilepath : string) =
+  var rInfile, tInfile : File
+  discard open(rInfile,referenceInfilepath,fmRead)
+  discard open(tInfile,translation_infilepath,fmRead)
+  let rRecords = parseFasta(rInfile)
+  rInfile.close()
+  let tRecords = parseFasta(tInfile)
+  tInfile.close()
+  var rProteins,tProteins : HashSet[string]
+  for record in rRecords:
+    rProteins.incl(record.sequence)
+  for record in tRecords:
+    tProteins.incl(record.sequence)
+  let tp = intersection(rProteins,tProteins).len
+  let fp = difference(tProteins,rProteins).len
+  let fn = difference(rProteins,tProteins).len
   echo "TP: ", tp
   echo "FP: ", fp
   echo "FN: ", fn
@@ -722,27 +721,27 @@ proc compareExactTranslations*(reference_infilepath : string, translation_infile
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
 
-proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath : string,) =
+proc compareBLASTPTranslations*(referenceInfilepath : string, blastp_infilepath : string,) =
   var fp,tp1 = 0
-  var reference_id_set : HashSet[string]
-  var match_set : HashSet[string]
-  var ref_infile : File
-  discard open(ref_infile,reference_infilepath,fmRead)
-  let reference_records = parseFasta(ref_infile)
-  ref_infile.close()
-  for record in reference_records:
-    reference_id_set.incl(record.read_id)
+  var referenceIdSet : HashSet[string]
+  var matchSet : HashSet[string]
+  var refInfile : File
+  discard open(refInfile,referenceInfilepath,fmRead)
+  let referenceRecords = parseFasta(refInfile)
+  refInfile.close()
+  for record in referenceRecords:
+    referenceIdSet.incl(record.readId)
   
-  let blast_records = parseBLASTPoutput(blastp_infilepath)
-  for record in blast_records:
-    if record.match_names.len > 0:
-      match_set.incl(record.match_names[0])
+  let blastRecords = parseBLASTPoutput(blastp_infilepath)
+  for record in blastRecords:
+    if record.matchNames.len > 0:
+      matchSet.incl(record.matchNames[0])
       tp1 += 1
     else:
       fp += 1
 
-  let tp2 = match_set.len
-  let fn = difference(reference_id_set,match_set).len
+  let tp2 = matchSet.len
+  let fn = difference(referenceIdSet,matchSet).len
 
   echo "TP1 - Total matches: ", tp1
   echo "TP2 - Match set len: ", tp2
@@ -763,19 +762,19 @@ proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) =
       let bedline = infile.readLine()
       let bedfields = bedline.split(sep='\t')
       let chr = bedfields[0]
-      let start_idx = parseUInt(bedfields[1])
-      let end_idx = parseUInt(bedfields[2])
+      let startIdx = parseUInt(bedfields[1])
+      # let endIdx = parseUInt(bedfields[2])
       let txid = bedfields[3]
       let strand = bedfields[5]
-      let block_sizes = bedfields[10].split(sep=',')
-      let block_starts= bedfields[11].split(sep=',')
+      let blockSizes = bedfields[10].split(sep=',')
+      let blockStarts= bedfields[11].split(sep=',')
 
       # var exon_count = 1
-      # var reverse_exon_count = block_starts.len
-      for i in 1..<block_starts.len:
-        let intron_start_idx = start_idx + parseUInt(block_starts[i-1]) + parseUInt(block_sizes[i-1])
-        let intron_end_idx = start_idx + parseUInt(block_starts[i])
-        outfile.write(&"{chr}\t{intron_start_idx}\t{intron_end_idx}\t{txid}\t.\t{strand}\n")
+      # var reverse_exon_count = blockStarts.len
+      for i in 1..<blockStarts.len:
+        let intronStartIdx = startIdx + parseUInt(blockStarts[i-1]) + parseUInt(blockSizes[i-1])
+        let intronEndIdx = startIdx + parseUInt(blockStarts[i])
+        outfile.write(&"{chr}\t{intronStartIdx}\t{intronEndIdx}\t{txid}\t.\t{strand}\n")
   except EOFError:
     discard
   infile.close()
@@ -818,38 +817,38 @@ proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string
       echo "WARNING - Very short intron detected"
     else:
       if record.sequence[0..1].toUpperAscii() != "GT" or record.sequence[^2..^1].toUpperAscii() != "AG":
-        outfile.writeLine(record.read_id)
+        outfile.writeLine(record.readId)
   outfile.close()
 
 
 proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1'u64,2'u64,5'u64,10'u64,20'u64,40'u64,80'u64,160'u64,320'u64,640'u64]) = 
   var infile : File
   discard open(infile,infilepath, fmRead)
-  let fasta_records = parseFasta(infile)
+  let fastaRecords = parseFasta(infile)
   infile.close()
-  var split_records : seq[seq[FastaRecord]]
+  var splitRecords : seq[seq[FastaRecord]]
   for i in 0..<bins.len:
-    split_records.add(@[])
-  for record in fasta_records:
-    let num_reads = uint64(parseUInt(record.read_id.split('_')[^1]))
+    splitRecords.add(@[])
+  for record in fastaRecords:
+    let numReads = uint64(parseUInt(record.readId.split('_')[^1]))
     var bin = -1
     for i in 0..<(bins.len - 1):
-      if num_reads >= bins[i] and num_reads < bins[i+1]:
+      if numReads >= bins[i] and numReads < bins[i+1]:
         bin = i
-    if num_reads >= bins[^1]:
+    if numReads >= bins[^1]:
       bin = bins.len - 1
     if bin != -1:
-      split_records[bin].add(record)
-  for i,split in split_records:
-    var bin_id = ""
+      splitRecords[bin].add(record)
+  for i,split in splitRecords:
+    var binId = ""
     if i == bins.len - 1:
-      bin_id = &"{bins[^1]}+"
+      binId = &"{bins[^1]}+"
     else:
-      bin_id = &"{bins[i]}-{bins[i+1] - 1}"
+      binId = &"{bins[i]}-{bins[i+1] - 1}"
     var outfile : File
-    discard open(outfile,&"{outfile_prefix}_{bin_id}.fa",fmWrite)
+    discard open(outfile,&"{outfile_prefix}_{binId}.fa",fmWrite)
     for record in split:
-      outfile.write(&">{record.read_id}\n")
+      outfile.write(&">{record.readId}\n")
       outfile.writeLine(record.sequence)
     outfile.close()
 
@@ -857,13 +856,13 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
 proc filterFASTAByReadCounts*(infilepath,outfilepath : string, filter : uint64 = 5'u64) =
   var infile,outfile : File
   discard open(infile,infilepath, fmRead)
-  let fasta_records = parseFasta(infile)
+  let fastaRecords = parseFasta(infile)
   infile.close()
   discard open(outfile,outfilepath,fmWrite)
-  for record in fasta_records:
-    let num_reads = uint64(parseUInt(record.read_id.split('_')[^1]))
-    if num_reads >= filter:
-      outfile.write(&">{record.read_id}\n")
+  for record in fastaRecords:
+    let numReads = uint64(parseUInt(record.readId.split('_')[^1]))
+    if numReads >= filter:
+      outfile.write(&">{record.readId}\n")
       outfile.writeLine(record.sequence)
   outfile.close()
 
@@ -877,16 +876,16 @@ proc parseAttributes(s : string) : Table[string,string] =
     result[key] = val
 
 
-proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string,threshold : uint = 5) =
-  var reference_infile,infile,outfile : File
-  discard open(reference_infile,reference_infilepath,fmRead)
+proc callNovelNonCanonical(referenceInfilepath, infilepath,outfilepath : string,threshold : uint = 5) =
+  var referenceInfile,infile,outfile : File
+  discard open(referenceInfile,referenceInfilepath,fmRead)
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
-  var reference_introns : HashSet[(string,uint64,uint64)]
-  var last_exons : Table[string,(string,uint64,uint64)]
+  var referenceIntrons : HashSet[(string,uint64,uint64)]
+  var lastExons : Table[string,(string,uint64,uint64)]
   try:
     while true:
-      let line = reference_infile.readLine()
+      let line = referenceInfile.readLine()
       if line.len == 0:
         continue
       elif line[0] == '#':
@@ -899,78 +898,78 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
         continue
       let attributes = parseAttributes(fields0[8])
       if "transcript_id" in attributes:
-        let new_chr = fields0[0]
-        let new_start_idx =  uint64(parseUInt(fields0[3])) - 1'u32
-        let new_end_idx = uint64(parseUInt(fields0[4]))
-        if attributes["transcript_id"] in last_exons:
-          let (chr, start_idx,end_idx)= last_exons[attributes["transcript_id"]]
+        let newChr = fields0[0]
+        let newStartIdx =  uint64(parseUInt(fields0[3])) - 1'u32
+        let newEndIdx = uint64(parseUInt(fields0[4]))
+        if attributes["transcript_id"] in lastExons:
+          let (chr, startIdx,endIdx)= lastExons[attributes["transcript_id"]]
           try:
-            assert chr == new_chr
-            reference_introns.incl((chr, end_idx, new_start_idx))
-          except AssertionError:
+            assert chr == newChr
+            referenceIntrons.incl((chr, endIdx, newStartIdx))
+          except AssertionDefect:
             echo "ERROR - same transcript on different chromosomes:"
-            let tx_id = attributes["transcript_id"]
-            echo &"{chr}:{start_idx}-{end_idx} {tx_id}"
-            echo &"{new_chr}:{new_start_idx}-{new_end_idx} {tx_id}"
-          # outfilepath.writeLine(chr,"\t",end_idx,"\t",new_start_idx,"\t","reference_intron")
-        last_exons[attributes["transcript_id"]] = (new_chr, new_start_idx, new_end_idx)
+            let txId = attributes["transcript_id"]
+            echo &"{chr}:{startIdx}-{endIdx} {txId}"
+            echo &"{newChr}:{newStartIdx}-{newEndIdx} {txId}"
+          # outfilepath.writeLine(chr,"\t",endIdx,"\t",newStartIdx,"\t","reference_intron")
+        lastExons[attributes["transcript_id"]] = (newChr, newStartIdx, newEndIdx)
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
     discard
-  reference_infile.close()
-  var novel_counter = 0
-  var total_counter = 0
+  referenceInfile.close()
+  var novelCounter = 0
+  var totalCounter = 0
   try:
     while true:
       let line = infile.readLine()
       if line.len == 0:
         continue
       let fields0 = line.split(':')
-      let cluster_id = fields0[0]
-      let read_support = parseUInt(cluster_id.split('_')[^1])
+      let clusterId = fields0[0]
+      let readSupport = parseUInt(clusterId.split('_')[^1])
       let chr = fields0[2]
       let indices = fields0[3].strip(chars={'(',')','+','-'})
-      let split_indices = indices.split('-')
-      let start_idx = uint64(parseUInt(split_indices[0])) 
-      let end_idx = uint64(parseUInt(split_indices[1]))
-      if read_support >= threshold:
-        total_counter += 1
-        if (chr,start_idx,end_idx) notin  reference_introns:
-          outfile.writeLine(&"{chr}\t{start_idx}\t{end_idx}\tquery_intron")
-          novel_counter += 1
+      let splitIndices = indices.split('-')
+      let startIdx = uint64(parseUInt(splitIndices[0])) 
+      let endIdx = uint64(parseUInt(splitIndices[1]))
+      if readSupport >= threshold:
+        totalCounter += 1
+        if (chr,startIdx,endIdx) notin  referenceIntrons:
+          outfile.writeLine(&"{chr}\t{startIdx}\t{endIdx}\tquery_intron")
+          novelCounter += 1
   except EOFError:
     discard
   infile.close()
   outfile.close()
-  echo &"Total introns above threshold - {total_counter}"
-  echo &"Novel introns - {novel_counter}"
+  echo &"Total introns above threshold - {totalCounter}"
+  echo &"Novel introns - {novelCounter}"
 
 
-proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : string) =
-  var reference_infile,infile,outfile : File
-  discard open(reference_infile,reference_infilepath,fmRead)
+proc callOverlappingNonCanonical(referenceInfilepath, infilepath,outfilepath : string) =
+  var referenceInfile,infile,outfile : File
+  discard open(referenceInfile,referenceInfilepath,fmRead)
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
-  var reference_introns : HashSet[(string,uint64,uint64)]
-  # var last_exons : Table[string,(string,uint64,uint64)]
+  var referenceIntrons : HashSet[(string,uint64,uint64)]
+  # var lastExons : Table[string,(string,uint64,uint64)]
   try:
     while true:
-      let line = reference_infile.readLine()
+      let line = referenceInfile.readLine()
       if line.len == 0:
         continue
       let fields0 = line.split(':')
       let chr = fields0[2]
       let indices = fields0[3].strip(chars={'(',')','+','-'})
-      let split_indices = indices.split('-')
-      let start_idx = uint64(parseUInt(split_indices[0])) 
-      let end_idx = uint64(parseUInt(split_indices[1]))
-      reference_introns.incl((chr,start_idx,end_idx))
+      let splitIndices = indices.split('-')
+      let startIdx = uint64(parseUInt(splitIndices[0])) 
+      let endIdx = uint64(parseUInt(splitIndices[1]))
+      referenceIntrons.incl((chr,startIdx,endIdx))
   except EOFError:
     discard
-  reference_infile.close()
-  var novel_counter = 0
-  var overlapping_counter = 0
+  referenceInfile.close()
+  var novelCounter = 0
+  var overlappingCounter = 0
   try:
     while true:
       let line = infile.readLine()
@@ -979,29 +978,29 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
       let fields0 = line.split(':')
       let chr = fields0[2]
       let indices = fields0[3].strip(chars={'(',')','+','-'})
-      let split_indices = indices.split('-')
-      let start_idx = uint64(parseUInt(split_indices[0])) 
-      let end_idx = uint64(parseUInt(split_indices[1]))
-      if (chr,start_idx,end_idx) notin  reference_introns:
-        novel_counter += 1
+      let splitIndices = indices.split('-')
+      let startIdx = uint64(parseUInt(splitIndices[0])) 
+      let endIdx = uint64(parseUInt(splitIndices[1]))
+      if (chr,startIdx,endIdx) notin  referenceIntrons:
+        novelCounter += 1
       else:
         outfile.writeLine(line)
-        overlapping_counter += 1
+        overlappingCounter += 1
   except EOFError:
     discard
   infile.close()
   outfile.close()
-  echo &"Non-overlapping introns - {novel_counter}"
-  echo &"Overlapping introns - {overlapping_counter}"
+  echo &"Non-overlapping introns - {novelCounter}"
+  echo &"Overlapping introns - {overlappingCounter}"
 
 
-proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) = 
-  var reference_infile,infile,outfile : File
-  discard open(reference_infile,reference_infilepath,fmRead)
-  var tx_exons : Table[(string,string),seq[(uint64,uint64)]]
+proc assignTxIDs(referenceInfilepath,infilepath,outfilepath : string) = 
+  var referenceInfile,infile,outfile : File
+  discard open(referenceInfile,referenceInfilepath,fmRead)
+  var txExons : Table[(string,string),seq[(uint64,uint64)]]
   try:
     while true:
-      let line = reference_infile.readLine()
+      let line = referenceInfile.readLine()
       if line.len == 0:
         continue
       elif line[0] == '#':
@@ -1014,35 +1013,35 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
         continue
       let attributes = parseAttributes(fields0[8])
       if "transcript_id" in attributes:
-        let new_chr = fields0[0]
-        let new_start_idx =  uint64(parseUInt(fields0[3])) - 1'u32
-        let new_end_idx = uint64(parseUInt(fields0[4]))
-        if (attributes["transcript_id"],new_chr) in tx_exons:
-          tx_exons[(attributes["transcript_id"],new_chr)].add((new_start_idx,new_end_idx))
+        let newChr = fields0[0]
+        let newStartIdx =  uint64(parseUInt(fields0[3])) - 1'u32
+        let newEndIdx = uint64(parseUInt(fields0[4]))
+        if (attributes["transcript_id"],newChr) in txExons:
+          txExons[(attributes["transcript_id"],newChr)].add((newStartIdx,newEndIdx))
         else:
-          tx_exons[(attributes["transcript_id"],new_chr)] = @[(new_start_idx,new_end_idx)]
+          txExons[(attributes["transcript_id"],newChr)] = @[(newStartIdx,newEndIdx)]
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
     discard
-  reference_infile.close()
-  var tx_introns : Table[(string,seq[(uint64,uint64)]), string]
-  var single_exon_genes : Table[string,seq[(uint64,uint64,string)]]
-  for (tx_id,chr) in tx_exons.keys:
+  referenceInfile.close()
+  var txIntrons : Table[(string,seq[(uint64,uint64)]), string]
+  var singleExonGenes : Table[string,seq[(uint64,uint64,string)]]
+  for (txId,chr) in txExons.keys:
     # echo chr
-    let exon_chain = tx_exons[(tx_id,chr)]
-    if exon_chain.len > 1:
-      var intron_chain : seq[(uint64,uint64)]
-      for i in 1..<exon_chain.len:
-        intron_chain.add((exon_chain[i-1][1],exon_chain[i][0]))
-      tx_introns[(chr,intron_chain)] = tx_id
+    let exonChain = txExons[(txId,chr)]
+    if exonChain.len > 1:
+      var intronChain : seq[(uint64,uint64)]
+      for i in 1..<exonChain.len:
+        intronChain.add((exonChain[i-1][1],exonChain[i][0]))
+      txIntrons[(chr,intronChain)] = txId
     else:
-      if chr in single_exon_genes:
-        single_exon_genes[chr].add((exon_chain[0][0],exon_chain[0][1],tx_id))
+      if chr in singleExonGenes:
+        singleExonGenes[chr].add((exonChain[0][0],exonChain[0][1],txId))
       else:
-        single_exon_genes[chr] = @[(exon_chain[0][0],exon_chain[0][1],tx_id)]
-  for chr in single_exon_genes.keys:
-    single_exon_genes[chr].sort
+        singleExonGenes[chr] = @[(exonChain[0][0],exonChain[0][1],txId)]
+  for chr in singleExonGenes.keys:
+    singleExonGenes[chr].sort
   
   #Read in BED12 file and get intron chains
   discard open(infile,infilepath,fmRead)
@@ -1052,27 +1051,27 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
       let bedline = infile.readLine()
       let bedfields = bedline.split(sep='\t')
       let chr = bedfields[0]
-      let start_idx = parseUInt(bedfields[1])
-      let end_idx = parseUInt(bedfields[2])
+      let startIdx = parseUInt(bedfields[1])
+      let endIdx = parseUInt(bedfields[2])
       let txid = bedfields[3]
-      let strand = bedfields[5]
-      let block_sizes = bedfields[10].split(sep=',')
-      let block_starts= bedfields[11].split(sep=',')
-      var reference_id = ""
-      if block_starts.len > 1:
-        var intron_chain : seq[(uint64,uint64)]
-        for i in 1..<block_starts.len:
-          let intron_start_idx = uint64(start_idx + parseUInt(block_starts[i-1]) + parseUInt(block_sizes[i-1]))
-          let intron_end_idx = uint64(start_idx + parseUInt(block_starts[i]))
-          intron_chain.add((intron_start_idx,intron_end_idx))
-        if (chr,intron_chain) in tx_introns:
-          reference_id = tx_introns[(chr,intron_chain)]
+      # let strand = bedfields[5]
+      let blockSizes = bedfields[10].split(sep=',')
+      let blockStarts= bedfields[11].split(sep=',')
+      var referenceId = ""
+      if blockStarts.len > 1:
+        var intronChain : seq[(uint64,uint64)]
+        for i in 1..<blockStarts.len:
+          let intronStartIdx = uint64(startIdx + parseUInt(blockStarts[i-1]) + parseUInt(blockSizes[i-1]))
+          let intronEndIdx = uint64(startIdx + parseUInt(blockStarts[i]))
+          intronChain.add((intronStartIdx,intronEndIdx))
+        if (chr,intronChain) in txIntrons:
+          referenceId = txIntrons[(chr,intronChain)]
       else:
-        reference_id = testOverlap((uint64(start_idx),uint64(end_idx)),single_exon_genes[chr])
-      if reference_id == "":
+        referenceId = testOverlap((uint64(startIdx),uint64(endIdx)),singleExonGenes[chr])
+      if referenceId == "":
         outfile.write(&"{txid}\t.\n")
       else:
-        outfile.write(&"{txid}\t{reference_id}\n")
+        outfile.write(&"{txid}\t{referenceId}\n")
   except EOFError:
     discard
   infile.close()
@@ -1096,45 +1095,47 @@ proc parseGTF*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
         continue
       let attributes = parseAttributes(fields0[8])
       if "transcript_id" in attributes:
-        let new_chr = fields0[0]
-        let new_strand = fields0[6][0]
-        let new_start_idx =  uint64(parseUInt(fields0[3])) - 1'u32
-        let new_end_idx = uint64(parseUInt(fields0[4]))
+        let newChr = fields0[0]
+        let newStrand = fields0[6][0]
+        let newStartIdx =  uint64(parseUInt(fields0[3])) - 1'u32
+        let newEndIdx = uint64(parseUInt(fields0[4]))
         if attributes["transcript_id"] in exons:
-          let (chr, strand, start_idx,end_idx)= exons[attributes["transcript_id"]][^1]
+          let (chr, strand, startIdx,endIdx)= exons[attributes["transcript_id"]][^1]
           try:
-            assert chr == new_chr
-            assert strand == new_strand
-            # reference_introns.incl((chr, end_idx, new_start_idx))
-          except AssertionError:
+            assert chr == newChr
+            assert strand == newStrand
+            # referenceIntrons.incl((chr, endIdx, newStartIdx))
+          except AssertionDefect:
             echo "ERROR - same transcript on different strand or chromosomes:"
-            let tx_id = attributes["transcript_id"]
-            echo &"{chr}({strand}):{start_idx}-{end_idx} {tx_id}"
-            echo &"{new_chr}({new_strand}):{new_start_idx}-{new_end_idx} {tx_id}"
-          exons[attributes["transcript_id"]].add((new_chr, new_strand, new_start_idx, new_end_idx))
+            let txId = attributes["transcript_id"]
+            echo &"{chr}({strand}):{startIdx}-{endIdx} {txId}"
+            echo &"{newChr}({newStrand}):{newStartIdx}-{newEndIdx} {txId}"
+          exons[attributes["transcript_id"]].add((newChr, newStrand, newStartIdx, newEndIdx))
         else:
-          exons[attributes["transcript_id"]] = @[(new_chr, new_strand, new_start_idx, new_end_idx)]
+          exons[attributes["transcript_id"]] = @[(newChr, newStrand, newStartIdx, newEndIdx)]
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
     discard
 
-  for tx_id in exons.keys:
-    let total_chr = exons[tx_id][0][0]
-    let total_strand = exons[tx_id][0][1]
-    let total_start = exons[tx_id][0][2]
-    let total_end = exons[tx_id][^1][3]
+  for txId in exons.keys:
+    let totalChr = exons[txId][0][0]
+    let totalStrand = exons[txId][0][1]
+    # let totalStart = exons[txId][0][2]
+    # let totalEnd = exons[txId][^1][3]
     var introns : seq[(uint64,uint64)]
-    for i in 1..<exons[tx_id].len:
-      let (_,_,_,end_idx1) = exons[tx_id][i-1]
-      let (_,_,start_idx2,_) = exons[tx_id][i]
-      introns.add((end_idx1,start_idx2))
-    # result.incl((total_chr,total_start,total_end,total_strand,introns))
-    result.incl((total_chr,total_strand,introns))
+    for i in 1..<exons[txId].len:
+      let (_,_,_,endIdx1) = exons[txId][i-1]
+      let (_,_,startIdx2,_) = exons[txId][i]
+      introns.add((endIdx1,startIdx2))
+    # result.incl((totalChr,totalStart,totalEnd,totalStrand,introns))
+    result.incl((totalChr,totalStrand,introns))
 
-
+#TODO - Add to help
+#TODO - (?) add outfile writing (?)
 proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,outfilepath : string) =
-  var infile, ref1file, ref2file, outfile : File
+  # var infile, ref1file, ref2file, outfile : File
+  var infile, ref1file, ref2file : File
   discard open(ref1file,reference1_infilepath,fmRead)
   let ref1set = parseGTF(ref1file)
   ref1file.close
@@ -1165,7 +1166,7 @@ proc getTxId*(s : string) : string =
 
 
 proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,field = 1) = 
-  var novel_loci : HashSet[string]
+  var novelLoci : HashSet[string]
   var infile,gfffile,outfile : File
   discard open(gfffile,gffcompare_infilepath,fmRead)
   try:
@@ -1180,9 +1181,9 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
         continue
       if fields0[3+field] != "-":
         echo fields0[1]
-        novel_loci.incl(getTxId(fields0[3+field]))
-        # for tx_id in fields0[2+field].split(','):
-          # novel_loci.incl(tx_id)
+        novelLoci.incl(getTxId(fields0[3+field]))
+        # for txId in fields0[2+field].split(','):
+          # novelLoci.incl(txId)
   except EOFError:
     discard
   gfffile.close
@@ -1190,13 +1191,13 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
   let records = parseFasta(infile)
-  var new_records : seq[FastaRecord]
+  var newRecords : seq[FastaRecord]
   for record in records:
-    if record.read_id in novel_loci:
-      new_records.add(record)
+    if record.readId in novelLoci:
+      newRecords.add(record)
   infile.close
-  # writeCorrectedReads(new_records,outfile)
-  writeFASTArecordsToFile(outfile,new_records)
+  # writeCorrectedReads(newRecords,outfile)
+  writeFASTArecordsToFile(outfile,newRecords)
   outfile.close
 
 
@@ -1205,28 +1206,28 @@ proc parseOptions() : UtilOptions =
   var mode = ""
   var last = ""
 
-  var help_flag = true
-  var run_flag = true
+  var helpFlag = true
+  var runFlag = true
 
   var fastq = false
-  var fastq_flag = false
+  var fastqFlag = false
 
-  var min_length = 75'u64
-  var min_length_flag = false
+  var minLength = 75'u64
+  var minLengthFlag = false
 
   var infilepath = ""
-  var infilepath_flag = false
+  var infilepathFlag = false
 
   var stranded = false
 
-  var reference_infilepath = ""
-  var reference_infilepath_flag = false
+  var referenceInfilepath = ""
+  var referenceInfilepathFlag = false
   
-  var reference_infilepath2 = ""
-  var reference_infilepath2_flag = false
+  var referenceInfilepath2 = ""
+  var referenceInfilepath2Flag = false
 
   var outfilepath = ""
-  var outfilepath_flag = false
+  var outfilepathFlag = false
 
   for kind, key, val in getopt():
     # echo kind," ", key," ", val
@@ -1235,7 +1236,7 @@ proc parseOptions() : UtilOptions =
       i += 1
       continue
     if i == 1:
-      help_flag = false
+      helpFlag = false
     i += 1
     case mode:
       of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs","idNovelIsoforms","getNovelLociFASTA":
@@ -1245,127 +1246,127 @@ proc parseOptions() : UtilOptions =
           of cmdShortOption, cmdLongOption:
             if last != "":
               echo &"ERROR - Option {last} provided without an argument"
-              run_flag = false
+              runFlag = false
               break
             case key:
               of "l", "min-length":
-                if not min_length_flag:
-                  min_length_flag = true
+                if not minLengthFlag:
+                  minLengthFlag = true
                   if val != "":
-                    min_length = parseUInt(val)
+                    minLength = parseUInt(val)
                   else:
                     last = "min-length"
                 else:
                   echo "ERROR - Multiple min-length provided"
-                  run_flag = false
+                  runFlag = false
               of "i":
-                if not infilepath_flag:
-                  infilepath_flag = true
+                if not infilepathFlag:
+                  infilepathFlag = true
                   if val != "":
                     infilepath = val
                   else:
                     last = "infile"
                 else:
                   echo "ERROR - Multiple infiles provided"
-                  run_flag = false
+                  runFlag = false
                   break
               of "q", "fastq":
-                if not fastq_flag:
+                if not fastqFlag:
                   fastq = true
-                  fastq_flag = true
+                  fastqFlag = true
                 elif not fastq:
                   echo "ERROR - Conflicting flags -q / --fastq and -a / --fasta"
-                  run_flag = false
+                  runFlag = false
                   break
               of "a", "fasta":
-                if not fastq_flag:
-                  fastq_flag = true
+                if not fastqFlag:
+                  fastqFlag = true
                 elif fastq:
                   echo "ERROR - Conflicting flags -q / --fastq and -a / --fasta"
-                  run_flag = false
+                  runFlag = false
                   break
               of "o":
-                if not outfilepath_flag:
-                  outfilepath_flag = true
+                if not outfilepathFlag:
+                  outfilepathFlag = true
                   if val != "":
                     infilepath = val
                   else:
                     last = "outfile"
                 else:
                   echo "ERROR - Multiple outfiles provided"
-                  run_flag = false
+                  runFlag = false
                   break
               of "r":
-                if not reference_infilepath_flag:
-                  reference_infilepath_flag = true
+                if not referenceInfilepathFlag:
+                  referenceInfilepathFlag = true
                   if val != "":
-                    reference_infilepath = val
+                    referenceInfilepath = val
                   else:
                     last = "reference"
                 else:
                   echo "ERROR Multiple references provided"
-                  run_flag = false
+                  runFlag = false
                   break
               of "r2":
-                if not reference_infilepath2_flag:
-                  reference_infilepath2_flag = true
+                if not referenceInfilepath2Flag:
+                  referenceInfilepath2Flag = true
                   if val != "":
-                    reference_infilepath2 = val
+                    referenceInfilepath2 = val
                   else:
                     last = "reference2"
                 else:
                   echo "ERROR Multiple references provided"
-                  run_flag = false
+                  runFlag = false
                   break
               of "s", "stranded":
                 stranded = true
               of "h", "help":
-                help_flag = true
-                run_flag = false
+                helpFlag = true
+                runFlag = false
                 break
           of cmdArgument:
             case last:
               of "min-length":
-                min_length = parseUInt(key)
+                minLength = parseUInt(key)
               of "infile":
                 infilepath = key
               of "outfile":
                 outfilepath = key
               of "reference":
-                reference_infilepath = key
+                referenceInfilepath = key
               of "reference2":
-                reference_infilepath2 = key
+                referenceInfilepath2 = key
               else:
                 echo &"ERROR - unknown option {last} provided"
-                run_flag = false
+                runFlag = false
                 break
             last = ""
       else:
-        help_flag = true
+        helpFlag = true
         break
-  if infilepath == "" and not help_flag:
+  if infilepath == "" and not helpFlag:
     echo "ERROR - infilepath must be specified"
-    run_flag = false
-    help_flag = true
-  var require_outfile,require_reference = false
+    runFlag = false
+    helpFlag = true
+  var requireOutfile,requireReference = false
   case mode:
     of "translate","bed2gtf","parseBLASTP","splitFASTA","filterFASTA","extractIntrons":
-      require_outfile = true
+      requireOutfile = true
     of "compareBLASTP","compareFASTA":
-      require_reference = true
+      requireReference = true
     of "callNonCanonical","callNovelNonCanonical","callOverlapping":
-      require_reference = true
-      require_outfile = true
+      requireReference = true
+      requireOutfile = true
   
-  if require_outfile and outfilepath == "" and not help_flag:
+  if requireOutfile and outfilepath == "" and not helpFlag:
     echo "ERROR - outfilepath must be specified"
-    run_flag = false
-    help_flag = true
-  if require_reference and reference_infilepath == "" and not help_flag:
+    runFlag = false
+    helpFlag = true
+  if requireReference and referenceInfilepath == "" and not helpFlag:
     echo "ERROR - referencefilepath must be specified"
-    run_flag = false
-    help_flag = true
-  if help_flag:
+    runFlag = false
+    helpFlag = true
+  if helpFlag:
     case mode:
       of "translate":
         writeTranslateHelp()
@@ -1395,33 +1396,38 @@ proc parseOptions() : UtilOptions =
         echo "ERROR - first argument must specify utility function"
         writeDefaultHelp()
   return UtilOptions(mode : mode,
-                     run_flag : run_flag,
+                     runFlag : runFlag,
                      infilepath : infilepath,
                      outfilepath : outfilepath,
-                     reference_infilepath : reference_infilepath,
-                     reference_infilepath2 : reference_infilepath2,
-                     min_length : min_length,
+                     referenceInfilepath : referenceInfilepath,
+                     referenceInfilepath2 : referenceInfilepath2,
+                     minLength : minLength,
                      fastq : fastq,
-                     stranded : stranded
-                     )
+                     stranded : stranded)
 
 
 proc main() =
   let opt = parseOptions()
-  if opt.run_flag:
+  if opt.runFlag:
     case opt.mode:
-      of "translate":
+      of "translate": #TODO - Wrap this in a proc
         var infile : File
         discard open(infile,opt.infilepath,fmRead)
         if opt.fastq:
           let records = parseFASTQ(infile)
           infile.close()
-          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
+          translateTranscripts(records,
+                               opt.outfilepath,
+                               threshold = int(opt.minLength),
+                               stranded = opt.stranded)
         else:
           let records = parseFasta(infile)
           infile.close()
-          translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
-      of "strandTranscripts":
+          translateTranscripts(records,
+                               opt.outfilepath,
+                               threshold = int(opt.minLength),
+                               stranded = opt.stranded)
+      of "strandTranscripts": #TODO - Wrap this in a proc
         var infile : File
         discard open(infile,opt.infilepath,fmRead)
         if opt.fastq:
@@ -1434,38 +1440,56 @@ proc main() =
           strandTranscripts(records,opt.outfilepath)
       of "bed2gtf":
         convertBED12toGTF(opt.infilepath,opt.outfilepath,opt.stranded)
-      of "parseBLASTP":
-        let blast_output = parseBLASTPoutput(opt.infilepath)
+      of "parseBLASTP": # TODO - Wrap this into a proc
+        let blastOutput = parseBLASTPoutput(opt.infilepath)
         var outfile : File
         discard open(outfile,opt.outfilepath,fmWrite)
-        for blast_match in blast_output:
-          if blast_match.identities_percentages.len != 0:
-            outfile.write(&"{blast_match.query_name}\t{blast_match.match_names[0]}\t{blast_match.evals[0][0]}\n")
+        for blast_match in blastOutput:
+          if blast_match.identitiesPercentages.len != 0:
+            outfile.write(&"{blast_match.queryName}\t" &
+              &"{blast_match.matchNames[0]}\t{blast_match.evals[0][0]}\n")
           else:
-            outfile.write(&"{blast_match.query_name}\t----\t----\n")
+            outfile.write(&"{blast_match.queryName}\t----\t----\n")
         outfile.close()
       of "compareBLASTP":
-        compareBLASTPTranslations(opt.reference_infilepath,opt.infilepath)
+        compareBLASTPTranslations(opt.referenceInfilepath,
+                                  opt.infilepath)
       of "compareFASTA":
-        compareExactTranslations(opt.reference_infilepath,opt.infilepath)
+        compareExactTranslations(opt.referenceInfilepath,
+                                 opt.infilepath)
       of "splitFASTA":
-        splitFASTAByReadCounts(opt.infilepath,opt.outfilepath)
+        splitFASTAByReadCounts(opt.infilepath,
+                               opt.outfilepath)
       of "filterFASTA":
-        filterFASTAByReadCounts(opt.infilepath,opt.outfilepath)
+        filterFASTAByReadCounts(opt.infilepath,
+                                opt.outfilepath)
       of "extractIntrons":
-        extractIntronsFromBED12(opt.infilepath,opt.outfilepath)
+        extractIntronsFromBED12(opt.infilepath,
+                                opt.outfilepath)
       of "callNonCanonical":
-        callNonCanonicalSplicingFromFASTA(opt.infilepath,opt.outfilepath)
+        callNonCanonicalSplicingFromFASTA(opt.infilepath,
+                                          opt.outfilepath)
       of "callNovelNonCanonical":
-        callNovelNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+        callNovelNonCanonical(opt.referenceInfilepath,
+                              opt.infilepath,
+                              opt.outfilepath)
       of "callOverlapping":
-        callOverlappingNonCanonical(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+        callOverlappingNonCanonical(opt.referenceInfilepath,
+                                    opt.infilepath,
+                                    opt.outfilepath)
       of "assignIDs":
-        assignTxIDs(opt.reference_infilepath,opt.infilepath,opt.outfilepath)
+        assignTxIDs(opt.referenceInfilepath,
+                    opt.infilepath,
+                    opt.outfilepath)
       of "idNovelIsoforms":
-        idNovelIsoforms(opt.infilepath,opt.reference_infilepath,opt.reference_infilepath2,opt.outfilepath)
+        idNovelIsoforms(opt.infilepath,
+                        opt.referenceInfilepath,
+                        opt.referenceInfilepath2,
+                        opt.outfilepath)
       of "getNovelLociFASTA":
-        getNovelLociFASTA(opt.infilepath,opt.reference_infilepath,opt.outfilepath)
+        getNovelLociFASTA(opt.infilepath,
+                          opt.referenceInfilepath,
+                          opt.outfilepath)
 
 
 

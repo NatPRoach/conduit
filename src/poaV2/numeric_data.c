@@ -131,7 +131,7 @@ void read_numeric_data(int nsource_seq,
       if (LOOP_FINISHED(i,nsource_seq)) /* SEQ NOT FOUND!! */
 	WARN_MSG(USERR,(ERRTXT,"Error! NUMERIC_DATA %s, sequence %s does not exist.  Skipping.\n\n",data_name,seq_name),"$Revision: 1.2 $");
       else { /* FOUND THE SEQ, SAVE THE DATA */
-	if (data=find_numeric_data(source_seq+i,data_name)) /*REUSE EXISTING*/
+	if ((data=find_numeric_data(source_seq+i,data_name))) /*REUSE EXISTING*/
 	  WARN_MSG(WARN,(ERRTXT,"NUMERIC_DATA %s already exists on sequence %s.  Overwriting.\n",data_name,seq_name),"$Revision: 1.2 $");
 	else /* CREATE A NEW DATA HOLDER */
 	  data=new_numeric_data(source_seq+i,data_name,title,0.);
