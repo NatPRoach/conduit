@@ -38,7 +38,7 @@ type
 # TODO -   Possibly change uint32 to uint64 where necessary.
 # TODO - Reevaluate before publication.
 proc conduitClusterVersion() : string =
-  return "CONDUIT Clustering Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu," &
+  return "CONDUIT Clustering Version 0.1.1 by Nathan Roach ( nroach2@jhu.edu," &
     " https://github.com/NatPRoach/conduit/ )"
 
 

@@ -59,7 +59,7 @@ type
 
 
 proc conduitUtilsVersion() : string =
-  return "CONDUIT Utilities Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+  return "CONDUIT Utilities Version 0.1.1 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
 
 proc writeDefaultHelp() = 
