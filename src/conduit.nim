@@ -457,7 +457,7 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
     let filepath = &"{indirectory}{trim}.consensus.fa"
-    if existsFile(filepath):
+    if fileExists(filepath):
       var file : File
       echo &"appending {filepath}"
       discard open(file,filepath,fmRead)
@@ -474,7 +474,7 @@ proc combineFilesIntermediate(indirectory : string, intrims : openArray[string],
     if i in last_correction:
       continue
     let filepath = &"{indirectory}{trim}.consensus.fa"
-    if existsFile(filepath):
+    if fileExists(filepath):
       var file : File
       echo &"appending {filepath}"
       discard open(file,filepath,fmRead)
@@ -493,7 +493,7 @@ proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openA
       last = uint64(last_correction[i]) #TODO convert last_correction to uint64 types.
     let indirectory = &"{tmp_directory}{last}{os.DirSep}fasta{os.DirSep}"
     let filepath = &"{indirectory}{trim}.consensus.fa"
-    if existsFile(filepath):
+    if fileExists(filepath):
       var file : File
       echo &"appending {filepath}"
       discard open(file,filepath,fmRead)
@@ -1133,12 +1133,12 @@ proc main() =
     var iter_times : seq[Time]
     iter_times.add(getTime())
 
-    if not existsDir(opt.output_dir):
+    if not dirExists(opt.output_dir):
       createDir(opt.output_dir)
     outputSettings(&"{opt.output_dir}CONDUIT.settings", opt)
 
     var tmp_already_existed = true
-    if not existsDir(opt.tmp_dir):
+    if not dirExists(opt.tmp_dir):
       tmp_already_existed = false
       createDir(opt.tmp_dir)
 
@@ -1242,14 +1242,14 @@ proc main() =
       # removeDir(last_fasta_dir)
     
       let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
-      if existsFile(final_consensus_path):
+      if fileExists(final_consensus_path):
         removeFile(final_consensus_path)
       var final_fasta_dir = &"{opt.tmp_dir}{directory_number}{os.DirSep}fasta{os.DirSep}"
 
       combineFiles(final_fasta_dir, opt.trims, final_consensus_path)
     else:
       let final_consensus_path = &"{opt.output_dir}conduit_final_consensuses.fa"
-      if existsFile(final_consensus_path):
+      if fileExists(final_consensus_path):
         removeFile(final_consensus_path)
 
       combineFilesFinal(opt.tmp_dir, directory_number, opt.trims, final_consensus_path, last_correction)

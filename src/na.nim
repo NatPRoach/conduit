@@ -3,7 +3,7 @@ import strutils
 import tables
 
 proc revComp*(nts : string) : string =
-  let wc_pairs = {'A' : 'T',
+  let wcPairs = {'A' : 'T',
                   'a' : 'T',
                   'C' : 'G',
                   'c' : 'G',
@@ -13,7 +13,7 @@ proc revComp*(nts : string) : string =
                   'u' : 'A',
                   'G' : 'C',
                   'g' : 'C'}.toTable()
-  var revcomp : seq[char]
+  var revComp : seq[char]
   for i in 1..nts.len:
-    revcomp.add(wc_pairs[nts[^i]])
-  result = revcomp.join("")
+    revComp.add(wcPairs[nts[^i]])
+  result = revComp.join("")
