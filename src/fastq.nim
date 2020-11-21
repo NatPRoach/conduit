@@ -24,11 +24,11 @@ proc writeFASTQrecordsToFile*( outfile : File,
     writeFASTQrecordToFile( outfile, record)
 
 
-proc convertQualityIntsToString( int_quals: seq[uint8]) : string =
-  var char_quals : seq[char]
-  for qual in int_quals:
-    char_quals.add(char(qual + 33'u8))
-  result = char_quals.join("")
+proc convertQualityIntsToString( intQuals: seq[uint8]) : string =
+  var charQuals : seq[char]
+  for qual in intQuals:
+    charQuals.add(char(qual + 33'u8))
+  result = charQuals.join("")
 
 
 proc writeBamRecordToFASTQfile*( outfile : File,
@@ -37,10 +37,10 @@ proc writeBamRecordToFASTQfile*( outfile : File,
   discard record.sequence(sequence)
   var qualities : seq[uint8]
   discard record.base_qualities(qualities)
-  let qual_str = convertQualityIntsToString(qualities)
+  let qualStr = convertQualityIntsToString(qualities)
   writeFASTQrecordToFile( outfile, FastqRecord(readId : record.qname,
                                                sequence : sequence,
-                                               qualities : qual_str))
+                                               qualities : qualStr))
 
 
 proc convertFASTQfileToFASTAfile*(infilepath,outfilepath : string ) =

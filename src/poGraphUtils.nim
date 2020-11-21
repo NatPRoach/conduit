@@ -15,7 +15,7 @@ type
     name* : string
     length* : uint32
     path* : seq[uint32]
-    corrected_path* : seq[uint32]
+    correctedPath* : seq[uint32]
     sequence* : string
     support* : uint32
   
@@ -30,7 +30,7 @@ type
     indegree* : uint16
     log_likelihood* : float
     path* : seq[uint32]
-    corrected_path* : seq[uint32]
+    correctedPath* : seq[uint32]
     start_node_flag* : bool
     end_node_flag* : bool
   
@@ -161,7 +161,7 @@ proc jsOutput( po:TrimmedPOGraph,
   if highlight_path1.len != 0:
     path = highlight_path1
   else:
-    path = po.reads[0].corrected_path
+    path = po.reads[0].correctedPath
   
   var highlight_nodes1,highlight_nodes2 : HashSet[uint32]
   var highlight_edges1,highlight_edges2 : HashSet[(uint32,uint32)]
@@ -274,7 +274,7 @@ proc htmlOutput( po:TrimmedPOGraph,
 proc writeCorrectedReads*( po : TrimmedPOGraph,outfile : File) = 
   for read in po.reads:
     var sequence : seq[string]
-    for idx in read.corrected_path:
+    for idx in read.correctedPath:
       sequence.add(po.nodes[po.node_indexes[('b',idx)]].nts)
     outfile.write(">",read.name,&"_{read.support}","\n")
     outfile.writeLine(sequence.join())
@@ -364,7 +364,7 @@ proc writePOGraph*( po : TrimmedPOGraph,
   outfile.write(&"SOURCECOUNT={po.reads.len}\n")
   for read in po.reads:
     outfile.write(&"SOURCENAME={read.name}\n")
-    outfile.write(&"SOURCEINFO={read.corrected_path.len} 0 1 -1 untitled\n")
+    outfile.write(&"SOURCEINFO={read.correctedPath.len} 0 1 -1 untitled\n")
   var reverse_edges : Table[uint32,seq[uint32]]
   for u in po.edges.keys():
     for v in po.edges[u]:
@@ -374,8 +374,8 @@ proc writePOGraph*( po : TrimmedPOGraph,
         reverse_edges[v] = @[u]
   var supporting_reads_table : Table[uint32,seq[uint32]]
   for i,read in po.reads:
-    # echo read.corrected_path
-    for node in read.corrected_path:
+    # echo read.correctedPath
+    for node in read.correctedPath:
       if not(node in supporting_reads_table):
         supporting_reads_table[node] = @[uint32(i)]
       else:
@@ -408,29 +408,29 @@ proc getIsoformExtractionDataStructures( po : ptr POGraph) : IsoformExtractionDa
   var u_set,v_set : HashSet[uint32]
   var node_support_counts : CountTable[uint32]
   for read in po[].reads:
-    for i in 0..<read.corrected_path.len-1:
-      if (read.corrected_path[i],read.corrected_path[i+1]) in weights:
-        weights[(read.corrected_path[i],read.corrected_path[i+1])].add(read.name)
+    for i in 0..<read.correctedPath.len-1:
+      if (read.correctedPath[i],read.correctedPath[i+1]) in weights:
+        weights[(read.correctedPath[i],read.correctedPath[i+1])].add(read.name)
       else:
-        weights[(read.corrected_path[i],read.corrected_path[i+1])] = @[read.name]
-        if read.corrected_path[i] in fwd_edges:
-          fwd_edges[read.corrected_path[i]].add(read.corrected_path[i+1])
+        weights[(read.correctedPath[i],read.correctedPath[i+1])] = @[read.name]
+        if read.correctedPath[i] in fwd_edges:
+          fwd_edges[read.correctedPath[i]].add(read.correctedPath[i+1])
         else:
-          fwd_edges[read.corrected_path[i]] = @[read.corrected_path[i+1]]
-        if read.corrected_path[i+1] in rev_edges:
-          rev_edges[read.corrected_path[i+1]].add(read.corrected_path[i])
+          fwd_edges[read.correctedPath[i]] = @[read.correctedPath[i+1]]
+        if read.correctedPath[i+1] in rev_edges:
+          rev_edges[read.correctedPath[i+1]].add(read.correctedPath[i])
         else:
-          rev_edges[read.corrected_path[i+1]] = @[read.corrected_path[i]]
-        u_set.incl(read.corrected_path[i])
-        v_set.incl(read.corrected_path[i+1])
-      if read.corrected_path[i] in node_support_counts:
-        node_support_counts.inc(read.corrected_path[i])
+          rev_edges[read.correctedPath[i+1]] = @[read.correctedPath[i]]
+        u_set.incl(read.correctedPath[i])
+        v_set.incl(read.correctedPath[i+1])
+      if read.correctedPath[i] in node_support_counts:
+        node_support_counts.inc(read.correctedPath[i])
       else:
-        node_support_counts[read.corrected_path[i]] = 1
-    if read.corrected_path[^1] in node_support_counts:
-      node_support_counts.inc(read.corrected_path[^1])
+        node_support_counts[read.correctedPath[i]] = 1
+    if read.correctedPath[^1] in node_support_counts:
+      node_support_counts.inc(read.correctedPath[^1])
     else:
-      node_support_counts[read.corrected_path[^1]] = 1
+      node_support_counts[read.correctedPath[^1]] = 1
   # echo "init dicts - ", (cpuTime() - time1)
   # time1 = cpuTime()
   let source_nodes = u_set - v_set
