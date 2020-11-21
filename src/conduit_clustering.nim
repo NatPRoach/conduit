@@ -12,10 +12,9 @@ import sets
 import genomeKDE
 import algorithm
 import poGraphUtils
-import conduitUtils
+import na
 import fasta
 import fastq
-
 
 type
   ClusteringOptions = object
@@ -26,6 +25,8 @@ type
     prefix : string
     out_type : string
     reference : string
+    run : bool
+    exit_code : int
   
   SpliceSiteGraph = object
     adjacencies : seq[seq[uint32]]
@@ -179,7 +180,7 @@ proc cmpNonSpliced(a,b : ((char,(uint64,uint64)), seq[string])) : int =
   result = system.cmp(a[0],b[0])
 
 
-proc parseOptions() : ClusteringOptions = 
+proc parseClusteringOptions() : ClusteringOptions = 
   var file : string
   var file_flag = false
 
@@ -204,6 +205,7 @@ proc parseOptions() : ClusteringOptions =
   var run_flag = true
   var help_flag = false
   var version_flag = false
+  var exit_code = QuitFailure
 
   var last = ""
 
@@ -301,10 +303,14 @@ proc parseOptions() : ClusteringOptions =
               break
           of "h", "help":
             help_flag = true
+            run_flag = false
+            exit_code = QuitSuccess
             break
           of "v", "version":
             help_flag = false
             version_flag = true
+            run_flag = false
+            exit_code = QuitSuccess
             break
           else:
             var dash = ""
@@ -334,6 +340,12 @@ proc parseOptions() : ClusteringOptions =
             break
         last = ""
 
+  if file == "":
+    echo "ERROR - clustering requires an input BAM file"
+    help_flag = true
+    run_flag = false
+    exit_code = QuitFailure
+
   if help_flag:
     writeClusterHelp()
   if version_flag:
@@ -345,7 +357,9 @@ proc parseOptions() : ClusteringOptions =
                            output_dir : output_dir,
                            prefix : prefix,
                            out_type : output_format,
-                           reference : reference_filepath)
+                           reference : reference_filepath,
+                           run : run_flag,
+                           exit_code : exit_code)
 
 
 proc bfs(ssgraph : ptr SpliceSiteGraph,
@@ -401,12 +415,13 @@ proc getWeightedSpliceJunctionLocations(
   echo result
 
 
-proc writeFASTAsFromBAM(bam : Bam,
+proc writeFASTXsFromBAM(bam : Bam,
                         read_id_to_cluster : ptr Table[string,int],
                         cluster_sizes : ptr CountTable[int],
                         query : string,
                         cluster_prefix : string,
-                        starting_count : int) : int =
+                        starting_count : int,
+                        output_type : string) : int =
   var open_files : Table[int, File]
   var written_reads : CountTable[int]
   for record in bam.query(query):
@@ -419,17 +434,28 @@ proc writeFASTAsFromBAM(bam : Bam,
     let cluster_id = read_id_to_cluster[][record.qname]
     if cluster_id notin open_files:
       var file : File
-      discard open(file,
-                   &"{cluster_prefix}{cluster_id + starting_count}.fa",
-                   fmWrite)
+      if output_type == "fasta":
+        discard open(file,
+                     &"{cluster_prefix}{cluster_id + starting_count}.fa",
+                     fmWrite)
+      elif output_type == "fastq":
+        discard open(file,
+                     &"{cluster_prefix}{cluster_id + starting_count}.fq",
+                     fmWrite)
       result += 1
       # echo &"Opening cluster file {cluster_id + starting_count}"
       open_files[cluster_id] = file
       # file.writeFASTArecordToFile(record)
-      file.writeBamRecordToFASTAfile(record)
+      if output_type == "fasta":
+        file.writeBamRecordToFASTAfile(record)
+      elif output_type == "fastq":
+        file.writeBamRecordToFASTQfile(record)
     else:
       # echo &"Appending to cluster file {cluster_id + starting_count}"
-      open_files[cluster_id].writeBamRecordToFASTAfile(record)
+      if output_type == "fasta":
+        open_files[cluster_id].writeBamRecordToFASTAfile(record)
+      elif output_type == "fastq":
+        open_files[cluster_id].writeBamRecordToFASTAfile(record)
     written_reads.inc(cluster_id)
     echo written_reads[cluster_id], "\t", cluster_sizes[][cluster_id]
     if written_reads[cluster_id] == cluster_sizes[][cluster_id]:
@@ -500,11 +526,15 @@ proc writeFASTAsFromBAM(bam : Bam,
 
 
 proc main() = 
-  let opt = parseOptions()
+  let opt = parseClusteringOptions()
+  if not opt.run:
+    quit(opt.exit_code)
   if not dirExists(opt.output_dir):
     createDir(opt.output_dir)
   var bam : Bam
   discard open(bam,opt.file,index=true)
+  #TODO - iterate over chromosomes, chunks of chromosomes
+  #TODO - multithread? - see how the memory and time looks like then decide
   var (strand_spliced_table, strand_nonspliced_table) =
     collapsedSummariesFromBam(bam, "chrI", true)
   bam.close
@@ -581,14 +611,12 @@ proc main() =
                                               output_file_count,
                                               fai)
     else:
-      output_file_count += writeFASTAsFromBAM(bam,
+      output_file_count += writeFASTXsFromBAM(bam,
                                               addr read_id_to_cluster,
                                               addr cluster_sizes,
                                               "chrI",
                                               "clusters_out/cluster_",
-                                              output_file_count)
-    #TODO - add logic to write FASTQs
-    #TODO - add option to 'correct' reads based on reference genome
+                                              output_file_count,
+                                              opt.out_type)
     bam.close
-
 main()

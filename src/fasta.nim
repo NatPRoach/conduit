@@ -58,22 +58,20 @@ proc convertUtoTinFASTA*(infilepath,outfilepath:string) =
   outfile.close()
 
 
-# TODO - Need to do this in a way where it's an iterator instead.
-# TODO - This is loading the entire file in to memory.
-# TODO - fine for small cluster files but will use huge memory at scale
 proc parseFasta*(file : File) : seq[FastaRecord] = 
   var records : seq[FastaRecord]
   var readId : string
   var sequence : string
-  var count = 0
+  var start = true
   while true:
     try:
       let line = file.readLine()
       if line[0] == '>':
-        if count != 0:
+        if not start:
           records.add(FastaRecord( readId : readId, sequence : sequence))
           sequence = ""
-        count += 1
+        else:
+          start = false
         readId = line.strip(leading=true,
                             trailing=false,
                             chars = {'>'}).strip(leading=false,
@@ -88,6 +86,35 @@ proc parseFasta*(file : File) : seq[FastaRecord] =
       records.add(FastaRecord( readId : readId, sequence : sequence))
       break
   return records
+
+
+iterator iterFasta*(file : File) : FastaRecord =
+  var readId : string
+  var sequence : string
+  var start = true
+  while true:
+    try:
+      let line = file.readLine()
+      if line[0] == '>':
+        if not start:
+          yield FastaRecord( readId : readId, sequence : sequence)
+          sequence = ""
+        else:
+          start = false
+        readId = line.strip(leading=true,
+                            trailing=false,
+                            chars = {'>'}).strip(leading=false,
+                                                 trailing=true,
+                                                 chars = {'\n'})
+      else:
+        sequence = sequence &
+          line.strip(leading=false,
+                     trailing=true,
+                     chars = {'\n'})
+    except EOFError:
+      yield FastaRecord( readId : readId, sequence : sequence)
+      break
+
 
 proc splitFASTA*(infilepath,outfilepath_prefix : string,
                  split_num : int = 200) : (int,int) =

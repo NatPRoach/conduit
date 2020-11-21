@@ -17,8 +17,3 @@ before install:
     exec "make"
 
 bin = @["conduit", "conduitUtils", "conduit_clustering"]
-# skipDirs = @["tests"]
-# skipFiles = @["GT04008021.bam"]
-
-# task test, "run the tests":
-#   exec "nim c --lineDir:on --debuginfo -r tests/all"

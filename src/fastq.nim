@@ -1,5 +1,6 @@
 import sets
 import fasta
+import hts
 import strutils
 import strformat
 
@@ -10,7 +11,39 @@ type
     qualities* : string
 
 
-proc convertFASTQfileToFASTAfile*(infilepath,outfilepath:string) = 
+proc writeFASTQrecordToFile*( outfile : File,
+                              record : FastqRecord) = 
+  outfile.write(&"@{record.readID}\n")
+  outfile.write(&"{record.sequence}\n")
+  outfile.write("+\n")
+  outfile.write(&"{record.qualities}\n")
+
+proc writeFASTQrecordsToFile*( outfile : File,
+                               records : seq[FastqRecord]) = 
+  for record in records:
+    writeFASTQrecordToFile( outfile, record)
+
+
+proc convertQualityIntsToString( int_quals: seq[uint8]) : string =
+  var char_quals : seq[char]
+  for qual in int_quals:
+    char_quals.add(char(qual + 33'u8))
+  result = char_quals.join("")
+
+
+proc writeBamRecordToFASTQfile*( outfile : File,
+                                 record : Record) = 
+  var sequence : string
+  discard record.sequence(sequence)
+  var qualities : seq[uint8]
+  discard record.base_qualities(qualities)
+  let qual_str = convertQualityIntsToString(qualities)
+  writeFASTQrecordToFile( outfile, FastqRecord(readId : record.qname,
+                                               sequence : sequence,
+                                               qualities : qual_str))
+
+
+proc convertFASTQfileToFASTAfile*(infilepath,outfilepath : string ) =
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
@@ -49,9 +82,6 @@ proc convertFASTQtoFASTA*(records : openArray[FastqRecord]) : seq[FastaRecord] =
     result.add(convertFASTQtoFASTA(record))
 
 
-#TODO - Need to do this in a way where it's an iterator instead.
-#TODO - This is loading the entire file in to memory, which is fine for 
-#TODO - small cluster files but will use huge memory at scale
 proc parseFASTQ*(infile : File) : seq[FastqRecord] = 
   while true:
     try:
@@ -68,5 +98,25 @@ proc parseFASTQ*(infile : File) : seq[FastqRecord] =
       result.add(FastqRecord( readId   : readId,
                               sequence  : sequence,
                               qualities : quals))
+    except EOFError:
+      break
+
+
+iterator iterFASTQ(infile : File) : FastqRecord =
+  while true:
+    try:
+      let line1 = infile.readLine()
+      try:
+        assert line1[0] == '@'
+      except AssertionDefect:
+        echo "File not in FASTQ format"
+        raise
+      let readId = line1[1..^1]
+      let sequence = infile.readLine().replace(sub='U',by='T')
+      discard infile.readLine()
+      let quals = infile.readLine()
+      yield FastqRecord( readId   : readId,
+                         sequence  : sequence,
+                         qualities : quals)
     except EOFError:
       break
