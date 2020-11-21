@@ -7,27 +7,30 @@ import tables
 import sets
 import poGraphUtils
 import algorithm
+import fasta
+import fastq
+import na
 
 type
   BLASTmatch* = object
-    query_name : string
-    query_len : uint
-    match_names : seq[string]
-    match_lens : seq[uint]
-    scores : seq[seq[float]]
-    evals : seq[seq[float]]
-    identities_numerators : seq[seq[uint]]
-    identities_denominators : seq[seq[uint]]
-    identities_percentages : seq[seq[float]]
-    positives_numerators : seq[seq[uint]]
-    positives_denominators : seq[seq[uint]]
-    positives_percentages : seq[seq[float]]
-    gap_numerators : seq[seq[uint]]
-    gap_denominators : seq[seq[uint]]
-    gap_percentages : seq[seq[float]]
-    query_seqs : seq[seq[string]]
-    conss_seqs : seq[seq[string]]
-    sbjct_seqs : seq[seq[string]]
+    query_name* : string
+    query_len* : uint
+    match_names* : seq[string]
+    match_lens* : seq[uint]
+    scores* : seq[seq[float]]
+    evals* : seq[seq[float]]
+    identities_numerators* : seq[seq[uint]]
+    identities_denominators* : seq[seq[uint]]
+    identities_percentages* : seq[seq[float]]
+    positives_numerators* : seq[seq[uint]]
+    positives_denominators* : seq[seq[uint]]
+    positives_percentages* : seq[seq[float]]
+    gap_numerators* : seq[seq[uint]]
+    gap_denominators* : seq[seq[uint]]
+    gap_percentages* : seq[seq[float]]
+    query_seqs* : seq[seq[string]]
+    conss_seqs* : seq[seq[string]]
+    sbjct_seqs* : seq[seq[string]]
   
   UtilOptions = object
     mode : string
@@ -39,11 +42,6 @@ type
     min_length : uint64
     fastq : bool
     stranded : bool
-
-  FastqRecord* = object
-    read_id* : string
-    sequence* : string
-    qualities* : string
   
   GTFTranscript* = object
     chr* : string
@@ -52,6 +50,7 @@ type
     end_idx* : uint64
     introns* : seq[(uint64,uint64)]
 
+
 # proc intersect(a,b : HashSet[GTFTranscript]) =
 #   var a_,b_ = HashSet[(string,char,seq[(uint64,uint64)])]
 #   for tx in a.items:
@@ -59,8 +58,10 @@ type
 #   for tx in b.items:
 #     b_.incl(())
 
+
 proc conduitUtilsVersion() : string =
   return "CONDUIT Utilities Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+
 
 proc writeDefaultHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -113,6 +114,7 @@ proc writeTranslateHelp() =
   echo "    -l, --min-length (75)"
   echo "        Minimum length in Amino Acids necessary for a putative ORF to be reported"
 
+
 proc writeStrandTranscriptsHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -144,6 +146,7 @@ proc writeBED2GTFHelp() =
   echo "    -s, --stranded"
   echo "        Report gtf fields with strand information"
 
+
 proc writeBLASTPHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -154,6 +157,7 @@ proc writeBLASTPHelp() =
   echo "  <outPutativeOrthologs.tsv>  Tab separated file of putative ortholog matches"
   echo "                              In format: <Query ID>\t<Reference proteome top match ID>\t<E value>"
 
+
 proc writeCompareBLASTPHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -162,6 +166,7 @@ proc writeCompareBLASTPHelp() =
   echo "  ./conduitUtils compareBLASTP -r <reference_proteome.fa> -i <inBLASTP.txt>"
   echo "  <reference_proteome.fa>     FASTA file describing the reference proteome used in the BLASTP search"
   echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
+
 
 proc writeCompareFASTAHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -172,6 +177,7 @@ proc writeCompareFASTAHelp() =
   echo "  <reference.fa>              Reference FASTA file defining the truth set"
   echo "  <query.fa>                  Query FASTA files defining the query set"
 
+
 proc writeSplitFASTAHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -180,6 +186,7 @@ proc writeSplitFASTAHelp() =
   echo "  ./conduitUtils splitFASTA -i <conduit_output.fa> -o <outprefix>"
   echo "  <conduit_output.fa>         CONDUIT produced FASTA file to be split based on number of reads supporting each isoform"
   echo "  <outprefix>                 Prefix for the fasta files to be output, suffix will describe the bin being reported"
+
 
 proc writeFilterFASTAHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -194,6 +201,7 @@ proc writeFilterFASTAHelp() =
   echo "     -n (5)"
   echo "        Minimum number of reads that must support an isoform for it to be reported in the filtered FASTA"
 
+
 proc writeExtractIntronsHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -202,6 +210,7 @@ proc writeExtractIntronsHelp() =
   echo "  ./conduitUtils extractIntrons -i <transcripts.bed12> -o <introns.bed>"
   echo "  <transcripts.bed12>         Transcripts in BED12 format to extract introns from"
   echo "  <introns.bed>               BED6 output of extracted introns"
+
 
 proc writeCallNonCanonicalHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -213,6 +222,7 @@ proc writeCallNonCanonicalHelp() =
   echo "                            Introns sequences can be obtained using `bedtools getfasta -name -s`"
   echo "  <noncanonical.txt>        Read IDs of the sequences that didn't begin with GT and end with AG"
 
+
 proc writeCallNovelNonCanonicalHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
@@ -222,6 +232,7 @@ proc writeCallNovelNonCanonicalHelp() =
   echo "  <reference.gtf>              Reference GTF file specifying the introns to compare against"
   echo "  <noncanonical.txt>           Read IDs specifying intron structure in the format produced by `bedtools getfasta -name`"
   echo "  <novel.bed>                  Output of introns found in the noncanonical.txt file but not found in the reference, in BED6 format"
+
 
 proc writeCallOverlappingHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -233,33 +244,6 @@ proc writeCallOverlappingHelp() =
   echo "  <introns2.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
   echo "  <shared_introns.txt>        The introns in common between the two files"
 
-
-proc parseFASTQ(infile : File) : seq[FastqRecord] = 
-  while true:
-    try:
-      let line1 = infile.readLine()
-      try:
-        assert line1[0] == '@'
-      except AssertionError:
-        echo "File not in FASTQ format"
-        raise
-      let read_id = line1[1..^1]
-      let sequence = infile.readLine().replace(sub='U',by='T')
-      discard infile.readLine()
-      let quals = infile.readLine()
-      result.add(FastqRecord( read_id   : read_id,
-                              sequence  : sequence,
-                              qualities : quals))
-    except EOFError:
-      break
-
-proc convertFASTQtoFASTA(record : FastqRecord) : FastaRecord = 
-  result.read_id = record.read_id
-  result.sequence = record.sequence
-
-proc convertFASTQtoFASTA(records : openArray[FastqRecord]) : seq[FastaRecord] =
-  for record in records:
-    result.add(convertFASTQtoFASTA(record))
 
 proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] = 
   ##
@@ -517,7 +501,8 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
     except EOFError:
       break
   infile.close()
-  
+
+
 proc translateORF*(nts : string,to_stop = true) : string =
   let translation_table = { "TTT" : 'F',
                             "TTC" : 'F',
@@ -592,6 +577,7 @@ proc translateORF*(nts : string,to_stop = true) : string =
       break
     translation.add(aa)
 
+
 proc findAll*(s,sub : string) : seq[int] = 
   #Very stupid means of finding ALL the matches of sub in s
   var start = 0
@@ -600,17 +586,8 @@ proc findAll*(s,sub : string) : seq[int] =
     if idx == -1:
       break
     result.add(idx)
-    start = idx + 1 
+    start = idx + 1
 
-proc revComp*(nts : string) : string =
-  let wc_pairs = {'A' : 'T',
-                  'C' : 'G',
-                  'T' : 'A',
-                  'G' : 'C'}.toTable()
-  var revcomp : seq[char]
-  for i in 1..nts.len:
-    revcomp.add(wc_pairs[nts[^i]])
-  result = revcomp.join("")
 
 proc translateTranscript*(nts : string) : string =
   let start_codon_indices = findAll(nts,"ATG")
@@ -619,6 +596,7 @@ proc translateTranscript*(nts : string) : string =
     let translation = translateORF(nts[start_codon_index..^1])
     if translation.len > result.len:
       result = translation
+
 
 proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60, stranded : bool = false) =
   var outfile : File
@@ -645,8 +623,10 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
         outfile.write(&"{translation[wrap_len*(translation.len div wrap_len)..^1]}\n")
   outfile.close()
 
+
 proc translateTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60,stranded = false) =
   translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,threshold,wrap_len,stranded)
+
 
 proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bool = false ) =
   ## Converts BED12 formatted file to well-formed GTF file suitable for evaluation with GFFcompare
@@ -690,6 +670,7 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
   infile.close()
   outfile.close()
 
+
 proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string, wrap_len : int = 60) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
@@ -712,16 +693,18 @@ proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : strin
       outfile.write(&"{stranded[wrap_len*(stranded.len div wrap_len)..^1]}\n")
   outfile.close()
 
+
 proc strandTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string, wrap_len : int = 60) =
   translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,wrap_len)
+
 
 proc compareExactTranslations*(reference_infilepath : string, translation_infilepath : string) =
   var r_infile, t_infile : File
   discard open(r_infile,reference_infilepath,fmRead)
   discard open(t_infile,translation_infilepath,fmRead)
-  let r_records = poGraphUtils.parseFasta(r_infile)
+  let r_records = parseFasta(r_infile)
   r_infile.close()
-  let t_records = poGraphUtils.parseFasta(t_infile)
+  let t_records = parseFasta(t_infile)
   t_infile.close()
   var r_proteins,t_proteins : HashSet[string]
   for record in r_records:
@@ -738,13 +721,14 @@ proc compareExactTranslations*(reference_infilepath : string, translation_infile
   echo &"Precision: {float(tp) / float(tp+fp)}"
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
+
 proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath : string,) =
   var fp,tp1 = 0
   var reference_id_set : HashSet[string]
   var match_set : HashSet[string]
   var ref_infile : File
   discard open(ref_infile,reference_infilepath,fmRead)
-  let reference_records = poGraphUtils.parseFasta(ref_infile)
+  let reference_records = parseFasta(ref_infile)
   ref_infile.close()
   for record in reference_records:
     reference_id_set.incl(record.read_id)
@@ -767,6 +751,7 @@ proc compareBLASTPTranslations*(reference_infilepath : string, blastp_infilepath
   echo ""
   echo &"Precision (uses TP1): {float(tp1) / float(tp1+fp)}"
   echo &"Recall (uses TP2):    {float(tp2) / float(tp2+fn)}"
+
 
 proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) = 
   ## Grabs Introns from BED12 file and reports one per line in BED format, with ID = ID from the BED12 line
@@ -796,6 +781,7 @@ proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) =
   infile.close()
   outfile.close()
 
+
 proc testOverlap(read : (uint64,uint64),single_exon_gene_list : seq[(uint64,uint64,string)]) : string = 
   result = ""
   for gene in single_exon_gene_list: #gene list must be sorted
@@ -820,6 +806,7 @@ proc testOverlap(read : (uint64,uint64),single_exon_gene_list : seq[(uint64,uint
     elif read[1] <= gene[0]:
       break
 
+
 proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string) =
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
@@ -833,6 +820,7 @@ proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string
       if record.sequence[0..1].toUpperAscii() != "GT" or record.sequence[^2..^1].toUpperAscii() != "AG":
         outfile.writeLine(record.read_id)
   outfile.close()
+
 
 proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1'u64,2'u64,5'u64,10'u64,20'u64,40'u64,80'u64,160'u64,320'u64,640'u64]) = 
   var infile : File
@@ -865,6 +853,7 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
       outfile.writeLine(record.sequence)
     outfile.close()
 
+
 proc filterFASTAByReadCounts*(infilepath,outfilepath : string, filter : uint64 = 5'u64) =
   var infile,outfile : File
   discard open(infile,infilepath, fmRead)
@@ -878,6 +867,7 @@ proc filterFASTAByReadCounts*(infilepath,outfilepath : string, filter : uint64 =
       outfile.writeLine(record.sequence)
   outfile.close()
 
+
 proc parseAttributes(s : string) : Table[string,string] = 
   let fields = s.split(';')[0..^2]
   for field in fields:
@@ -885,6 +875,7 @@ proc parseAttributes(s : string) : Table[string,string] =
     let key = fields1[0]
     let val = fields1[1].strip(leading=true,trailing=true,chars = {'"'})
     result[key] = val
+
 
 proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string,threshold : uint = 5) =
   var reference_infile,infile,outfile : File
@@ -955,6 +946,7 @@ proc callNovelNonCanonical(reference_infilepath, infilepath,outfilepath : string
   echo &"Total introns above threshold - {total_counter}"
   echo &"Novel introns - {novel_counter}"
 
+
 proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : string) =
   var reference_infile,infile,outfile : File
   discard open(reference_infile,reference_infilepath,fmRead)
@@ -1001,6 +993,7 @@ proc callOverlappingNonCanonical(reference_infilepath, infilepath,outfilepath : 
   outfile.close()
   echo &"Non-overlapping introns - {novel_counter}"
   echo &"Overlapping introns - {overlapping_counter}"
+
 
 proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) = 
   var reference_infile,infile,outfile : File
@@ -1085,8 +1078,8 @@ proc assignTxIDs(reference_infilepath,infilepath,outfilepath : string) =
   infile.close()
   outfile.close()
 
-# proc parseGTF*(infile) : HashSet[(string,char,uint64,uint64,seq[(uint64,uint64)])] = 
-proc parseGTF1*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] = 
+
+proc parseGTF*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] = 
   var exons : Table[string,seq[(string,char,uint64,uint64)]]
   try:
     while true:
@@ -1139,18 +1132,19 @@ proc parseGTF1*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
     # result.incl((total_chr,total_start,total_end,total_strand,introns))
     result.incl((total_chr,total_strand,introns))
 
+
 proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,outfilepath : string) =
   var infile, ref1file, ref2file, outfile : File
   discard open(ref1file,reference1_infilepath,fmRead)
-  let ref1set = parseGTF1(ref1file)
+  let ref1set = parseGTF(ref1file)
   ref1file.close
   
   discard open(ref2file,reference2_infilepath,fmRead)
-  let ref2set = parseGTF1(ref2file)
+  let ref2set = parseGTF(ref2file)
   ref2file.close
   
   discard open(infile,infilepath,fmRead)
-  let inset = parseGTF1(infile)
+  let inset = parseGTF(infile)
   infile.close
 
   let novel = (inset - ref1set) - ref2set
@@ -1165,8 +1159,10 @@ proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,out
   # discard open(outfile,outfilepath,fmWrite)
   # outfile.close
 
+
 proc getTxId*(s : string) : string =
   result = s.split(':')[1].split('|')[0]
+
 
 proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,field = 1) = 
   var novel_loci : HashSet[string]
@@ -1199,11 +1195,12 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
     if record.read_id in novel_loci:
       new_records.add(record)
   infile.close
-  writeCorrectedReads(new_records,outfile)
+  # writeCorrectedReads(new_records,outfile)
+  writeFASTArecordsToFile(outfile,new_records)
   outfile.close
 
+
 proc parseOptions() : UtilOptions = 
-  
   var i = 0
   var mode = ""
   var last = ""
@@ -1408,6 +1405,7 @@ proc parseOptions() : UtilOptions =
                      stranded : stranded
                      )
 
+
 proc main() =
   let opt = parseOptions()
   if opt.run_flag:
@@ -1420,7 +1418,7 @@ proc main() =
           infile.close()
           translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
         else:
-          let records = poGraphUtils.parseFasta(infile)
+          let records = parseFasta(infile)
           infile.close()
           translateTranscripts(records,opt.outfilepath,threshold = int(opt.min_length),stranded = opt.stranded)
       of "strandTranscripts":
@@ -1431,7 +1429,7 @@ proc main() =
           infile.close()
           strandTranscripts(records,opt.outfilepath)
         else:
-          let records = poGraphUtils.parseFasta(infile)
+          let records = parseFasta(infile)
           infile.close()
           strandTranscripts(records,opt.outfilepath)
       of "bed2gtf":
