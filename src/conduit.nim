@@ -86,7 +86,7 @@ type
 
 
 proc conduitVersion() : string =
-  return "CONDUIT Version 0.1.1 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+  return "CONDUIT Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
 proc writeDefaultHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -629,9 +629,16 @@ proc parseOptions() : ConduitOptions =
   for kind, key, val in getopt():
     # echo kind," ", key," ", val
     if i == 0:
-      mode = key
-      i += 1
-      continue
+      if kind == cmdArgument:
+        mode = key
+        i += 1
+        continue
+      else:
+        if key == "h" or key == "help":
+          mode = "help"
+        helpFlag = true
+        runFlag = false
+        break
     if i == 1:
       helpFlag = false
     i += 1
@@ -1022,7 +1029,7 @@ proc parseOptions() : ConduitOptions =
       else:
         helpFlag = true
         break
-  if clustersDirectory == "":
+  if clustersDirectory == "" and mode != "help" and not helpFlag:
     echo "ERROR - <clusters directory> must be specified"
     helpFlag = true
     runFlag = false
@@ -1033,6 +1040,9 @@ proc parseOptions() : ConduitOptions =
         writeNanoHelp()
       of "hybrid":
         writeHybridHelp()
+      of "help":
+        writeDefaultHelp()
+        quit(QuitSuccess)
       else:
         echo "ERROR - first argument must specify correction mode, \"nano\" or \"hybrid\""
         writeDefaultHelp()

@@ -59,7 +59,7 @@ type
 
 
 proc conduitUtilsVersion() : string =
-  return "CONDUIT Utilities Version 0.1.1 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+  return "CONDUIT Utilities Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
 
 proc writeDefaultHelp() = 
@@ -1232,9 +1232,17 @@ proc parseOptions() : UtilOptions =
   for kind, key, val in getopt():
     # echo kind," ", key," ", val
     if i == 0:
-      mode = key
-      i += 1
-      continue
+      if kind == cmdArgument:
+        mode = key
+        i += 1
+        continue
+      else:
+        if key == "h" or key == "help":
+          mode = "help"
+        helpFlag = true
+        runFlag = false
+        break
+
     if i == 1:
       helpFlag = false
     i += 1
@@ -1392,6 +1400,9 @@ proc parseOptions() : UtilOptions =
         writeCallNovelNonCanonicalHelp()
       of "callOverlapping":
         writeCallOverlappingHelp()
+      of "help":
+        writeDefaultHelp()
+        quit(QuitSuccess)
       else:
         echo "ERROR - first argument must specify utility function"
         writeDefaultHelp()

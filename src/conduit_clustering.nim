@@ -38,7 +38,7 @@ type
 # TODO -   Possibly change uint32 to uint64 where necessary.
 # TODO - Reevaluate before publication.
 proc conduitClusterVersion() : string =
-  return "CONDUIT Clustering Version 0.1.1 by Nathan Roach ( nroach2@jhu.edu," &
+  return "CONDUIT Clustering Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu," &
     " https://github.com/NatPRoach/conduit/ )"
 
 
@@ -339,7 +339,7 @@ proc parseClusteringOptions() : ClusteringOptions =
             break
         last = ""
 
-  if file == "":
+  if file == "" and not helpFlag:
     echo "ERROR - clustering requires an input BAM file"
     helpFlag = true
     runFlag = false
