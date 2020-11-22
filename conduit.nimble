@@ -7,7 +7,7 @@ license       = "GPLv2"
 
 # Dependencies
 
-requires "hts >= 0.3.1", "nim >= 1.0.0"
+requires "hts >= 0.3.1", "nim >= 1.4.0"
 
 srcDir = "src/"
 
