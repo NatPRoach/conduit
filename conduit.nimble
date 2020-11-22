@@ -13,12 +13,20 @@ srcDir = "src/"
 
 before install:
   echo "Building poaV2"
-  withDir "src/poaV2":
-    exec "make"
+  if existsEnv("CC"):
+    withDir "src/poaV2":
+      exec "make CC=$CC"
+  else:
+    withDir "src/poaV2":
+      exec "make"
 
 before build:
   echo "Building poaV2"
-  withDir "src/poaV2":
-    exec "make"
+  if existsEnv("CC"):
+    withDir "src/poaV2":
+      exec "make CC=$CC"
+  else:
+    withDir "src/poaV2":
+      exec "make"
 
 bin = @["conduit", "conduitUtils", "conduit_clustering"]

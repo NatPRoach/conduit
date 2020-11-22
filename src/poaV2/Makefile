@@ -23,7 +23,10 @@ LIBOBJECTS= \
 	stringptr.o
 
 
-CC = gcc
+ifeq ($(CC),)
+CC := gcc
+endif
+# CC = gcc
 #CFLAGS= -g -ansi-strict -W -Wall -DUSE_WEIGHTED_LINKS -DUSE_PROJECT_HEADER -I.
 CFLAGS= -g -O2 -DUSE_WEIGHTED_LINKS -DUSE_PROJECT_HEADER -I.
 # -I$(HOME)/lib/include
