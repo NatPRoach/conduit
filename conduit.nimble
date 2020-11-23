@@ -13,6 +13,8 @@ srcDir = "src/"
 
 before install:
   echo "Building poaV2"
+  withDir "src/poaV2":
+    exec "make clean"
   if existsEnv("CC"):
     withDir "src/poaV2":
       exec "make CC=$CC"
@@ -22,6 +24,8 @@ before install:
 
 before build:
   echo "Building poaV2"
+  withDir "src/poaV2":
+    exec "make clean"
   if existsEnv("CC"):
     withDir "src/poaV2":
       exec "make CC=$CC"

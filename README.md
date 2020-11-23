@@ -5,39 +5,32 @@
 # CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly
 #### Builds a transcriptome independent of a reference genome using Oxford Nanopore Technologies and optionally Illumina RNA-seq data (recommended)
 
-### Building CONDUIT:
+### Installing CONDUIT:
+The easiest way to install CONDUIT on MacOS and Linux is via [Bioconda](https://anaconda.org/bioconda/conduit-assembler). The command for which is:
+
+`conda install -c bioconda conduit-assembler`
+
+### Building from source
 CONDUIT is built in Nim (A statically typed, compiled systems programming language with python-like syntax).
 
 CONDUIT therefore requires a Nim installation. Easy Nim installation instructions can be found [here](https://nim-lang.org/install.html)
 
 CONDUIT also uses the following libraries:
-*    [poaV2](https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), the necessary files of which are distributed in the CONDUIT GitHub and need not be downloaded separately.
-*    [nim-hts](https://github.com/brentp/hts-nim), which wraps htslib in nim.
 *    [htslib](https://github.com/samtools/htslib), a C library for interfacing with common bioinformatics file formats.
-*    [threadpools](https://github.com/yglukhov/threadpools), which provides instance threadpools in nim.
-
+*    [poaV2](https://github.com/tanghaibao/bio-pipeline/tree/master/poaV2), the necessary files of which are distributed in the CONDUIT GitHub and need not be downloaded separately.
+*    [threadpools](https://github.com/yglukhov/threadpools), which provides instance threadpools in nim, the necessary files of which are included as a submodule in CONDUIT, and need not be downloaded separately if the conduit repo is downloaded with the `--recursive` flag.
+*    [nim-hts](https://github.com/brentp/hts-nim), which wraps htslib in nim and will be installed by nimble automatically if you are missing it.
 And the following tools must be installed:
 *   [samtools](https://github.com/samtools/samtools)
 *   [bowtie2](https://github.com/BenLangmead/bowtie2)
 
-#### Installing threadpools:
-Threadpools is the only library listed above without listed installation instructions, they are therefore provided here.
-Once you've installed nim, installing threadpools is quite simple:
-```
-git clone https://github.com/yglukhov/threadpools
-cd threadpools
-nimble install -y
-```
-
 Once all the required libraries and tools are installed, building CONDUIT can be done in the following manner:
 ```
-git clone https://github.com/NatPRoach/conduit.git
+git clone --recursive https://github.com/NatPRoach/conduit.git
 cd conduit
-make
+nimble install -y --verbose
 ```
 This should result in a `conduit` binary file which can then be used.
-
-A Conda recipe is coming ASAP, which should ease installation significantly.
 
 ### Running CONDUIT - 
 CONDUIT requires as input reads clustered at the gene level, with one gene level cluster per FASTA or FASTQ file located in the same directory. For this purpose we reccomend the use of [RATTLE](https://github.com/comprna/RATTLE) gene level clustering, which outperforms minimizer based clustering per the [RATTLE preprint](https://doi.org/10.1101/2020.02.08.939942).
@@ -66,7 +59,7 @@ Both RATTLE gene level clustering and CONDUIT consensus extraction work better i
 ### Usage statement for hybrid (ONT + Illumina) assembly:
 ```
 CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:
-CONDUIT Version 0.1.0 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )
+CONDUIT Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )
 Usage:
   ./conduit hybrid [options] <clusters_directory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}
   <clusters_directory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster
