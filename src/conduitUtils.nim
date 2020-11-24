@@ -9,6 +9,7 @@ import algorithm
 import fasta
 import fastq
 import na
+import version
 
 type
   BLASTmatch* = object
@@ -59,7 +60,8 @@ type
 
 
 proc conduitUtilsVersion() : string =
-  return "CONDUIT Utilities Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+  return &"CONDUIT Utilities Version {version.ConduitVersion} by Nathan Roach" &
+       "\n( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
 
 proc writeDefaultHelp() = 
@@ -68,38 +70,60 @@ proc writeDefaultHelp() =
   echo "Usage:"
   echo "  ./conduitUtils <function>"
   echo "Where <function> is one of the following:"
-  echo "  translate   - Translates FASTA/Q nucleotide sequences into protein based on their longest ORF"
+  echo "  translate     - Translates FASTA/Q nucleotide sequences into protein"
+  echo "                  based on their longest ORF"
   echo ""
-  echo "  bed2gtf     - Converts BED12 files to well structured GTF file suitable for use in GFFcompare"
+  echo "  bed2gtf       - Converts BED12 files to well structured GTF file"
+  echo "                  suitable for use in GFFcompare"
   echo ""
-  echo "  parseBLASTP   - Parses BLASTP output and outputs closest match for each query transcript as determined by BLASTP"
+  echo "  parseBLASTP   - Parses BLASTP output and outputs closest match for"
+  echo "                  each query transcript as determined by BLASTP"
   echo ""
-  echo "  compareBLASTP - Compares BLASTP output and reference proteome to determine the # of TP, FP, and FN for a sample"
+  echo "  compareBLASTP - Compares BLASTP output and reference proteome to "
+  echo "                  determine the # of TP, FP, and FN for a sample"
   echo ""
-  echo "  compareFASTA  - Compares two FASTA files, an input and a reference, to determine the # of TP, FP, and FN for a sample"
+  echo "  compareFASTA  - Compares two FASTA files, an input and a reference, "
+  echo "                  to determine the # of TP, FP, and FN for a sample"
   echo ""
-  echo "  splitFASTA    - Splits CONDUIT produced FASTA file based on the number of reads supporting each isoform"
+  echo "  splitFASTA    - Splits CONDUIT produced FASTA file based on the "
+  echo "                  number of reads supporting each isoform"
   echo ""
-  echo "  filterFASTA   - Filters CONDUIT produced FASTA file based on number of reads supporting each isoform"
+  echo "  filterFASTA   - Filters CONDUIT produced FASTA file based on number "
+  echo "                  of reads supporting each isoform"
   echo ""
-  echo "  extractIntrons   - Extracts out intronic sequences from BED12 formatted input and outputs as BED6"
+  echo "  extractIntrons   - Extracts out intronic sequences from BED12"
+  echo "                     formatted input and outputs as BED6"
   echo ""
-  echo "  callNonCanonical - Reads in a FASTA file and reports the readIDs of sequences that dont begin with GT and end with AG"
+  echo "  callOverlapping  - Compares two files of readIDs specifying introns "
+  echo "                     in the format produced by:"
+  echo "                       `bedtools getfasta -name`"
+  echo "                     and reports the introns that are shared between"
+  echo "                     the two files (not stranded)"
   echo ""
-  echo "  callNovelNonCanonical - Compares introns described by reference GTF file to introns described by a list of readIDs in the format produced by `bedtools getfasta -name` function, outputs the novel introns in BED format"
+  echo "  callNonCanonical - Reads in a FASTA file and reports the readIDs of "
+  echo "                     sequences that dont begin with GT and end with AG"
   echo ""
-  echo "  callOverlapping - Compares two files of readIDs specifying introns in the format produced by `bedtools getfasta -name`, and reports the introns that are shared between the two files (not stranded)"
+  echo "  callNovelNonCanonical - Compares introns described by reference GTF "
+  echo "                          file to introns described by a list of "
+  echo "                          readIDs in the format produced by:"
+  echo "                            `bedtools getfasta -name`"
+  echo "                          function, outputs the novel introns in BED"
+  echo "                          format"
   echo ""
 
 
 proc writeTranslateHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "translate   - Translates FASTA/Q nucleotide sequences into protein based on their longest ORF"
+  echo "translate   - Translates FASTA/Q nucleotide sequences into protein "
+  echo "              based on their longest ORF"
   echo "Usage:"
-  echo "  ./conduitUtils translate [options] -i <transcripts.fa> -o <predicted_protein.fa>"
-  echo "  <transcripts.fa>         FASTA/Q infile containing putative transcripts to be translated"
-  echo "  <predicted_protein.fa>   FASTA outfile containing in silico translated ORFs from transcripts.fa"
+  echo "  ./conduitUtils translate [options] -i <transcripts.fa>"
+  echo "                                     -o <predicted_protein.fa>"
+  echo "  <transcripts.fa>         FASTA/Q infile containing putative"
+  echo "                           transcripts to be translated"
+  echo "  <predicted_protein.fa>   FASTA outfile containing in silico"
+  echo "                           translated ORFs from transcripts.fa"
   echo ""
   echo "Options (defaults in parentheses):"
   echo "  Input Options:"
@@ -111,17 +135,22 @@ proc writeTranslateHelp() =
   echo "        Input reads are forward stranded"
   echo "  Filtering Options:"
   echo "    -l, --min-length (75)"
-  echo "        Minimum length in Amino Acids necessary for a putative ORF to be reported"
+  echo "        Minimum length in Amino Acids necessary for a putative ORF to "
+  echo "        be reported"
 
 
 proc writeStrandTranscriptsHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "strandTranscripts  - Translates FASTA/Q nucleotide sequences into protein based on their longest ORF"
+  echo "strandTranscripts - Translates FASTA/Q nucleotide sequences into"
+  echo "                    protein based on their longest ORF"
   echo "Usage:"
-  echo "  ./conduitUtils strandTranscripts [options] -i <transcripts.fa> -o <predicted_protein.fa>"
-  echo "  <transcripts.fa>            FASTA/Q infile containing putative transcripts to be translated"
-  echo "  <stranded_trasncripts.fa>   FASTA outfile containing in silico translated ORFs from transcripts.fa"
+  echo "  ./conduitUtils strandTranscripts [options] -i <transcripts.fa> \\"
+  echo "                                             -o <predicted_protein.fa>"
+  echo "  <transcripts.fa>            FASTA/Q infile containing putative "
+  echo "                              transcripts to be translated"
+  echo "  <stranded_trasncripts.fa>   FASTA outfile containing in silico "
+  echo "                              translated ORFs from transcripts.fa"
   echo ""
   echo "Options (defaults in parentheses):"
   echo "  Input Options:"
@@ -134,7 +163,8 @@ proc writeStrandTranscriptsHelp() =
 proc writeBED2GTFHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "bed2gtf     - Converts BED12 files to well structured GTF file suitable for use in GFFcompare"
+  echo "bed2gtf - Converts BED12 files to well structured GTF file suitable for"
+  echo "          use in GFFcompare"
   echo "Usage:"
   echo "  ./conduitUtils bed2gtf -i <infile.bed> -o <outfile.gtf>"
   echo "  <infile.bed>    BED12 infile to be converted in to GTF format"
@@ -149,99 +179,145 @@ proc writeBED2GTFHelp() =
 proc writeBLASTPHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "parseBLASTP   - Parses BLASTP output and outputs closest match for each query transcript as determined by BLASTP"
+  echo "parseBLASTP - Parses BLASTP output and outputs closest match for each"
+  echo "              query transcript as determined by BLASTP"
   echo "Usage:"
-  echo "  ./conduitUtils parseBLASTP -i <inBLASTP.txt> -o <outPutativeOrthologs.tsv>"
-  echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
-  echo "  <outPutativeOrthologs.tsv>  Tab separated file of putative ortholog matches"
-  echo "                              In format: <Query ID>\t<Reference proteome top match ID>\t<E value>"
+  echo "  ./conduitUtils parseBLASTP -i <inBLASTP.txt> \\"
+  echo "                             -o <outPutativeOrthologs.tsv>"
+  echo "  <inBLASTP.txt>              Default output of BLASTP search of"
+  echo "                              translated protein products vs some"
+  echo "                              reference proteome"
+  echo "  <outPutativeOrthologs.tsv>  Tab separated file of putative ortholog"
+  echo "                              matches"
+  echo "    Output will be in format:"
+  echo "      <Query ID>\\t<Reference proteome top match ID>\\t<E value>"
 
 
 proc writeCompareBLASTPHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "compareBLASTP - Compares BLASTP output and reference proteome to determine the # of true positives, false positives, and false negatives for a sample"
+  echo "compareBLASTP - Compares BLASTP output and reference proteome to"
+  echo "                determine the # of true positives, false positives, and"
+  echo "                false negatives for a sample"
   echo "Usage:"
-  echo "  ./conduitUtils compareBLASTP -r <reference_proteome.fa> -i <inBLASTP.txt>"
-  echo "  <reference_proteome.fa>     FASTA file describing the reference proteome used in the BLASTP search"
-  echo "  <inBLASTP.txt>              Default output of BLASTP search of translated protein products vs some reference proteome"
+  echo "  ./conduitUtils compareBLASTP -r <reference_proteome.fa> \\"
+  echo "                               -i <inBLASTP.txt>"
+  echo "  <reference_proteome.fa>     FASTA file describing the reference"
+  echo "                              proteome used in the BLASTP search"
+  echo "  <inBLASTP.txt>              Default output of BLASTP search of"
+  echo "                              translated protein products vs some"
+  echo "                              reference proteome"
 
 
 proc writeCompareFASTAHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "compareFASTA  - Compares two FASTA files, an input and a reference, to determine the # of true positives, false positives, and false negatives for a sample"
+  echo "compareFASTA  - Compares two FASTA files, an input and a reference, to"
+  echo "                determine the # of true positives, false positives, and"
+  echo "                false negatives for a sample"
   echo "Usage:"
   echo "  ./conduitUtils compareFASTA -r <reference.fa> -i <query.fa>"
-  echo "  <reference.fa>              Reference FASTA file defining the truth set"
-  echo "  <query.fa>                  Query FASTA files defining the query set"
+  echo "  <reference.fa>  Reference FASTA file defining the truth set"
+  echo "  <query.fa>      Query FASTA files defining the query set"
 
 
 proc writeSplitFASTAHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "splitFASTA    - Splits CONDUIT produced FASTA file based on the number of reads supporting each isoform"
+  echo "splitFASTA - Splits CONDUIT produced FASTA file based on the number of"
+  echo "             reads supporting each isoform"
   echo "Usage:"
   echo "  ./conduitUtils splitFASTA -i <conduit_output.fa> -o <outprefix>"
-  echo "  <conduit_output.fa>         CONDUIT produced FASTA file to be split based on number of reads supporting each isoform"
-  echo "  <outprefix>                 Prefix for the fasta files to be output, suffix will describe the bin being reported"
+  echo "  <conduit_output.fa> CONDUIT produced FASTA file to be split based on"
+  echo "                      number of reads supporting each isoform"
+  echo "  <outprefix>         Prefix for the fasta files to be output, suffix "
+  echo "                      will describe the bin being reported"
 
 
 proc writeFilterFASTAHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "filterFASTA   - Filters CONDUIT produced FASTA file based on number of reads supporting each isoform"
+  echo "filterFASTA - Filters CONDUIT produced FASTA file based on number of"
+  echo "              reads supporting each isoform"
   echo "Usage:"
-  echo "  ./conduitUtils filterFASTA -i <inBLASTP.txt> -o <outPutativeOrthologs.tsv>"
-  echo "  <conduit_output.fa>         CONDUIT produced FASTA file to be filtered based on number of reads supporting each isoform"
-  echo "  <filtered.fa>               Output FASTA file for filtered reads"
+  echo "  ./conduitUtils filterFASTA -i <inBLASTP.txt> \\"
+  echo "                             -o <outPutativeOrthologs.tsv>"
+  echo "  <conduit_output.fa> CONDUIT produced FASTA file to be filtered based"
+  echo "                      on number of reads supporting each isoform"
+  echo "  <filtered.fa>       Output FASTA file for filtered reads"
   echo "Options: (defaults in parentheses)"
   echo "  Filtering options:"
   echo "     -n (5)"
-  echo "        Minimum number of reads that must support an isoform for it to be reported in the filtered FASTA"
+  echo "        Minimum number of reads that must support an isoform for it to"
+  echo "        be reported in the filtered FASTA"
 
 
 proc writeExtractIntronsHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "extractIntrons   - Extracts out intronic sequences from BED12 formatted input and outputs as BED6"
+  echo "extractIntrons - Extracts out intronic sequences from BED12 formatted "
+  echo "                 input and outputs as BED6"
   echo "Usage:"
   echo "  ./conduitUtils extractIntrons -i <transcripts.bed12> -o <introns.bed>"
-  echo "  <transcripts.bed12>         Transcripts in BED12 format to extract introns from"
+  echo "  <transcripts.bed12>         Transcripts in BED12 format to extract "
+  echo "                              introns from"
   echo "  <introns.bed>               BED6 output of extracted introns"
 
 
 proc writeCallNonCanonicalHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "callNonCanonical - Reads in a FASTA file and reports the readIDs of sequences that dont begin with GT and end with AG"
+  echo "callNonCanonical - Reads in a FASTA file and reports the readIDs of "
+  echo "                   sequences that dont begin with GT and end with AG"
   echo "Usage:"
   echo "  ./conduitUtils callNonCanonical -i <introns.fa> -o <noncanonical.txt>"
-  echo "  <introns.fa>              FASTA describing the stranded sequence of introns extracted from `extractIntrons`"
-  echo "                            Introns sequences can be obtained using `bedtools getfasta -name -s`"
-  echo "  <noncanonical.txt>        Read IDs of the sequences that didn't begin with GT and end with AG"
+  echo "  <introns.fa>       FASTA describing the stranded sequence of introns"
+  echo "                     extracted from `extractIntrons` Introns sequences"
+  echo "                     can be obtained using `bedtools getfasta -name -s`"
+  echo "  <noncanonical.txt> Read IDs of the sequences that didn't begin with"
+  echo "                     GT and end with AG"
 
 
 proc writeCallNovelNonCanonicalHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "callNovelNonCanonical - Compares introns described by reference GTF file to introns described by a list of readIDs in the format produced by `bedtools getfasta -name` function, outputs the novel introns in BED format"
+  echo "callNovelNonCanonical - Compares introns described by reference GTF"
+  echo "                        file to introns described by a list of readIDs"
+  echo "                        in the format produced by"
+  echo "                          `bedtools getfasta -name`"
+  echo "                        function, outputs the novel introns in BED"
+  echo "                        format"
   echo "Usage:"
-  echo "  ./conduitUtils callNovelNonCanonical -r <reference.gtf> -i <noncanonical.txt> -o <novel.bed>"
-  echo "  <reference.gtf>              Reference GTF file specifying the introns to compare against"
-  echo "  <noncanonical.txt>           Read IDs specifying intron structure in the format produced by `bedtools getfasta -name`"
-  echo "  <novel.bed>                  Output of introns found in the noncanonical.txt file but not found in the reference, in BED6 format"
+  echo "  ./conduitUtils callNovelNonCanonical -r <reference.gtf> \\"
+  echo "                                       -i <noncanonical.txt> \\"
+  echo "                                       -o <novel.bed>"
+  echo "  <reference.gtf>              Reference GTF file specifying the"
+  echo "                               introns to compare against"
+  echo "  <noncanonical.txt>           Read IDs specifying intron structure in"
+  echo "                               the format produced by"
+  echo "                               `bedtools getfasta -name`"
+  echo "  <novel.bed>                  Output of introns found in the"
+  echo "                               noncanonical.txt file but not found in"
+  echo "                               the reference, in BED6 format"
 
 
 proc writeCallOverlappingHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitUtilsVersion()
-  echo "callOverlapping - Compares two files of readIDs specifying introns in the format produced by `bedtools getfasta -name`, and reports the introns that are shared between the two files (not stranded)"
+  echo "callOverlapping - Compares two files of readIDs specifying introns in"
+  echo "                  the format produced by `bedtools getfasta -name`, and"
+  echo "                  reports the introns that are shared between the two"
+  echo "                  files (not stranded)"
   echo "Usage:"
-  echo "  ./conduitUtils callOverlapping -r <introns1.txt> -i <introns2.txt> -o <shared_introns.txt>"
-  echo "  <introns1.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
-  echo "  <introns2.txt>              Read IDs specifying introns in the format produced by `bedtools getfasta -name`"
-  echo "  <shared_introns.txt>        The introns in common between the two files"
+  echo "  ./conduitUtils callOverlapping -r <introns1.txt> \\"
+  echo "                                 -i <introns2.txt> \\"
+  echo "                                 -o <shared_introns.txt>"
+  echo "  <introns1.txt>              Read IDs specifying introns in the format"
+  echo "                              produced by `bedtools getfasta -name`"
+  echo "  <introns2.txt>              Read IDs specifying introns in the format"
+  echo "                              produced by `bedtools getfasta -name`"
+  echo "  <shared_introns.txt>        The introns in common between the two"
+  echo "                              files"
 
 
 proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] = 
@@ -262,7 +338,8 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
   while true:
     try:
       if not firstIter1:
-        queryLine = infile.readLine() # Query= cluster_10_0 <unknown description>
+        # Query= cluster_10_0 <unknown description>
+        queryLine = infile.readLine()
       else:
         firstIter1 = false
       # echo queryLine
@@ -303,14 +380,16 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
       let splitline = infile.readLine()
       if splitline == "":
         # No significant alignments here
-        discard infile.readLine() # ""
+        discard infile.readLine()  # ""
         assert infile.readLine() == "***** No hits found *****"
-        discard infile.readLine() # ""
-        discard infile.readLine() # ""
-        discard infile.readLine() # ""
-      elif splitline == "                                                                      Score        E":
-        assert infile.readLine() == "Sequences producing significant alignments:                          (Bits)     Value"
-        discard infile.readLine() # ""
+        discard infile.readLine()  # ""
+        discard infile.readLine()  # ""
+        discard infile.readLine()  # ""
+      elif splitline == "                                   " &
+                        "                                   Score        E":
+        assert infile.readLine() == "Sequences producing significant " &
+          "alignments:                          (Bits)     Value"
+        discard infile.readLine()  # ""
         var nextline : string
         var numSeqs = 0
         while true:
@@ -379,7 +458,8 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
               var fields2 = fields1[2].strip().split(seps={'/'})
               let idsNumerator = parseUInt(fields2[0])
               let idsDenominator = parseUInt(fields2[1])
-              let idsPercentage = 100.0 * float(idsNumerator) / float(idsDenominator)
+              let idsPercentage = 100.0 * float(idsNumerator) /
+                float(idsDenominator)
               
               idsNumeratorsForMatch.add(idsNumerator)
               idsDenominatorsForMatch.add(idsDenominator)
@@ -389,7 +469,8 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
               fields2 = fields1[2].strip().split(seps={'/'})
               let posNumerator = parseUInt(fields2[0])
               let posDenominator = parseUInt(fields2[1])
-              let posPercentage = 100.0 * float(posNumerator) / float(posDenominator)
+              let posPercentage = 100.0 * float(posNumerator) /
+                float(posDenominator)
 
               posNumeratorsForMatch.add(posNumerator)
               posDenominatorsForMatch.add(posDenominator)
@@ -399,7 +480,8 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
               fields2 = fields1[2].strip().split(seps={'/'})
               let gapNumerator = parseUInt(fields2[0])
               let gapDenominator = parseUInt(fields2[1])
-              let gapPercentage = 100.0 * float(gapNumerator) / float(gapDenominator)
+              let gapPercentage = 100.0 * float(gapNumerator) /
+                float(gapDenominator)
 
               gapNumeratorsForMatch.add(gapNumerator)
               gapDenominatorsForMatch.add(gapDenominator)
@@ -421,7 +503,8 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
                 let sbjctline = infile.readLine()
                 discard infile.readLine()
                 let queryfields = queryline.strip().splitWhitespace()
-                let conssSubseq = consensusline[12..^1] # Have to do it this way because sometimes there'll be a space at the beginning
+                let conssSubseq = consensusline[12..^1] # Have to do it this way
+                #  because sometimes there'll be a space at the beginning
                 let sbjctfields = sbjctline.strip().splitWhitespace()
                 # echo queryfields
                 if firstIter:
@@ -469,12 +552,15 @@ proc parseBLASTPoutput*(infilepath : string) : seq[BLASTmatch] =
       # let test = infile.readLine()
       # echo test
       # assert test == "Lambda      K        H        a         alpha"
-      assert infile.readLine() == "Lambda      K        H        a         alpha"
+      assert infile.readLine() == "Lambda      K        H        " &
+        "a         alpha"
       discard infile.readLine() #    0.308    0.126    0.365    0.792     4.96
       discard infile.readLine() # ""
       assert infile.readLine() == "Gapped"
-      assert infile.readLine() == "Lambda      K        H        a         alpha    sigma"
-      discard infile.readLine() #    0.267   0.0410    0.140     1.90     42.6     43.6
+      assert infile.readLine() == "Lambda      K        H        " &
+        "a         alpha    sigma"
+      #    0.267   0.0410    0.140     1.90     42.6     43.6
+      discard infile.readLine() 
       discard infile.readLine() # ""
       discard infile.readLine() # "Effective search space used: 318188442"
       discard infile.readLine() # ""
@@ -597,7 +683,11 @@ proc translateTranscript*(nts : string) : string =
       result = translation
 
 
-proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60, stranded : bool = false) =
+proc translateTranscripts*(transcripts : openArray[FastaRecord],
+                           outfilepath : string ,
+                           threshold : int = 75,
+                           wrap_len : int = 60,
+                           stranded : bool = false) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for transcript in transcripts:
@@ -619,16 +709,28 @@ proc translateTranscripts*(transcripts : openArray[FastaRecord],outfilepath : st
       for i in 0..<(translation.len div wrap_len):
         outfile.write(&"{translation[i*wrap_len..(i+1)*wrap_len - 1]}\n")
       if translation.len mod wrap_len != 0 :
-        outfile.write(&"{translation[wrap_len*(translation.len div wrap_len)..^1]}\n")
+        let line = translation[wrap_len * (translation.len div wrap_len)..^1]
+        outfile.write(&"{line}\n")
   outfile.close()
 
 
-proc translateTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string , threshold : int = 75,wrap_len : int = 60,stranded = false) =
-  translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,threshold,wrap_len,stranded)
+proc translateTranscripts*(transcripts : openArray[FastqRecord],
+                           outfilepath : string ,
+                           threshold : int = 75,
+                           wrap_len : int = 60,
+                           stranded = false) =
+  translateTranscripts(convertFASTQtoFASTA(transcripts),
+                       outfilepath,
+                       threshold,
+                       wrap_len,
+                       stranded)
 
 
-proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bool = false ) =
-  ## Converts BED12 formatted file to well-formed GTF file suitable for evaluation with GFFcompare
+proc convertBED12toGTF*(infilepath : string,
+                        outfilepath : string,
+                        stranded : bool = false ) =
+  ## Converts BED12 formatted file to well-formed GTF file
+  ## suitable for evaluation with GFFcompare
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
@@ -642,9 +744,11 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
       let txid = bedfields[3]
       let strand = bedfields[5]
       if stranded:
-        outfile.write(&"{chr}\tBLANK\ttranscript\t{startIdx}\t{endIdx}\t.\t{strand}\t.\ttranscript_id \"{txid}\";\n")
+        outfile.write(&"{chr}\tBLANK\ttranscript\t{startIdx}\t{endIdx}\t.\t" &
+          &"{strand}\t.\ttranscript_id \"{txid}\";\n")
       else:
-        outfile.write(&"{chr}\tBLANK\ttranscript\t{startIdx}\t{endIdx}\t.\t.\t.\ttranscript_id \"{txid}\";\n")
+        outfile.write(&"{chr}\tBLANK\ttranscript\t{startIdx}\t{endIdx}\t.\t" &
+          &".\t.\ttranscript_id \"{txid}\";\n")
       let blockSizes = bedfields[10].split(sep=',')
       let blockStarts= bedfields[11].split(sep=',')
 
@@ -654,23 +758,34 @@ proc convertBED12toGTF*(infilepath : string, outfilepath : string ,stranded : bo
         var newStartIdx, newEndIdx, exonNumber : uint
         if strand == "+" or not stranded:
           newStartIdx = startIdx + parseUInt(blockStarts[i])
-          newEndIdx = startIdx + parseUInt(blockStarts[i]) + parseUInt(blockSizes[i]) - 1
+          newEndIdx = startIdx +
+                      parseUInt(blockStarts[i]) +
+                      parseUInt(blockSizes[i]) - 1
           exonNumber = uint(i + 1)
         elif strand == "-":
-          newStartIdx = startIdx + parseUInt(blockStarts[i])
-          newEndIdx = startIdx + parseUInt(blockStarts[i]) + parseUInt(blockSizes[i]) - 1
+          newStartIdx = startIdx +
+                        parseUInt(blockStarts[i])
+          newEndIdx = startIdx +
+                      parseUInt(blockStarts[i]) +
+                      parseUInt(blockSizes[i]) - 1
           exonNumber = uint(blockStarts.len - i)
         if stranded:
-          outfile.write(&"{chr}\tBLANK\texon\t{newStartIdx}\t{newEndIdx}\t.\t{strand}\t.\ttranscript_id \"{txid}\"; exonNumber \"{exonNumber}\"\n")
+          outfile.write(&"{chr}\tBLANK\texon\t{newStartIdx}\t{newEndIdx}\t." &
+            &"\t{strand}\t.\ttranscript_id \"{txid}\"; " &
+            &"exonNumber \"{exonNumber}\"\n")
         else:
-          outfile.write(&"{chr}\tBLANK\texon\t{newStartIdx}\t{newEndIdx}\t.\t.\t.\ttranscript_id \"{txid}\"; exonNumber \"{exonNumber}\"\n")
+          outfile.write(&"{chr}\tBLANK\texon\t{newStartIdx}\t{newEndIdx}\t." &
+            &"\t.\t.\ttranscript_id \"{txid}\"; " &
+            &"exonNumber \"{exonNumber}\"\n")
   except EOFError:
     discard
   infile.close()
   outfile.close()
 
 
-proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : string, wrap_len : int = 60) =
+proc strandTranscripts*(transcripts : openArray[FastaRecord],
+                        outfilepath : string,
+                        wrap_len : int = 60) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for transcript in transcripts:
@@ -693,11 +808,16 @@ proc strandTranscripts*(transcripts : openArray[FastaRecord],outfilepath : strin
   outfile.close()
 
 
-proc strandTranscripts*(transcripts : openArray[FastqRecord],outfilepath : string, wrap_len : int = 60) =
-  translateTranscripts(convertFASTQtoFASTA(transcripts),outfilepath,wrap_len)
+proc strandTranscripts*(transcripts : openArray[FastqRecord],
+                        outfilepath : string,
+                        wrap_len : int = 60) =
+  translateTranscripts(convertFASTQtoFASTA(transcripts),
+                       outfilepath,
+                       wrap_len)
 
 
-proc compareExactTranslations*(referenceInfilepath : string, translation_infilepath : string) =
+proc compareExactTranslations*(referenceInfilepath : string,
+                               translation_infilepath : string) =
   var rInfile, tInfile : File
   discard open(rInfile,referenceInfilepath,fmRead)
   discard open(tInfile,translation_infilepath,fmRead)
@@ -721,7 +841,8 @@ proc compareExactTranslations*(referenceInfilepath : string, translation_infilep
   echo &"Recall:    {float(tp) / float(tp+fn)}"
 
 
-proc compareBLASTPTranslations*(referenceInfilepath : string, blastp_infilepath : string,) =
+proc compareBLASTPTranslations*(referenceInfilepath : string,
+                                blastpInfilepath : string) =
   var fp,tp1 = 0
   var referenceIdSet : HashSet[string]
   var matchSet : HashSet[string]
@@ -732,7 +853,7 @@ proc compareBLASTPTranslations*(referenceInfilepath : string, blastp_infilepath 
   for record in referenceRecords:
     referenceIdSet.incl(record.readId)
   
-  let blastRecords = parseBLASTPoutput(blastp_infilepath)
+  let blastRecords = parseBLASTPoutput(blastpInfilepath)
   for record in blastRecords:
     if record.matchNames.len > 0:
       matchSet.incl(record.matchNames[0])
@@ -752,8 +873,10 @@ proc compareBLASTPTranslations*(referenceInfilepath : string, blastp_infilepath 
   echo &"Recall (uses TP2):    {float(tp2) / float(tp2+fn)}"
 
 
-proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) = 
-  ## Grabs Introns from BED12 file and reports one per line in BED format, with ID = ID from the BED12 line
+proc extractIntronsFromBED12*(infilepath : string,
+                              outfilepath : string) = 
+  ## Grabs Introns from BED12 file and reports one per line in BED format
+  ## with ID = ID from the BED12 line
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
@@ -772,16 +895,21 @@ proc extractIntronsFromBED12*(infilepath : string, outfilepath : string) =
       # var exon_count = 1
       # var reverse_exon_count = blockStarts.len
       for i in 1..<blockStarts.len:
-        let intronStartIdx = startIdx + parseUInt(blockStarts[i-1]) + parseUInt(blockSizes[i-1])
-        let intronEndIdx = startIdx + parseUInt(blockStarts[i])
-        outfile.write(&"{chr}\t{intronStartIdx}\t{intronEndIdx}\t{txid}\t.\t{strand}\n")
+        let intronStartIdx = startIdx +
+                             parseUInt(blockStarts[i-1]) +
+                             parseUInt(blockSizes[i-1])
+        let intronEndIdx = startIdx +
+                           parseUInt(blockStarts[i])
+        outfile.write(&"{chr}\t{intronStartIdx}\t{intronEndIdx}\t{txid}\t." &
+          &"\t{strand}\n")
   except EOFError:
     discard
   infile.close()
   outfile.close()
 
 
-proc testOverlap(read : (uint64,uint64),single_exon_gene_list : seq[(uint64,uint64,string)]) : string = 
+proc testOverlap(read : (uint64,uint64),
+                 single_exon_gene_list : seq[(uint64,uint64,string)]) : string =
   result = ""
   for gene in single_exon_gene_list: #gene list must be sorted
     if read[0] >= gene[0] and read[0] <= gene[1]:
@@ -806,7 +934,8 @@ proc testOverlap(read : (uint64,uint64),single_exon_gene_list : seq[(uint64,uint
       break
 
 
-proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string) =
+proc callNonCanonicalSplicingFromFASTA*(infilepath : string,
+                                        outfilepath : string) =
   var infile,outfile : File
   discard open(infile,infilepath,fmRead)
   discard open(outfile,outfilepath,fmWrite)
@@ -816,12 +945,24 @@ proc callNonCanonicalSplicingFromFASTA*(infilepath : string,outfilepath : string
     if record.sequence.len < 2:
       echo "WARNING - Very short intron detected"
     else:
-      if record.sequence[0..1].toUpperAscii() != "GT" or record.sequence[^2..^1].toUpperAscii() != "AG":
+      if record.sequence[0..1].toUpperAscii() != "GT" or
+         record.sequence[^2..^1].toUpperAscii() != "AG":
         outfile.writeLine(record.readId)
   outfile.close()
 
 
-proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins : openArray[uint64] = [1'u64,2'u64,5'u64,10'u64,20'u64,40'u64,80'u64,160'u64,320'u64,640'u64]) = 
+proc splitFASTAByReadCounts*(infilepath : string,
+                             outfile_prefix : string,
+                             bins : openArray[uint64] = [1'u64,
+                                                         2'u64,
+                                                         5'u64,
+                                                         10'u64,
+                                                         20'u64,
+                                                         40'u64,
+                                                         80'u64,
+                                                         160'u64,
+                                                         320'u64,
+                                                         640'u64]) = 
   var infile : File
   discard open(infile,infilepath, fmRead)
   let fastaRecords = parseFasta(infile)
@@ -853,7 +994,8 @@ proc splitFASTAByReadCounts*(infilepath : string, outfile_prefix : string, bins 
     outfile.close()
 
 
-proc filterFASTAByReadCounts*(infilepath,outfilepath : string, filter : uint64 = 5'u64) =
+proc filterFASTAByReadCounts*(infilepath,outfilepath : string,
+                              filter : uint64 = 5'u64) =
   var infile,outfile : File
   discard open(infile,infilepath, fmRead)
   let fastaRecords = parseFasta(infile)
@@ -876,7 +1018,10 @@ proc parseAttributes(s : string) : Table[string,string] =
     result[key] = val
 
 
-proc callNovelNonCanonical(referenceInfilepath, infilepath,outfilepath : string,threshold : uint = 5) =
+proc callNovelNonCanonical(referenceInfilepath,
+                           infilepath,
+                           outfilepath : string,
+                           threshold : uint = 5) =
   var referenceInfile,infile,outfile : File
   discard open(referenceInfile,referenceInfilepath,fmRead)
   discard open(infile,infilepath,fmRead)
@@ -911,8 +1056,11 @@ proc callNovelNonCanonical(referenceInfilepath, infilepath,outfilepath : string,
             let txId = attributes["transcript_id"]
             echo &"{chr}:{startIdx}-{endIdx} {txId}"
             echo &"{newChr}:{newStartIdx}-{newEndIdx} {txId}"
-          # outfilepath.writeLine(chr,"\t",endIdx,"\t",newStartIdx,"\t","reference_intron")
-        lastExons[attributes["transcript_id"]] = (newChr, newStartIdx, newEndIdx)
+          # outfilepath.writeLine(chr,"\t",endIdx,"\t"," & 
+          #   &"newStartIdx,"\t","reference_intron")
+        lastExons[attributes["transcript_id"]] = (newChr,
+                                                  newStartIdx,
+                                                  newEndIdx)
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
@@ -946,7 +1094,9 @@ proc callNovelNonCanonical(referenceInfilepath, infilepath,outfilepath : string,
   echo &"Novel introns - {novelCounter}"
 
 
-proc callOverlappingNonCanonical(referenceInfilepath, infilepath,outfilepath : string) =
+proc callOverlappingNonCanonical(referenceInfilepath,
+                                 infilepath,
+                                 outfilepath : string) =
   var referenceInfile,infile,outfile : File
   discard open(referenceInfile,referenceInfilepath,fmRead)
   discard open(infile,infilepath,fmRead)
@@ -994,7 +1144,9 @@ proc callOverlappingNonCanonical(referenceInfilepath, infilepath,outfilepath : s
   echo &"Overlapping introns - {overlappingCounter}"
 
 
-proc assignTxIDs(referenceInfilepath,infilepath,outfilepath : string) = 
+proc assignTxIDs(referenceInfilepath,
+                 infilepath,
+                 outfilepath : string) = 
   var referenceInfile,infile,outfile : File
   discard open(referenceInfile,referenceInfilepath,fmRead)
   var txExons : Table[(string,string),seq[(uint64,uint64)]]
@@ -1017,9 +1169,11 @@ proc assignTxIDs(referenceInfilepath,infilepath,outfilepath : string) =
         let newStartIdx =  uint64(parseUInt(fields0[3])) - 1'u32
         let newEndIdx = uint64(parseUInt(fields0[4]))
         if (attributes["transcript_id"],newChr) in txExons:
-          txExons[(attributes["transcript_id"],newChr)].add((newStartIdx,newEndIdx))
+          txExons[(attributes["transcript_id"],newChr)].add((newStartIdx,
+                                                             newEndIdx))
         else:
-          txExons[(attributes["transcript_id"],newChr)] = @[(newStartIdx,newEndIdx)]
+          txExons[(attributes["transcript_id"],newChr)] = @[(newStartIdx,
+                                                             newEndIdx)]
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
@@ -1061,13 +1215,17 @@ proc assignTxIDs(referenceInfilepath,infilepath,outfilepath : string) =
       if blockStarts.len > 1:
         var intronChain : seq[(uint64,uint64)]
         for i in 1..<blockStarts.len:
-          let intronStartIdx = uint64(startIdx + parseUInt(blockStarts[i-1]) + parseUInt(blockSizes[i-1]))
-          let intronEndIdx = uint64(startIdx + parseUInt(blockStarts[i]))
+          let intronStartIdx = uint64(startIdx +
+                                      parseUInt(blockStarts[i-1]) +
+                                      parseUInt(blockSizes[i-1]))
+          let intronEndIdx = uint64(startIdx +
+                                    parseUInt(blockStarts[i]))
           intronChain.add((intronStartIdx,intronEndIdx))
         if (chr,intronChain) in txIntrons:
           referenceId = txIntrons[(chr,intronChain)]
       else:
-        referenceId = testOverlap((uint64(startIdx),uint64(endIdx)),singleExonGenes[chr])
+        referenceId = testOverlap((uint64(startIdx),uint64(endIdx)),
+                                  singleExonGenes[chr])
       if referenceId == "":
         outfile.write(&"{txid}\t.\n")
       else:
@@ -1100,7 +1258,8 @@ proc parseGTF*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
         let newStartIdx =  uint64(parseUInt(fields0[3])) - 1'u32
         let newEndIdx = uint64(parseUInt(fields0[4]))
         if attributes["transcript_id"] in exons:
-          let (chr, strand, startIdx,endIdx)= exons[attributes["transcript_id"]][^1]
+          let (chr, strand, startIdx,endIdx) =
+            exons[attributes["transcript_id"]][^1]
           try:
             assert chr == newChr
             assert strand == newStrand
@@ -1110,9 +1269,15 @@ proc parseGTF*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
             let txId = attributes["transcript_id"]
             echo &"{chr}({strand}):{startIdx}-{endIdx} {txId}"
             echo &"{newChr}({newStrand}):{newStartIdx}-{newEndIdx} {txId}"
-          exons[attributes["transcript_id"]].add((newChr, newStrand, newStartIdx, newEndIdx))
+          exons[attributes["transcript_id"]].add((newChr,
+                                                  newStrand,
+                                                  newStartIdx,
+                                                  newEndIdx))
         else:
-          exons[attributes["transcript_id"]] = @[(newChr, newStrand, newStartIdx, newEndIdx)]
+          exons[attributes["transcript_id"]] = @[(newChr,
+                                                  newStrand,
+                                                  newStartIdx,
+                                                  newEndIdx)]
       else:
         echo "ERROR - no field transcript_id"
   except EOFError:
@@ -1133,7 +1298,10 @@ proc parseGTF*(infile : File) : HashSet[(string,char,seq[(uint64,uint64)])] =
 
 #TODO - Add to help
 #TODO - (?) add outfile writing (?)
-proc idNovelIsoforms*(infilepath,reference1_infilepath,reference2_infilepath,outfilepath : string) =
+proc idNovelIsoforms*(infilepath,
+                      reference1_infilepath,
+                      reference2_infilepath,
+                      outfilepath : string) =
   # var infile, ref1file, ref2file, outfile : File
   var infile, ref1file, ref2file : File
   discard open(ref1file,reference1_infilepath,fmRead)
@@ -1165,7 +1333,10 @@ proc getTxId*(s : string) : string =
   result = s.split(':')[1].split('|')[0]
 
 
-proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,field = 1) = 
+proc getNovelLociFASTA*(infilepath,
+                        gffcompare_infilepath,
+                        outfilepath : string,
+                        field = 1) = 
   var novelLoci : HashSet[string]
   var infile,gfffile,outfile : File
   discard open(gfffile,gffcompare_infilepath,fmRead)
@@ -1177,7 +1348,12 @@ proc getNovelLociFASTA*(infilepath,gffcompare_infilepath,outfilepath : string,fi
       elif line[0] == '#':
         continue
       let fields0 = line.split('\t')
-      if fields0[3] != "u" and fields0[3] != "p" and fields0[3] != "y" and fields0[3] != "i" and fields0[3] != "x" and fields0[3] != "s":
+      if fields0[3] != "u" and
+         fields0[3] != "p" and
+         fields0[3] != "y" and
+         fields0[3] != "i" and
+         fields0[3] != "x" and
+         fields0[3] != "s":
         continue
       if fields0[3+field] != "-":
         echo fields0[1]
@@ -1247,7 +1423,21 @@ proc parseOptions() : UtilOptions =
       helpFlag = false
     i += 1
     case mode:
-      of "translate", "strandTranscripts", "bed2gtf", "parseBLASTP","compareBLASTP","compareFASTA","splitFASTA","filterFASTA","extractIntrons","callNonCanonical","callNovelNonCanonical","callOverlapping","assignIDs","idNovelIsoforms","getNovelLociFASTA":
+      of "translate",
+          "strandTranscripts",
+          "bed2gtf",
+          "parseBLASTP",
+          "compareBLASTP",
+          "compareFASTA",
+          "splitFASTA",
+          "filterFASTA",
+          "extractIntrons",
+          "callNonCanonical",
+          "callNovelNonCanonical",
+          "callOverlapping",
+          "assignIDs",
+          "idNovelIsoforms",
+          "getNovelLociFASTA":
         case kind:
           of cmdEnd:
             break
@@ -1358,11 +1548,19 @@ proc parseOptions() : UtilOptions =
     helpFlag = true
   var requireOutfile,requireReference = false
   case mode:
-    of "translate","bed2gtf","parseBLASTP","splitFASTA","filterFASTA","extractIntrons":
+    of "translate",
+       "bed2gtf",
+       "parseBLASTP",
+       "splitFASTA",
+       "filterFASTA",
+       "extractIntrons":
       requireOutfile = true
-    of "compareBLASTP","compareFASTA":
+    of "compareBLASTP",
+       "compareFASTA":
       requireReference = true
-    of "callNonCanonical","callNovelNonCanonical","callOverlapping":
+    of "callNonCanonical",
+       "callNovelNonCanonical",
+       "callOverlapping":
       requireReference = true
       requireOutfile = true
   

@@ -6,6 +6,8 @@
 #### Builds a transcriptome independent of a reference genome using Oxford Nanopore Technologies and optionally Illumina RNA-seq data (recommended)
 
 ### Installing CONDUIT:
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/conduit-assembler/badges/version.svg)](https://anaconda.org/bioconda/conduit-assembler)
+
 The easiest way to install CONDUIT on MacOS and Linux is via [Bioconda](https://anaconda.org/bioconda/conduit-assembler). The command for which is:
 
 `conda install -c bioconda conduit-assembler`

@@ -14,6 +14,7 @@ import poaV2/header
 import poaV2/poa
 import fasta
 import fastq
+import version
 
 {.experimental.}
 
@@ -86,7 +87,8 @@ type
 
 
 proc conduitVersion() : string =
-  return "CONDUIT Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
+  return &"CONDUIT Version {version.ConduitVersion} by Nathan Roach\n"&
+          "( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
 proc writeDefaultHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
@@ -94,23 +96,31 @@ proc writeDefaultHelp() =
   echo "Usage:"
   echo "  ./conduit <nano | hybrid>"
   echo "NOTE: nano mode not yet implemented... coming soon"
-  echo "      to run the equivalent of nano mode, run hybrid mode with -i:0 and --no-final-polish"
-  echo "      this will still require 'illumina' files to be passed, but will not check that they actually exist"
-  echo "      so including -U this_file_does_not_exist.fq should run."
+  echo "      to run the equivalent of nano mode, run hybrid mode with -i:0 and"
+  echo "      --no-final-polish this will still require 'illumina' files to be"
+  echo "      passed, but will not check that they actually exist so including"
+  echo "      -U this_file_does_not_exist.fq should run."
 
 proc writeNanoHelp() =
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
   echo "  ./conduit nano [options] <clustersDirectory>"
-  echo "  <clustersDirectory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
+  echo "  <clustersDirectory>   Directory containing the .fasta/.fa or"
+  echo "                        .fastq/.fq files of reads separated by"
+  echo "                        gene cluster"
   echo ""
   echo "Options (defaults in parentheses):"
   echo "  Scaffold type:"
+  #TODO -replace these param names, (leave them hidden for backwards comp)
+  #TODO - cdna is not stranded the way you think. Go with minimap2 convention
+  #TODO --uf, --ur, --ub
   echo "    --drna (default)"
-  echo "        Scaffold reads are stranded forward relative to coding strand, and may contain U characters instead of Ts"
+  echo "        Scaffold reads are stranded forward relative to coding strand,"
+  echo "        and may contain U characters instead of Ts"
   echo "    --cdna-rev-stranded"
-  echo "        Scaffold reads are stranded reverse complemented relative to coding strand"
+  echo "        Scaffold reads are stranded reverse complemented relative to"
+  echo "        coding strand"
   echo "    --cdna"
   echo "        Scaffold reads are NOT stranded"
   echo "    --sfq (default)"
@@ -119,9 +129,11 @@ proc writeNanoHelp() =
   echo "        Scaffold reads are in FASTA format"
   echo "  Consensus Collapsing:"
   echo "    -d, --isoform-delta (35)"
-  echo "        Maximum indel size to be 'corrected', beyond this size a new isoform is declared"
+  echo "        Maximum indel size to be 'corrected', beyond this size a new"
+  echo "        isoform is declared"
   echo "    -e, --ends-delta (35)"
-  echo "        Maximum size at the ends of isoforms to 'correct' before splitting"
+  echo "        Maximum size at the ends of isoforms to 'correct' before"
+  echo "        splitting"
   echo "  Ouput:"
   echo "    -o, --output-dir <path> (conduit/)"
   echo "        <path> where corrected clusters will be written"
@@ -134,37 +146,52 @@ proc writeNanoHelp() =
   echo "    --tmp-dir <path> (conduit-tmp/)"
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
-  echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
+  echo "        Number of threads to run in parallel (used for both Bowtie2 and"
+  echo "        Partial Order Graph correction)"
 
 proc writeHybridHelp() = 
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
-  echo "  ./conduit hybrid [options] <clustersDirectory> {-1 <m1> -2 <m2> | -U <r> | --interleaved <i> | -b <bam>}"
-  echo "  <clustersDirectory>   Directory containing the .fasta/.fa or .fastq/.fq files of reads separated by gene cluster"
-  echo "                         NOTE: .gz support coming for nanopore scaffold data, but is not an option at this time"
+  echo "  ./conduit hybrid [options] <clustersDirectory> {-1 <m1> -2 <m2>   |"
+  echo "                                                  -U <r>            |"
+  echo "                                                  --interleaved <i> |"
+  echo "                                                  -b <bam>}"
+  echo "  <clustersDirectory>   Directory containing the .fasta/.fa or"
+  echo "                        .fastq/.fq files of reads separated by gene"
+  echo "                        cluster"
+  echo "  NOTE: .gz support coming for nanopore scaffold data, but is not an "
+  echo "        option at this time"
   echo ""
-  echo "  Illumina data is aligned with Bowtie2, therefore Illumina data is provided in the same format as Bowtie2, namely:"
+  echo "  Illumina data is aligned with Bowtie2, therefore Illumina data is "
+  echo "  provided in the same format as Bowtie2, namely:"
   echo ""
-  echo "    <m1>                   Files with #1 mates, paired with files in <m2>"
-  echo "                           Could be gzip'ed (extension: .gz) or bzip2'ed (extension: .bz2)."
-  echo "    <m2>                   Files with #2 mates, paired with files in <m1>"
-  echo "                           Could be gzip'ed (extension: .gz) or bzip2'ed (extension: .bz2)."
-  echo "    <r>                    Files with unpaired reads"
-  echo "                           Could be gzip'ed (extension: .gz) or bzip2'ed (extension: .bz2)."
-  echo "    <i>                    File with interleaved paired-end FASTQ/FASTA reads"
-  echo "                           Could be gzip'ed (extension: .gz) or bzip2'ed (extension: .bz2)."
-  echo "    <bam>                  Files are unaligned BAM sorted by read name."
+  echo "    <m1>  Files with #1 mates, paired with files in <m2>"
+  echo "          Could be gzip'ed (extension: .gz)"
+  echo "          or bzip2'ed (extension: .bz2)."
+  echo "    <m2>  Files with #2 mates, paired with files in <m1>"
+  echo "          Could be gzip'ed (extension: .gz)"
+  echo "          or bzip2'ed (extension: .bz2)."
+  echo "    <r>   Files with unpaired reads"
+  echo "          Could be gzip'ed (extension: .gz)"
+  echo "          or bzip2'ed (extension: .bz2)."
+  echo "    <i>   File with interleaved paired-end FASTQ/FASTA reads"
+  echo "          Could be gzip'ed (extension: .gz)"
+  echo "          or bzip2'ed (extension: .bz2)."
+  echo "    <bam> Files are unaligned BAM sorted by read name."
   echo ""
-  echo "  <m1>, <m2>, <r> can be comma-separated lists (no whitespace) and can be specified many times."
+  echo "  <m1>, <m2>, <r> can be comma-separated lists (no whitespace)"
+  echo "                  and can be specified many times."
   echo "  E.g. '-U file1.fq,file2.fq -U file3.fq'."
   echo ""
   echo "Options (defaults in parentheses):"
   echo "  Scaffold Type:"
   echo "    --drna (default)"
-  echo "        Scaffold reads are stranded forward relative to coding strand, enforces --UtoT"
+  echo "        Scaffold reads are stranded forward relative to coding strand"
+  echo "        enforces --UtoT"
   echo "    --cdna-rev-stranded"
-  echo "        Scaffold reads are stranded reverse complemented relative to coding strand"
+  echo "        Scaffold reads are stranded reverse complemented relative to"
+  echo "        coding strand"
   echo "    --cdna"
   echo "        Scaffold reads are NOT stranded"
   echo "    --sfq (default)"
@@ -172,65 +199,92 @@ proc writeHybridHelp() =
   echo "    --sfa"
   echo "        Scaffold reads are in FASTA format"
   echo "    --UtoT (default)"
-  echo "        Scaffold reads contain Us instead of Ts. Converts U nucleotides to Ts in the sequences"
-  echo "        NOTE: This adds a bit of I/O overhead but doesn't affect things if your sequences are already U free"
+  echo "        Scaffold reads contain Us instead of Ts. Converts U nucleotides"
+  echo "        to Ts in the sequences"
+  echo "        NOTE: This adds a bit of I/O overhead but doesn't affect things"
+  echo "        if your sequences are already U free"
   echo "    --noUtoT"
-  echo "        Scaffold reads do not contain Us and do not need to be converted."
+  echo "        Scaffold reads don't contain Us and don't need to be converted"
   # echo "    --duplicate-filter"
-  # echo "        Scaffold reads have duplicate read IDs, filter out the duplicate reads"
+  # echo "        Scaffold reads have duplicate read IDs"
+  # echo "        filter out the duplicate reads"
   echo "  Illumina Type:"
   echo "    -u, --unstranded"
   echo "        Illumina reads are unstranded"
   echo "    -f, --fwd-stranded"
-  echo "        Illumina reads are stranded s.t. the first mate originates from the RNA strand"
+  echo "        Illumina reads are stranded s.t. the first mate originates from"
+  echo "        the RNA strand"
   echo "        Ignored if scaffold reads are not stranded"
   echo "    -r, --rev-stranded (default)"
-  echo "        Illumina reads are stranded s.t. the first mate is the reverse complement of the RNA strand"
+  echo "        Illumina reads are stranded s.t. the first mate is the reverse"
+  echo "        complement of the RNA strand"
   echo "        Ignored if scaffold reads are not stranded"
   echo "    --ifq (default)"
-  echo "        Illumina reads are in FASTQ format; Mutually exclusive with --ifa"
+  echo "        Illumina reads are in FASTQ format"
+  echo "        Mutually exclusive with --ifa"
   echo "    --ifa"
-  echo "        Illumina reads are in FASTA format; Mutually exclusive with --ifq"
+  echo "        Illumina reads are in FASTA format"
+  echo "        Mutually exclusive with --ifq"
   echo "  Consensus Collapsing:"
   echo "    -m, --score-matrix <path>"
-  echo "        Provide an alternative scoring matrix to use in partial order alignment"
-  echo "        Example formatting for the score matrix can be found at poaV2/myNUC3.4.4.mat"
+  echo "        Provide an alternative scoring matrix to use in partial order "
+  echo "        alignment"
+  echo "        Example formatting for the score matrix can be found at:"
+  echo "          src/poaV2/myNUC3.4.4.mat"
   echo "    -d, --isoform-delta (35)"
-  echo "        Maximum indel size to be 'corrected', beyond this size a new isoform is declared. Must be between 2 and 255"
+  echo "        Maximum indel size to be 'corrected', beyond this size a new"
+  echo "        isoform is declared. Must be between 2 and 255"
   echo "    -e, --ends-delta (35)"
-  echo "        Maximum size at the ends of isoforms to 'correct' before splitting. Must be between 2 and 255"
+  echo "        Maximum size at the ends of isoforms to 'correct' before"
+  echo "        splitting. Must be between 2 and 255"
   echo "    -i, --max-iterations (5)"
-  echo "        Maximum number of iterations to align to and correct scaffolds. Does not include optional final polshing step"
-  echo "        Note: Providing a value of 0 will not perform any graph based illumina correction"
+  echo "        Maximum number of iterations to align to and correct scaffolds."
+  echo "        Does not include optional final polshing step"
+  echo "        Note: Providing a value of 0 will not perform any graph based"
+  echo "        illumina correction"
   echo "    -w, --illumina-weight (10)"
-  echo "        Weight of illumina reads relative to nanopore reads when generating consensus"
+  echo "        Weight of illumina reads relative to nanopore reads when"
+  echo "        generating consensus"
   echo "    --final-polish (default)"
-  echo "        Include a final correction of individual isoforms, not in a splice graph"
+  echo "        Include a final correction of individual isoforms, not in a"
+  echo "        splice graph"
   echo "    --no-final-polish"
-  echo "        Do not do a final correction of individual isoforms, not in a splice graph"
+  echo "        Do not do a final correction of individual isoforms, not in a"
+  echo "        splice graph"
   echo "    --stringent (default)"
-  echo "        Enforce that every base / edge in each final reported isoform is supported by an Illumina read, excluding --stringent-tolerance bp on each end of each isoform"
+  echo "        Enforce that every base / edge in each final reported isoform"
+  echo "        is supported by an Illumina read"
+  echo "        excluding --stringent-tolerance bp on each end of each isoform"
   echo "    --no-stringent"
-  echo "        Do not enforce that every base / edge in each final reported isoform is supported by an Illumina read"
+  echo "        Do not enforce that every base / edge in each final reported"
+  echo "        isoform is supported by an Illumina read"
   echo "    --stringent-tolerance (100)"
-  echo "        Number of bases at the end of each isoform that do not have to have Illumina reads supporting them when run in --stringent mode; ignored when run with --no-stringents"
+  echo "        Number of bases at the end of each isoform that do not need to"
+  echo "        have Illumina reads supporting them when run in --stringent"
+  echo "        mode"
+  echo "        Ignored when run with --no-stringent"
   # echo "    --scaffold-minimum (1)" # TODO
-  # echo "        Minimum number of scaffolding reads supporting an isoform necessary to report the isoform in the final output"
+  # echo "        Minimum number of scaffolding reads supporting an isoform"
+  # echo "        necessary to report the isoform in the final output"
   echo "  Ouput:"
   echo "    -o, --output-dir <path> (conduit/)"
   echo "        <path> where corrected clusters will be written"
   echo "        NOTE: THIS WILL OVERWRITE EXISTING FILES!"
   echo "    -n, --no-intermediates (default)"
-  echo "        Does not save FASTA file generated for intermediate rounds of polishing"
+  echo "        Does not save FASTA file generated for intermediate rounds of"
+  echo "        polishing"
   echo "    -s, --save-intermediates"
-  echo "        Saves the FASTA file generated for intermediate rounds of polishing"
+  echo "        Saves the FASTA file generated for intermediate rounds of"
+  echo "        polishing"
   echo "  Bowtie2:"
   echo "    --end-to-end (default)"
-  echo "        Align Illumina reads to ONT scaffolds in end-to-end alignment mode"
+  echo "        Align Illumina reads to ONT scaffolds in end-to-end alignment"
+  echo "        mode"
   echo "    --local"
   echo "        Align Illumina reads to ONT scaffolds in local alignment mode"
   echo "    -k,--bowtie2-max-alignments (50)"
-  echo "        Maximum number of alignments per Illumina read to be used in final polishing step"
+  echo "        Maximum number of alignments per Illumina read to be used in"
+  echo "        final polishing step"
   # echo "    --bowtie2-path (bowtie2)" # TODO
   echo "  SAMtools:"
   echo "    --samtools-thread-memory (768 MiB)"
@@ -245,9 +299,12 @@ proc writeHybridHelp() =
   echo "    --tmp-dir <path> (conduit-tmp/)"
   echo "        <path> where temporary files will be created"
   echo "    -t, --threads (4)"
-  echo "        Number of threads to run in parallel (used for both Bowtie2 and Partial Order Graph correction)"
-  # echo "        NOTE: Providing a value of 0 will attempt to autodetect the number of CPUs availible and use that." # TODO
-  # echo "              If CPU number cannot be detected, the default of 4 threads will be used. # TODO
+  echo "        Number of threads to run in parallel (used for both Bowtie2 and"
+  echo "        Partial Order Graph correction)"
+  # echo "        NOTE: Providing a value of 0 will attempt to autodetect the"
+  # echo "              number of CPUs availible and use that." # TODO
+  # echo "              If CPU number cannot be detected, the default of 4"
+  # echo "              threads will be used. # TODO
 
 proc removeFiles(files : openArray[string]) =
   for file in files:
@@ -260,18 +317,27 @@ proc createDirs(dirs : openArray[string]) =
 proc returnFalse() : bool {.thread.} = 
   return false
 
-proc outputTiming(outfilepath : string,time_seq : seq[Time],opts : ConduitOptions) =
+proc outputTiming(outfilepath : string,
+                  time_seq : seq[Time],
+                  opts : ConduitOptions) =
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   outfile.write("CONDUIT Timing Log:\n")
   for i in 0..<time_seq.len - 2:
-    outfile.write(&"Iter {i}: {(time_seq[i + 1] - time_seq[i]).inSeconds} s\n")
+    let time = (time_seq[i + 1] -
+                time_seq[i]).inSeconds
+    outfile.write(&"Iter {i}: {time} s\n")
   if opts.finalPolish:
-    outfile.write(&"Final Polish: {(time_seq[^1] - time_seq[^2]).inSeconds} s\n")
-  outfile.write(&"Total: {(time_seq[^1] - time_seq[0]).inSeconds} s\n")
+    let time = (time_seq[^1] -
+                time_seq[^2]).inSeconds
+    outfile.write(&"Final Polish: {time} s\n")
+  let time = (time_seq[^1] -
+              time_seq[0]).inSeconds
+  outfile.write(&"Total: {time} s\n")
   outfile.close()
 
-proc outputSettings(outfilepath : string,opts : ConduitOptions) = 
+proc outputSettings(outfilepath : string,
+                    opts : ConduitOptions) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   outfile.write("CONDUIT Command Log:\n")
@@ -306,13 +372,16 @@ proc outputSettings(outfilepath : string,opts : ConduitOptions) =
   outfile.write("SAMtools Settings\n")
   outfile.write(&"    SAMtools thread memory : {opts.samtoolsMemory}\n")
   outfile.write("Bowtie2 Settings:\n")
-  outfile.write(&"    bowtie2 strand constraint : {opts.bowtieStrandConstraint}\n")
+  outfile.write("    bowtie2 strand constraint : " &
+    &"{opts.bowtieStrandConstraint}\n")
   outfile.write(&"    bowtie2 alignment mode : {opts.bowtieAlignmentMode}\n")
   outfile.write(&"    bowtie2 max alignments : {opts.maxAlignments}\n")
   outfile.close()
 
 
-proc mergeFiles(infilepaths : openArray[string], outfilepath : string, delete_old_files : bool = false) = 
+proc mergeFiles(infilepaths : openArray[string],
+                outfilepath : string,
+                delete_old_files : bool = false) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for infilepath in infilepaths:
@@ -325,8 +394,20 @@ proc mergeFiles(infilepaths : openArray[string], outfilepath : string, delete_ol
   outfile.close()
 
 
-proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint16,bool)) {.thread.} =
-  let (infilepath,outdir,matrixFilepath,format,isoformDelta,endsDelta,u2t) = intuple
+proc runPOAandCollapsePOGraph(intuple : (string,
+                                         string,
+                                         string,
+                                         string,
+                                         uint16,
+                                         uint16,
+                                         bool)) {.thread.} =
+  let (infilepath,
+       outdir,
+       matrixFilepath,
+       format,
+       isoformDelta,
+       endsDelta,
+       u2t) = intuple
   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
   var fastaFile : string
   if format == "fasta":
@@ -339,14 +420,17 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     fastaFile = &"{outdir}{trim}.tmp.fa"
     convertFASTQfileToFASTAfile(infilepath,fastaFile)
   var splitNum = 200
-  var (numFastas,_) = splitFASTA2(fastaFile,&"{outdir}{trim}.tmp",splitNum = splitNum)
+  var (numFastas,_) = splitFASTA2(fastaFile,
+                                  &"{outdir}{trim}.tmp",
+                                  splitNum = splitNum)
   var totalFastas = numFastas
   var deleteFastaFlag = false
   if format == "fastq" or u2t or numFastas > 1:
     deleteFastaFlag = true
   if numFastas > 1:
     removeFile(fastaFile)
-    # Cacluate representative reads for each subfasta, store each in separate consensus fasta file
+    # Cacluate representative reads for each subfasta
+    # store each in separate consensus fasta file
     var mergeQueue : HeapQueue[(int, int)]
     for i in 0..<numFastas:
       let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
@@ -354,11 +438,20 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
       discard open(outFASTAfile,outFASTAfilepath,fmWrite)
       let tmpFasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
       var seqFile : PFile = fopen(cstring(tmpFasta))
-      var po = getPOGraphFromFasta(seqFile,cstring(matrixFilepath),cint(1),matrix_scoring_function)
+      var po = getPOGraphFromFasta(seqFile,
+                                   cstring(matrixFilepath),
+                                   cint(1),
+                                   matrix_scoring_function)
       removeFile(tmpFasta)
       var trimPo = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var (representativePaths,readSupports) = poGraphUtils.getRepresentativePaths3(addr trimPo, psi = isoformDelta, endsDelta = endsDelta)
-      let consensusPo = poGraphUtils.buildConsensusPO(addr po, representativePaths, readSupports, &"{trim}.tmp_subfasta{i}")
+      var (representativePaths,readSupports) =
+        poGraphUtils.getRepresentativePaths3(addr trimPo,
+                                             psi = isoformDelta,
+                                             endsDelta = endsDelta)
+      let consensusPo = poGraphUtils.buildConsensusPO(addr po,
+                                                      representativePaths,
+                                                      readSupports,
+                                                      &"{trim}.tmp_subfasta{i}")
       poGraphUtils.writeCorrectedReads(consensusPo,outFASTAfile)
       outFASTAfile.close()
       mergeQueue.push((consensusPo.reads.len,i))
@@ -377,11 +470,22 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
 
       # Decompose the new temp file
       var seqFile : PFile = fopen(cstring(newTmpFilepath))
-      var po = getPOGraphFromFasta(seqFile,cstring(matrixFilepath),cint(1),matrix_scoring_function,weight_support = true)
+      var po = getPOGraphFromFasta(seqFile,
+                                   cstring(matrixFilepath),
+                                   cint(1),
+                                   matrix_scoring_function,
+                                   weight_support = true)
       removeFile(newTmpFilepath)
       var trimPo = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var (representativePaths,readSupports) = poGraphUtils.getRepresentativePaths3(addr trimPo, psi = isoformDelta, endsDelta = endsDelta)
-      let consensusPo = poGraphUtils.buildConsensusPO(addr po, representativePaths, readSupports, &"{trim}.tmp_subfasta{totalFastas}")
+      var (representativePaths,readSupports) =
+        poGraphUtils.getRepresentativePaths3(addr trimPo,
+                                             psi = isoformDelta,
+                                             endsDelta = endsDelta)
+      let consensusPo =
+        poGraphUtils.buildConsensusPO(addr po,
+                                      representativePaths,
+                                      readSupports,
+                                      &"{trim}.tmp_subfasta{totalFastas}")
       
       # Write the decomposition to a new consensus file
       newFilepath = &"{outdir}{trim}.tmp_consensus{totalFastas}.fa"
@@ -401,12 +505,21 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     moveFile(newFilepath, &"{outdir}fasta{os.DirSep}{trim}.consensus.fa")
   else:
     var seqFile : PFile = fopen(cstring(fastaFile), "r")
-    var po2 = getPOGraphFromFasta(seqFile,cstring(matrixFilepath),cint(1),matrix_scoring_function)
+    var po2 = getPOGraphFromFasta(seqFile,
+                                  cstring(matrixFilepath),
+                                  cint(1),
+                                  matrix_scoring_function)
     if deleteFastaFlag:
       removeFile(fastaFile)
     var trimPo2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
-    var (representativePaths,readSupports) = poGraphUtils.getRepresentativePaths3(addr trimPo2, psi = isoformDelta, endsDelta = endsDelta)
-    let consensusPo = poGraphUtils.buildConsensusPO(addr po2, representativePaths, readSupports, trim)
+    var (representativePaths,readSupports) =
+      poGraphUtils.getRepresentativePaths3(addr trimPo2,
+                                           psi = isoformDelta,
+                                           endsDelta = endsDelta)
+    let consensusPo = poGraphUtils.buildConsensusPO(addr po2,
+                                                    representativePaths,
+                                                    readSupports,
+                                                    trim)
     let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
     var outFASTAfile : File
     discard open(outFASTAfile,outFASTAfilepath,fmWrite)
@@ -414,14 +527,23 @@ proc runPOAandCollapsePOGraph(intuple : (string,string,string,string,uint16,uint
     outFASTAfile.close()
 
 
-proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint16,uint16)) : bool {.thread.} =
+proc runGraphBasedIlluminaCorrection(intuple : (string,
+                                                string,
+                                                string,
+                                                uint64,
+                                                uint16,
+                                                uint16)) : bool {.thread.} =
   let (tmpDir, trim, matrixFilepath, iter,isoformDelta,endsDelta) = intuple
   let lastFastaDir = &"{tmpDir}{iter-1}{os.DirSep}fasta{os.DirSep}"
   let thisFastaDir = &"{tmpDir}{iter}{os.DirSep}fasta{os.DirSep}"
 
   let lastFastaFilepath = &"{lastFastaDir}{trim}.consensus.fa"
   var seqFile : PFile = fopen(cstring(lastFastaFilepath), "r")
-  var po = getPOGraphFromFasta(seqFile,matrixFilepath,cint(1),matrix_scoring_function,weight_support = true)
+  var po = getPOGraphFromFasta(seqFile,
+                               matrixFilepath,
+                               cint(1),
+                               matrix_scoring_function,
+                               weight_support = true)
 
   let thisFastaFilepath = &"{thisFastaDir}{trim}.consensus.fa"
 
@@ -431,8 +553,14 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   var trimPo = convertPOGraphtoTrimmedPOGraph(po)
   discard open(bam,bamfilepath,index=true)
   illuminaPolishPOGraph(addr trimPo, bam)
-  var (representativePaths,readSupports) = getRepresentativePaths3(addr trimPo, psi = isoformDelta,endsDelta = endsDelta)
-  var records = getFastaRecordsFromTrimmedPOGraph(addr trimPo, representativePaths, readSupports, trim)
+  var (representativePaths,readSupports) =
+    getRepresentativePaths3(addr trimPo,
+                            psi = isoformDelta,
+                            endsDelta = endsDelta)
+  var records = getFastaRecordsFromTrimmedPOGraph(addr trimPo,
+                                                  representativePaths,
+                                                  readSupports,
+                                                  trim)
   var outfile : File
   discard open(outfile,thisFastaFilepath,fmWrite)
   writeFASTArecordsToFile(outfile,records)
@@ -441,8 +569,20 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,string,string,uint64,uint
   result = sameFileContent(lastFastaFilepath,thisFastaFilepath)
   removeFile(lastFastaFilepath)
 
-proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uint16,bool,int)) {.thread.} = 
-  let (tmpDir, trim, convergedIter, iter,isoformDelta,stringent,stringentTolerance) = intuple
+proc runLinearBasedIlluminaCorrection(intuple : (string,
+                                                 string,
+                                                 uint64,
+                                                 uint64,
+                                                 uint16,
+                                                 bool,
+                                                 int)) {.thread.} = 
+  let (tmpDir,
+       trim,
+       convergedIter,
+       iter,
+       isoformDelta,
+       stringent,
+       stringentTolerance) = intuple
   let lastFastaDir = &"{tmpDir}{convergedIter}{os.DirSep}fasta{os.DirSep}"
   let thisFastaDir = &"{tmpDir}{iter}{os.DirSep}fasta{os.DirSep}"
 
@@ -462,8 +602,14 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
     var trimPo = getTrimmedGraphFromFastaRecord(read)
     illuminaPolishPOGraph(addr trimPo, bam,debug=true)
     discard getRepresentativePaths3(addr trimPo, psi = isoformDelta)
-    if (not stringent) or stringencyCheck(addr trimPo,trimPo.reads[0].correctedPath,stringentTolerance = stringentTolerance):
-      corrected.add(FastaRecord(readId : read.readId, sequence : getSequenceFromPath(trimPo,trimPo.reads[0].correctedPath)))
+    if (not stringent) or
+       stringencyCheck(addr trimPo,
+                       trimPo.reads[0].correctedPath,
+                       stringentTolerance = stringentTolerance):
+      let sequence = getSequenceFromPath(trimPo,
+                                        trimPo.reads[0].correctedPath)
+      corrected.add(FastaRecord(readId : read.readId,
+                                sequence : sequence))
   var outfile : File
   discard open(outfile,thisFastaFilepath,fmWrite)
   writeFASTArecordsToFile(outfile,corrected)
@@ -471,7 +617,9 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,string,uint64,uint64,uin
   outfile.close()
 
 
-proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath : string) = 
+proc combineFiles(indirectory : string,
+                  intrims : openArray[string],
+                  outfilepath : string) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
@@ -486,7 +634,10 @@ proc combineFiles(indirectory : string, intrims : openArray[string], outfilepath
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster"
   outfile.close()
 
-proc combineFilesIntermediate(indirectory : string, intrims : openArray[string], outfilepath : string, lastCorrection : Table[int,int]) = 
+proc combineFilesIntermediate(indirectory : string,
+                              intrims : openArray[string],
+                              outfilepath : string,
+                              lastCorrection : Table[int,int]) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
@@ -503,13 +654,17 @@ proc combineFilesIntermediate(indirectory : string, intrims : openArray[string],
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openArray[string], outfilepath : string, lastCorrection : Table[int,int]) = 
+proc combineFilesFinal(tmp_directory : string,
+                       last_num : uint64,
+                       intrims : openArray[string],
+                       outfilepath : string,
+                       lastCorrection : Table[int,int]) = 
   var outfile : File
   discard open(outfile,outfilepath,fmWrite)
   for i,trim in intrims:
     var last = last_num
     if i in lastCorrection:
-      last = uint64(lastCorrection[i]) #TODO convert lastCorrection to uint64 types.
+      last = uint64(lastCorrection[i])
     let indirectory = &"{tmp_directory}{last}{os.DirSep}fasta{os.DirSep}"
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if fileExists(filepath):
@@ -522,7 +677,9 @@ proc combineFilesFinal(tmp_directory : string,last_num : uint64, intrims : openA
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc getBowtie2options(opt : ConduitOptions, indexPrefix, sam : string, finalPolish : bool = false) : seq[string] = 
+proc getBowtie2options(opt : ConduitOptions,
+                       indexPrefix, sam : string,
+                       finalPolish : bool = false) : seq[string] = 
   var arguments : seq[string]
   arguments.add("--xeq")
   arguments.add("--no-unal")
@@ -683,7 +840,12 @@ proc parseOptions() : ConduitOptions =
                   nanoporeTypeFlag = true
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple scaffold types input, choose one of \"--drna\", \"--cdna-rev-stranded\", or \"--cdna\""
+                  echo "ERROR - Multiple scaffold types input, choose one of:"
+                  echo "  \"--drna\""
+                  echo "  \"--cdna-rev-stranded\" or"
+                  echo "  \"--cdna\""
+                  helpFlag = true
+                  break
               of "cdna-rev-stranded":
                 if not nanoporeTypeFlag:
                   nanoporeTypeFlag = true
@@ -691,7 +853,10 @@ proc parseOptions() : ConduitOptions =
                   nanoporeStrand = "reverse"
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple scaffold types input, choose one of \"--drna\", \"--cdna-rev-stranded\", or \"--cdna\""
+                  echo "ERROR - Multiple scaffold types input, choose one of:"
+                  echo "  \"--drna\""
+                  echo "  \"--cdna-rev-stranded\" or"
+                  echo "  \"--cdna\""
                   helpFlag = true
                   break
               of "cdna":
@@ -701,7 +866,10 @@ proc parseOptions() : ConduitOptions =
                   nanoporeStrand = "unstranded"
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple scaffold types input, choose one of \"--drna\", \"--cdna-rev-stranded\", or \"--cdna\""
+                  echo "ERROR - Multiple scaffold types input, choose one of:"
+                  echo "  \"--drna\""
+                  echo "  \"--cdna-rev-stranded\" or"
+                  echo "  \"--cdna\""
                   helpFlag = true
                   break
               of "sfq":
@@ -710,7 +878,9 @@ proc parseOptions() : ConduitOptions =
                   nanoporeFormatFlag = true
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple scaffold format input, choose one of FASTA (--sfa) or FASTQ (--sfq)"
+                  echo "ERROR - Multiple scaffold format input, choose one of:"
+                  echo "  FASTA (--sfa) or"
+                  echo "  FASTQ (--sfq)"
                   helpFlag = true
                   break
               of "sfa":
@@ -720,7 +890,9 @@ proc parseOptions() : ConduitOptions =
                   nanoporeFormat = "fasta"
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple scaffold format input, choose one of FASTA (--sfa) or FASTQ (--sfq)"
+                  echo "ERROR - Multiple scaffold format input, choose one of:"
+                  echo "  FASTA (--sfa) or"
+                  echo "  FASTQ (--sfq)"
                   helpFlag = true
                   break
               of "UtoT":
@@ -728,7 +900,8 @@ proc parseOptions() : ConduitOptions =
                   u2tFlag = true
                 elif not u2t:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --UtoT and --noUtoT both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --UtoT and --noUtoT both specified"
                   break
               of "noUtoT":
                 if not u2tFlag:
@@ -736,7 +909,8 @@ proc parseOptions() : ConduitOptions =
                   u2t = false
                 elif u2t:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --UtoT and --noUtoT both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --UtoT and --noUtoT both specified"
                   break
               of "m", "score-matrix":
                 if not scoreMatrixPathFlag:
@@ -755,7 +929,10 @@ proc parseOptions() : ConduitOptions =
                   illuminaStrand = "unstranded"
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple illumina strand input, choose one of (-u,--unstranded), (-f,--fwd-stranded), (-r,--rev-stranded)"
+                  echo "ERROR - Multiple illumina strand input, choose one of:"
+                  echo "  (-u,--unstranded)"
+                  echo "  (-f,--fwd-stranded)"
+                  echo "  (-r,--rev-stranded)"
                   helpFlag = true
                   break
               of "f", "fwd-stranded":
@@ -764,7 +941,10 @@ proc parseOptions() : ConduitOptions =
                   illuminaStrand = "forward"
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple illumina strand input, choose one of (-u,--unstranded), (-f,--fwd-stranded), (-r,--rev-stranded)"
+                  echo "ERROR - Multiple illumina strand input, choose one of:"
+                  echo "  (-u,--unstranded)"
+                  echo "  (-f,--fwd-stranded)"
+                  echo "  (-r,--rev-stranded)"
                   helpFlag = true
                   break
                 continue
@@ -773,7 +953,10 @@ proc parseOptions() : ConduitOptions =
                   illuminaStrandFlag = true
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple illumina strand input, choose one of (-u,--unstranded), (-f,--fwd-stranded), (-r,--rev-stranded)"
+                  echo "ERROR - Multiple illumina strand input, choose one of:"
+                  echo "  (-u,--unstranded)"
+                  echo "  (-f,--fwd-stranded)"
+                  echo "  (-r,--rev-stranded)"
                   helpFlag = true
                   break
               of "ifq":
@@ -781,7 +964,9 @@ proc parseOptions() : ConduitOptions =
                   illuminaFormatFlag = true
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple illumina format input, choose one of FASTA (--ifa), or FASTQ (--ifq)"
+                  echo "ERROR - Multiple illumina format input, choose one of:"
+                  echo "  FASTA (--ifa) or"
+                  echo "  FASTQ (--ifq)"
                   helpFlag = true
                   break
               of "ifa":
@@ -790,7 +975,9 @@ proc parseOptions() : ConduitOptions =
                   illuminaFormat = "fasta"
                 else:
                   runFlag = false
-                  echo "ERROR - Multiple illumina format input, choose one of FASTA (--ifa), or FASTQ (--ifq)"
+                  echo "ERROR - Multiple illumina format input, choose one of:"
+                  echo "  FASTA (--ifa) or"
+                  echo "  FASTQ (--ifq)"
                   helpFlag = true
                   break
               of "d", "isoform-delta":
@@ -842,7 +1029,8 @@ proc parseOptions() : ConduitOptions =
                   finalPolishFlag = true
                 elif not finalPolish:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --final-polish and --no-final-polish both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --final-polish and --no-final-polish both specified"
                   break
               of "no-final-polish":
                 if not finalPolishFlag:
@@ -850,21 +1038,24 @@ proc parseOptions() : ConduitOptions =
                   finalPolish = false
                 elif finalPolish:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --final-polish and --no-final-polish both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --final-polish and --no-final-polish both specified"
                   break
               of "stringent":
                 if not stringentFlag:
                   stringentFlag = true
                 elif not stringent:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --stringent and --no-stringent both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --stringent and --no-stringent both specified"
               of "no-stringent":
                 if not stringentFlag:
                   stringentFlag = true
                   stringent = false
                 elif stringent:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --stringent and --no-stringent both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --stringent and --no-stringent both specified"
               of "stringent-tolerance":
                 if not stringentToleranceFlag:
                   stringentToleranceFlag = true
@@ -877,7 +1068,9 @@ proc parseOptions() : ConduitOptions =
                   intermediatesFlag = true
                 elif intermediates:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --no-intermediates and --save-intermediates both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --no-intermediates and --save-intermediates both"
+                  echo "  specified"
                   break
               of "s", "save-intermediates":
                 if not intermediatesFlag:
@@ -885,7 +1078,9 @@ proc parseOptions() : ConduitOptions =
                   intermediates = true
                 elif not intermediates:
                   runFlag = false
-                  echo "ERROR - Conflicting flags: --no-intermediates and --save-intermediates both specified"
+                  echo "ERROR - Conflicting flags:"
+                  echo "  --no-intermediates and --save-intermediates both"
+                  echo "  specified"
                   break
               of "o", "output-dir":
                 if not outputDirFlag:
@@ -905,7 +1100,8 @@ proc parseOptions() : ConduitOptions =
                 else:
                   if local:
                     runFlag = false
-                    echo "ERROR - Conflicting flags: --local and --end-to-end both specified"
+                    echo "ERROR - Conflicting flags:"
+                    echo "  --local and --end-to-end both specified"
                     break
               of "local":
                 if not localFlag:
@@ -914,7 +1110,8 @@ proc parseOptions() : ConduitOptions =
                 else:
                   if not local:
                     runFlag = false
-                    echo "ERROR - Conflicting flags: --local and --end-to-end both specified"
+                    echo "ERROR - Conflicting flags:"
+                    echo "  --local and --end-to-end both specified"
                     break
               of "k","bowtie2-max-alignments":
                 if not maxAlignmentsFlag:
@@ -1019,7 +1216,8 @@ proc parseOptions() : ConduitOptions =
                   clustersDirectory = key
                 else:
                   runFlag = false
-                  echo "ERROR - Argument provided without associated option; please provide one <clustersDirectory> only"
+                  echo "ERROR - Argument provided without associated option;"
+                  echo "please provide one <clustersDirectory> only"
                   break
               else:
                 echo &"ERROR - unknown option {last} provided"
@@ -1044,7 +1242,9 @@ proc parseOptions() : ConduitOptions =
         writeDefaultHelp()
         quit(QuitSuccess)
       else:
-        echo "ERROR - first argument must specify correction mode, \"nano\" or \"hybrid\""
+        echo "ERROR - first argument must specify correction mode:"
+        echo "  \"nano\" or"
+        echo "  \"hybrid\""
         writeDefaultHelp()
   if versionFlag:
     echo conduitVersion()
@@ -1054,9 +1254,11 @@ proc parseOptions() : ConduitOptions =
   var bowtieReadInputs : string
   if runFlag and mode == "hybrid":
     # Determine strand relationship between nanopore and illumina reads:
-    if (nanoporeStrand == "forward" and illuminaStrand == "reverse") or (nanoporeStrand == "reverse" and illuminaStrand == "forward"):
+    if (nanoporeStrand == "forward" and illuminaStrand == "reverse") or
+        (nanoporeStrand == "reverse" and illuminaStrand == "forward"):
       bowtieStrandConstraint = "--nofw"
-    elif (nanoporeStrand == "forward" and illuminaStrand == "forward") or (nanoporeStrand == "reverse" and illuminaStrand == "reverse"):
+    elif (nanoporeStrand == "forward" and illuminaStrand == "forward") or
+         (nanoporeStrand == "reverse" and illuminaStrand == "reverse"):
       bowtieStrandConstraint = "--norc"
     
     # Format illumina inputs in a manner readable by Bowtie2
@@ -1075,7 +1277,8 @@ proc parseOptions() : ConduitOptions =
       bowtieInterleavedInputs = "--interleaved " & interleaved.join(",") & " "
     if bams.len != 0:
       bowtieBamInputs = "-b " & bams.join(",") & " "
-    bowtieReadInputs = &"{bowtieMate1Inputs}{bowtieMate2Inputs}{bowtieUnpairedInputs}{bowtieInterleavedInputs}{bowtieBamInputs}"
+    bowtieReadInputs = &"{bowtieMate1Inputs}{bowtieMate2Inputs}" &
+      &"{bowtieUnpairedInputs}{bowtieInterleavedInputs}{bowtieBamInputs}"
     if bowtieReadInputs == "":
       echo "ERROR - No Illumina data provided"
       runFlag = false
@@ -1092,8 +1295,11 @@ proc parseOptions() : ConduitOptions =
         files.add(file)
       if files.len == 0:
         runFlag = false
-        echo &"ERROR - No files of type .fa or .fasta found in <clusters directory> {clustersDirectory}"
-        echo "NOTE: We don't currently support .gzip'd or bzip2'd scaffold files, though support for these formats is coming"
+        echo  "ERROR - No files of type .fa or .fasta found in " &
+          "<clusters directory>"
+        echo &"  {clustersDirectory}"
+        echo "NOTE: We don't currently support .gzip'd or bzip'd scaffold files"
+        echo "      though support for these formats is coming"
     elif nanoporeFormat == "fastq":
       for file in walkFiles(&"{clustersDirectory}*.fq"):
         files.add(file)
@@ -1101,13 +1307,17 @@ proc parseOptions() : ConduitOptions =
         files.add(file)
       if files.len == 0:
         runFlag = false
-        echo &"ERROR - No files of type .fq or .fastq found in <clusters directory> {clustersDirectory}"
-        echo "NOTE: We don't currently support .gzip'd or bzip2'd scaffold files, though support for these formats is coming"
+        echo  "ERROR - No files of type .fq or .fastq found in " &
+          "<clusters directory>"
+        echo &"{clustersDirectory}"
+        echo "NOTE: We don't currently support .gzip'd or bzip'd scaffold files"
+        echo "      though support for these formats is coming"
     if isoformDelta > 255'u64 or isoformDelta < 2'u64:
       echo "ERROR - Isoform delta must be between 2 and 255"
       runFlag = false
     elif isoformDelta < 15'u64:
-      echo "WARNING - Low isoform delta values will increase the number of distinct isoforms and dramatically increase runtime"
+      echo "WARNING - Low isoform delta values will increase the number of"
+      echo "          distinct isoforms and dramatically increase runtime"
       echo "          An isoform delta value of 15 or above is reccomended"
     if endsDelta > 255'u64 or endsDelta < 2'u64:
       echo "ERROR - Ends delta must be between 2 and 255"
@@ -1119,12 +1329,14 @@ proc parseOptions() : ConduitOptions =
       echo "ERROR - Illumina weight must be greater than 0"
       runFlag = false
     elif illuminaWeight < 5'u64:
-      echo "WARNING - We reccomend weighing Illumina reads by at least 5x their long-read counterparts"
+      echo "WARNING - We reccomend weighing Illumina reads by at least 5x their"
+      echo "          long-read counterparts"
     if stringentTolerance < 3:
       echo "ERROR - Stringent tolerance cannot be less than 3"
       runFlag = false
     elif stringentTolerance < 25:
-      echo "WARNING - Reads map poorly to the ends of long read scaffolds, we reccomend a stringency tolerance of at least 25"
+      echo "WARNING - Reads map poorly to the ends of long read scaffolds, we"
+      echo "          reccomend a stringency tolerance of at least 25"
     
   var trims = newSeq[string](files.len)
   for i,infilepath in files:
@@ -1232,7 +1444,8 @@ proc main() =
                                 poStdErrToStdOut})
       
       let bam = &"{lastDir}alignments.bam"
-      # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}", options={poEvalCommand,poUsePath})
+      # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}",
+      #                  options={poEvalCommand,poUsePath})
       echo execProcess("samtools",
                        args=["sort",
                              "-@",
@@ -1261,7 +1474,13 @@ proc main() =
         if i in lastCorrection:
           converged[i] = p.spawn returnFalse()
           continue
-        converged[i] = p.spawn runGraphBasedIlluminaCorrection((opt.tmpDir,trim,opt.scoreMatrixPath,iter,uint16(opt.isoformDelta),uint16(opt.endsDelta)))
+        let inputTuple = (opt.tmpDir,
+                           trim,
+                           opt.scoreMatrixPath,
+                           iter,
+                           uint16(opt.isoformDelta),
+                           uint16(opt.endsDelta))
+        converged[i] = p.spawn runGraphBasedIlluminaCorrection(inputTuple)
       p.sync()
 
       for i,converge in converged:
@@ -1309,7 +1528,8 @@ proc main() =
                                 poStdErrToStdOut})
       
       let bam = &"{lastDir}alignments.bam"
-      # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}", options={poEvalCommand,poUsePath})
+      # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}",
+      #                  options={poEvalCommand,poUsePath})
       echo execProcess("samtools",
                         args=["sort",
                               "-@",
@@ -1356,7 +1576,8 @@ proc main() =
       let finalConsensusPath = &"{opt.outputDir}conduit_final_consensuses.fa"
       if fileExists(finalConsensusPath):
         removeFile(finalConsensusPath)
-      var finalFastaDir = &"{opt.tmpDir}{directoryNumber}{os.DirSep}fasta{os.DirSep}"
+      var finalFastaDir = &"{opt.tmpDir}{directoryNumber}" &
+        &"{os.DirSep}fasta{os.DirSep}"
 
       combineFiles(finalFastaDir, opt.trims, finalConsensusPath)
     else:
@@ -1364,7 +1585,11 @@ proc main() =
       if fileExists(finalConsensusPath):
         removeFile(finalConsensusPath)
 
-      combineFilesFinal(opt.tmpDir, directoryNumber, opt.trims, finalConsensusPath, lastCorrection)
+      combineFilesFinal(opt.tmpDir,
+                        directoryNumber,
+                        opt.trims,
+                        finalConsensusPath,
+                        lastCorrection)
 
     
     if not tmpAlreadyExisted:
