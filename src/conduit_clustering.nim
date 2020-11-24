@@ -9,6 +9,7 @@ import algorithm
 import na
 import fasta
 import fastq
+import version
 # import genomeKDE
 # import threadpools/threadpool_simple as tps
 
@@ -31,15 +32,11 @@ type
     indexToIndex : OrderedTable[uint32,uint32]
     previouslyVisited : seq[uint32]
 
-# TODO -   Clean up line wrapping where necessary (make it readable)
-# TODO - but also conform to nim style guide length restrictions
-# TODO - where possible
-
 # TODO -   Possibly change uint32 to uint64 where necessary.
 # TODO - Reevaluate before publication.
 proc conduitClusterVersion() : string =
-  return "CONDUIT Clustering Version 0.1.2 by Nathan Roach ( nroach2@jhu.edu," &
-    " https://github.com/NatPRoach/conduit/ )"
+  return &"CONDUIT Clustering Version {version.ConduitVersion} by Nathan Roac" &
+      "h\n( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
 
 proc writeClusterHelp() = 
