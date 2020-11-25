@@ -13,7 +13,7 @@ type
 
 proc writeFASTQrecordToFile*( outfile : File,
                               record : FastqRecord) = 
-  outfile.write(&"@{record.readID}\n")
+  outfile.write(&"@{record.readId}\n")
   outfile.write(&"{record.sequence}\n")
   outfile.write("+\n")
   outfile.write(&"{record.qualities}\n")
@@ -38,6 +38,7 @@ proc writeBamRecordToFASTQfile*( outfile : File,
   var qualities : seq[uint8]
   discard record.base_qualities(qualities)
   let qualStr = convertQualityIntsToString(qualities)
+  # echo record.qname
   writeFASTQrecordToFile( outfile, FastqRecord(readId : record.qname,
                                                sequence : sequence,
                                                qualities : qualStr))
