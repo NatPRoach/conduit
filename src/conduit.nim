@@ -273,6 +273,8 @@ proc writeHybridHelp() =
   echo "    -n, --no-intermediates (default)"
   echo "        Does not save FASTA file generated for intermediate rounds of"
   echo "        polishing"
+  # TODO - make levels of this, 0 - save nothing 1 - save fastas
+  # TODO - 2 - save clusters 3 - save .po files 4 - save bowtie2 alignments
   echo "    -s, --save-intermediates"
   echo "        Saves the FASTA file generated for intermediate rounds of"
   echo "        polishing"
@@ -1591,7 +1593,6 @@ proc main() =
                         finalConsensusPath,
                         lastCorrection)
 
-    
     if not tmpAlreadyExisted:
       removeDir(opt.tmpDir)
     iterTimes.add(getTime())

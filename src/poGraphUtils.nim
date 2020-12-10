@@ -195,7 +195,7 @@ proc jsOutput( po:TrimmedPOGraph,
       lastJInPathTable = int(i)
   for i in 0..<po.nodes.len:
     let j = uint32(i)
-    if j in po.deletedNodes:
+    if j in po.deletedNodes or j > 1200:
       continue
     let node = po.nodes[po.nodeIndexes[('b',uint32(i))]]
     var line : seq[string]

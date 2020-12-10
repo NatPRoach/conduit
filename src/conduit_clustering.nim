@@ -453,7 +453,7 @@ proc writeFASTXsFromBAM(bam : Bam,
       if output_type == "fasta":
         openFiles[clusterId].writeBamRecordToFASTAfile(record)
       elif output_type == "fastq":
-        openFiles[clusterId].writeBamRecordToFASTAfile(record)
+        openFiles[clusterId].writeBamRecordToFASTQfile(record)
     writtenReads.inc(clusterId)
     # echo writtenReads[clusterId], "\t", clusterSizes[][clusterId]
     if writtenReads[clusterId] == clusterSizes[][clusterId]:
@@ -475,7 +475,7 @@ proc correctBamRecordWithGenome(record : Record, fai : Fai) : FastaRecord =
     let nts = fai.get(record.chrom,
                       startBase,
                       endBase)
-    # if record.qname == "m54284U_191110_105540/18482073/ccs":
+    # if record.qname == "m54284U_191110_105540/34605360/ccs":
     #   echo record.qname, "\t", record.chrom, "\t", startBase, "\t", endBase
     #   echo nts
     ntSequence.add(nts)
@@ -484,7 +484,7 @@ proc correctBamRecordWithGenome(record : Record, fai : Fai) : FastaRecord =
   let nts = fai.get(record.chrom,
                     startBase,
                     endBase)
-  # if record.qname == "m54284U_191110_105540/18482073/ccs":
+  # if record.qname == "m54284U_191110_105540/34605360/ccs":
   #   echo record.qname, "\t", record.chrom, "\t", startBase, "\t", endBase
   #   echo nts
   ntSequence.add(nts)
@@ -617,7 +617,6 @@ proc main() =
                                                   &"{opt.prefix}",
                                                 outputFileCount,
                                                 fai)
-        # fai.close
       else:
         outputFileCount += writeFASTXsFromBAM(bam,
                                                 addr readIdToCluster,
@@ -629,4 +628,5 @@ proc main() =
                                                 outputFileCount,
                                                 opt.outType)
   bam.close
+  # fai.close
 main()
