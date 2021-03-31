@@ -236,8 +236,8 @@ int black_flag(int bug_level,
 	       int sourceline,
 	       char sourcefile_revision[]);
 
-char *Program_name;
-char *Program_version;
+extern char *Program_name;
+extern char *Program_version;
 
 void black_flag_init(char progname[],char progversion[]);
 void black_flag_init_args(int narg,char *arg[],char progversion[]);
