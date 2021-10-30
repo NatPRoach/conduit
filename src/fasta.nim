@@ -4,47 +4,54 @@ import strformat
 
 type
   FastaRecord* = object
-    readId* : string
-    sequence* : string
+    ## Stores information pertaining to a single FASTA record
+    readId*: string   # The read ID of the FASTA record
+    sequence*: string # The sequence of the FASTA record
 
 
-proc writeFASTArecordToFile*( outfile : File,
-                              record : FastaRecord,
-                              wrap_len : int = 75) = 
+proc writeFASTArecordToFile*(outfile: File,
+                              record: FastaRecord,
+                              wrap_len: int = 75) =
+  ## Writes a FASTA record to a provided file
+
   outfile.write(&">{record.readId}\n")
   for i in 0..<(record.sequence.len div wrap_len):
     let line = record.sequence[i *
                                wrap_len..(i + 1) * wrap_len - 1]
     outfile.write(&"{line}\n")
-  if record.sequence.len mod wrap_len != 0 :
+  if record.sequence.len mod wrap_len != 0:
     let line = record.sequence[wrap_len *
                                (record.sequence.len div wrap_len)..^1]
     outfile.write(&"{line}\n")
 
 # proc writeCorrectedReads*( outfile : File,
 #                            records : seq[FastaRecord],
-#                            wrap_len : int = 75) = 
-proc writeFASTArecordsToFile*( outfile : File,
-                               records : seq[FastaRecord],
-                               wrap_len : int = 75) = 
+#                            wrap_len : int = 75) =
+proc writeFASTArecordsToFile*(outfile: File,
+                               records: seq[FastaRecord],
+                               wrap_len: int = 75) =
+  ## Writes multiple FASTA records to a provided file
   for record in records:
-    writeFASTArecordToFile( outfile, record, wrap_len)
+    writeFASTArecordToFile(outfile, record, wrap_len)
 
 
-proc writeBamRecordToFASTAfile*( outfile : File,
-                                 record : Record,
-                                 wrap_len : int = 75) = 
-  var sequence : string
+proc writeBamRecordToFASTAfile*(outfile: File,
+                                 record: Record,
+                                 wrap_len: int = 75) =
+  ## Writes BAM record sequence to a FASTA file.
+
+  var sequence: string
   record.sequence(sequence)
-  writeFASTArecordToFile( outfile, FastaRecord(readId : record.qname,
-                                               sequence : sequence),
+  writeFASTArecordToFile(outfile, FastaRecord(readId: record.qname,
+                                               sequence: sequence),
                                                wrap_len)
 
 
-proc convertUtoTinFASTA*(infilepath,outfilepath:string) =
-  var infile,outfile : File
-  discard open(infile,infilepath,fmRead)
-  discard open(outfile,outfilepath,fmWrite)
+proc convertUtoTinFASTA*(infilepath, outfilepath: string) =
+  ## Converts a FASTA from containing Uracil bases to containing Thymine
+  var infile, outfile: File
+  discard open(infile, infilepath, fmRead)
+  discard open(outfile, outfilepath, fmWrite)
   while true:
     try:
       let line = infile.readLine()
@@ -58,155 +65,158 @@ proc convertUtoTinFASTA*(infilepath,outfilepath:string) =
   outfile.close()
 
 
-proc parseFasta*(file : File) : seq[FastaRecord] = 
-  var records : seq[FastaRecord]
-  var readId : string
-  var sequence : string
+proc parseFasta*(file: File): seq[FastaRecord] =
+  ## Function that parses entire FASTA file into memory and returns it as a
+  ## seq[FastaRecord]. Prefer to use iterFasta if at all possible.
+  var records: seq[FastaRecord]
+  var readId: string
+  var sequence: string
   var start = true
   while true:
     try:
       let line = file.readLine()
       if line[0] == '>':
         if not start:
-          records.add(FastaRecord( readId : readId, sequence : sequence))
+          records.add(FastaRecord(readId: readId, sequence: sequence))
           sequence = ""
         else:
           start = false
-        readId = line.strip(leading=true,
-                            trailing=false,
-                            chars = {'>'}).strip(leading=false,
-                                                 trailing=true,
+        readId = line.strip(leading = true,
+                            trailing = false,
+                            chars = {'>'}).strip(leading = false,
+                                                 trailing = true,
                                                  chars = {'\n'})
       else:
         sequence = sequence &
-          line.strip(leading=false,
-                     trailing=true,
+          line.strip(leading = false,
+                     trailing = true,
                      chars = {'\n'})
     except EOFError:
-      records.add(FastaRecord( readId : readId, sequence : sequence))
+      records.add(FastaRecord(readId: readId, sequence: sequence))
       break
   return records
 
 
-iterator iterFasta*(file : File) : FastaRecord =
-  var readId : string
-  var sequence : string
+iterator iterFasta*(file: File): FastaRecord =
+  ## Iterator that generates FASTA records
+  var readId: string
+  var sequence: string
   var start = true
   while true:
     try:
       let line = file.readLine()
       if line[0] == '>':
         if not start:
-          yield FastaRecord( readId : readId, sequence : sequence)
+          yield FastaRecord(readId: readId, sequence: sequence)
           sequence = ""
         else:
           start = false
-        readId = line.strip(leading=true,
-                            trailing=false,
-                            chars = {'>'}).strip(leading=false,
-                                                 trailing=true,
+        readId = line.strip(leading = true,
+                            trailing = false,
+                            chars = {'>'}).strip(leading = false,
+                                                 trailing = true,
                                                  chars = {'\n'})
       else:
         sequence = sequence &
-          line.strip(leading=false,
-                     trailing=true,
+          line.strip(leading = false,
+                     trailing = true,
                      chars = {'\n'})
     except EOFError:
-      yield FastaRecord( readId : readId, sequence : sequence)
+      yield FastaRecord(readId: readId, sequence: sequence)
       break
 
 
-proc splitFASTA*(infilepath,outfilepath_prefix : string,
-                 split_num : int = 200) : (int,int) =
-  # Takes in a fasta file with more reads than some arbitrary number split_num
-  # produces fasta files split into sizes of that size or smaller.
-  # Similar to RATTLE implementation in that to avoid size biases
-  # the sampling is performed with an offset.
-  var infile : File
-  discard open(infile,infilepath,fmRead)
-  var records : seq[FastaRecord]
-  var readId : string
-  var sequence : string
+proc splitFASTA*(infilepath, outfilepath_prefix: string,
+                 split_num: int = 200): (int, int) =
+  ## Takes in a fasta file with more reads than some arbitrary number split_num
+  ## produces fasta files split into sizes of that size or smaller.
+  ## Similar to RATTLE implementation in that to avoid size biases
+  ## the sampling is performed with an offset.
+  var infile: File
+  discard open(infile, infilepath, fmRead)
+  var records: seq[FastaRecord]
+  var readId: string
+  var sequence: string
   var count = 0
   while true:
     try:
       let line = infile.readLine()
       if line[0] == '>':
         if count != 0:
-          records.add(FastaRecord( readId : readId, sequence : sequence))
+          records.add(FastaRecord(readId: readId, sequence: sequence))
           sequence = ""
         count += 1
-        readId = line.strip(leading=true,
-                            trailing=false,
-                            chars = {'>'}).strip(leading=false,
-                                                 trailing=true,
+        readId = line.strip(leading = true,
+                            trailing = false,
+                            chars = {'>'}).strip(leading = false,
+                                                 trailing = true,
                                                  chars = {'\n'})
       else:
-        sequence = sequence & line.strip(leading=false,
-                                         trailing=true,
+        sequence = sequence & line.strip(leading = false,
+                                         trailing = true,
                                          chars = {'\n'})
     except EOFError:
-      records.add(FastaRecord( readId : readId, sequence : sequence))
+      records.add(FastaRecord(readId: readId, sequence: sequence))
       break
   infile.close()
   let numOutfiles = int(records.len mod split_num != 0) +
                      (records.len div split_num)
   if numOutfiles > 1:
     for i in 0..<numOutfiles:
-      var outfile : File
-      discard open(outfile,&"{outfilepath_prefix}_subfasta{i}.fa",fmWrite)
+      var outfile: File
+      discard open(outfile, &"{outfilepath_prefix}_subfasta{i}.fa", fmWrite)
       for j in 0..<split_num:
         let idx = i + (j * numOutfiles)
         if idx < records.len:
-          outfile.write(">",records[idx].readId,"\n")
+          outfile.write(">", records[idx].readId, "\n")
           outfile.writeLine(records[idx].sequence)
       outfile.close()
-  return (numOutfiles,records.len)
+  return (numOutfiles, records.len)
 
 
-proc splitFASTA2*(infilepath,outfilepath_prefix : string,
-                  split_num : int = 200) : (int,int) =
-  # Takes in a fasta file with more reads than some arbitrary number split_num
-  # produces fasta files split into sizes of that size or smaller.
-  # Different from RATTLE implementation in that size bias is not
-  # considered and linear blocks of sequences are extracted
-  var infile : File
-  discard open(infile,infilepath,fmRead)
-  var records : seq[FastaRecord]
-  var readId : string
-  var sequence : string
+proc splitFASTA2*(infilepath, outfilepath_prefix: string,
+                  split_num: int = 200): (int, int) =
+  ## Takes in a fasta file with more reads than some arbitrary number split_num
+  ## produces fasta files split into sizes of that size or smaller.
+  ## Different from RATTLE implementation in that size bias is not
+  ## considered and linear blocks of sequences are extracted
+  var infile: File
+  discard open(infile, infilepath, fmRead)
+  var records: seq[FastaRecord]
+  var readId: string
+  var sequence: string
   var count = 0
   while true:
     try:
       let line = infile.readLine()
       if line[0] == '>':
         if count != 0:
-          records.add(FastaRecord( readId : readId, sequence : sequence))
+          records.add(FastaRecord(readId: readId, sequence: sequence))
           sequence = ""
         count += 1
-        readId = line.strip(leading=true,
-                            trailing=false,
-                            chars = {'>'}).strip(leading=false,
-                                                 trailing=true,
+        readId = line.strip(leading = true,
+                            trailing = false,
+                            chars = {'>'}).strip(leading = false,
+                                                 trailing = true,
                                                  chars = {'\n'})
       else:
-        sequence = sequence & line.strip(leading=false,
-                                         trailing=true,
+        sequence = sequence & line.strip(leading = false,
+                                         trailing = true,
                                          chars = {'\n'})
     except EOFError:
-      records.add(FastaRecord( readId : readId, sequence : sequence))
+      records.add(FastaRecord(readId: readId, sequence: sequence))
       break
   infile.close()
   let numOutfiles = int(records.len mod split_num != 0) +
                     (records.len div split_num)
   if numOutfiles > 1:
     for i in 0..<numOutfiles:
-      var outfile : File
-      discard open(outfile,&"{outfilepath_prefix}_subfasta{i}.fa",fmWrite)
+      var outfile: File
+      discard open(outfile, &"{outfilepath_prefix}_subfasta{i}.fa", fmWrite)
       for j in 0..<split_num:
         let idx = (i*split_num) + j
         if idx < records.len:
-          outfile.write(">",records[idx].readId,"\n")
+          outfile.write(">", records[idx].readId, "\n")
           outfile.writeLine(records[idx].sequence)
       outfile.close()
-  return (numOutfiles,records.len)
+  return (numOutfiles, records.len)

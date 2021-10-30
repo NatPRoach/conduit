@@ -14,83 +14,86 @@ import poaV2/header
 import poaV2/poa
 import fasta
 import fastq
-import version
+import package_version
 
 {.experimental.}
 
 type
   ConduitOptions = object
-    runFlag : bool
-    finalPolish : bool
-    intermediates : bool
-    mode : string
-    clustersDirectory : string
-    nanoporeFormat : string
-    illuminaFormat : string
-    u2t : bool
-    bowtieStrandConstraint : string
-    bowtieAlignmentMode : string
-    bowtieReadInputs : string
-    scoreMatrixPath : string
-    outputDir : string
-    tmpDir : string
-    files : seq[string]
-    trims : seq[string]
-    isoformDelta : uint64
-    endsDelta : uint64
-    illuminaWeight : uint64
-    threadNum : uint64
-    maxIterations : uint64
-    stringent : bool
-    stringentTolerance : int
-    samtoolsMemory : string
-    maxAlignments : uint64
+    runFlag: bool
+    finalPolish: bool
+    intermediates: bool
+    mode: string
+    clustersDirectory: string
+    nanoporeFormat: string
+    illuminaFormat: string
+    u2t: bool
+    bowtieStrandConstraint: string
+    bowtieAlignmentMode: string
+    bowtieReadInputs: string
+    scoreMatrixPath: string
+    outputDir: string
+    tmpDir: string
+    files: seq[string]
+    trims: seq[string]
+    isoformDelta: uint64
+    endsDelta: uint64
+    illuminaWeight: uint64
+    threadNum: uint64
+    maxIterations: uint64
+    stringent: bool
+    stringentTolerance: int
+    samtoolsMemory: string
+    maxAlignments: uint64
 
 #Minor TODOs:
-#[TODO - convert from passing tuple back to passing vars individually 
-         relic of older threading approach ]#
+#[TODO - convert from passing tuple back to passing vars individually
+  relic of older threading approach ]#
 
 #Major TODOs (Future release versions?):
+#[TODO - Replace custom arg parsing with docopt]#
 #[TODO - Add clustering tool that runs with the benefit of a reference genome
-         (Cluster based on splice junctions / or overlap of alignments) ]#
+  (Cluster based on splice junctions / or overlap of alignments) ]#
 #[TODO - Move filtering step to a graph based polishing step, the linear step
-         has a problem of too low coverage or too many isoforms leading to
-         isoforms not being completely covered by illumina reads when they
-         should be. ]#
+  has a problem of too low coverage or too many isoforms leading to
+  isoforms not being completely covered by illumina reads when they
+  should be. ]#
 #[TODO - Add less stringent filtering step that extracts out the longest
-         contiguous region covered by Illumina reads (with ends tolerance?)
-         should be easy to do and reduce # of false negatives. ]#
+  contiguous region covered by Illumina reads (with ends tolerance?)
+  should be easy to do and reduce # of false negatives. ]#
 #[TODO - Add support for duplicate read ID's that doesn't break everything. ]#
 #[TODO - Add option to output both sensitive and stringent isoform sets in the
-         same run ]#
-#[TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does 
-         and just add a decompress step for generating temp files. ]#
-#[TODO - Add output indicating completion percentage for each iteration. Use 
-         https://github.com/euantorano/progress.nim ? ]#
+  same run ]#
+#[TODO - .gz support for nanopore scaffolds. Can probably do what Trinity does
+  and just add a decompress step for generating temp files. ]#
+#[TODO - Add output indicating completion percentage for each iteration. Use
+  https://github.com/euantorano/progress.nim ? ]#
 #[TODO - Add mode that continues polishing where a previous run left off ]#
-#[TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage 
-         to the rewrite is it makes doing clever things with the poa easier down
-         the line. (Unless we did SIMD poa, which would require learning nim
-         SIMD, and probably step on Eyras Lab's toes) ]#
-#[TODO - Clustering mode for when you DO have a reference genome? Or is that 
-         too similar to Stringtie2 to be worth doing? -- Probably too similar?]#
+#[TODO - Rewrite poa in nim(?) - Probably faster as the C code, only advantage
+  to the rewrite is it makes doing clever things with the poa easier down
+  the line. (Unless we did SIMD poa, which would require learning nim
+  SIMD, and probably step on Eyras Lab's toes) ]#
+#[TODO - Clustering mode for when you DO have a reference genome? Or is that
+  too similar to Stringtie2 to be worth doing? -- Probably too similar?]#
 #[TODO - Break poParser into smaller .nim files with more accurate and
-         descriptive names ]#
+  descriptive names ]#
 #[TODO - Figure out if there's anything to be done about the left-aligned
-         problem inherent to the partial order graph based correction? 
-         (thereby allowing us to get rid of linear polishing step) ]#
-#[TODO - Add option to output .po files (or a new format, a multi-po file) to 
-         explain the relationships between isoforms. ]#
+  problem inherent to the partial order graph based correction?
+  (thereby allowing us to get rid of linear polishing step) ]#
+#[TODO - Add option to output .po files (or a new format, a multi-po file) to
+  explain the relationships between isoforms. ]#
 #[TODO - Add quantification output for each isoform / gene ]#
-#[TODO - Add options that allow you to specify the path to the bowtie2 and 
-         samtools binaries ]#
+#[TODO - Add options that allow you to specify the path to the bowtie2 and
+  samtools binaries ]#
 
 
-proc conduitVersion() : string =
-  return &"CONDUIT Version {version.ConduitVersion} by Nathan Roach\n"&
+proc conduitVersion(): string =
+  ## Rerturns the description of the version of CONDUIT
+  return &"CONDUIT Version {package_version.ConduitVersionString} by Nathan Roach\n" &
           "( nroach2@jhu.edu, https://github.com/NatPRoach/conduit/ )"
 
-proc writeDefaultHelp() = 
+proc writeDefaultHelp() =
+  ## Prints the default help text for this tool.
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
@@ -102,6 +105,7 @@ proc writeDefaultHelp() =
   echo "      -U this_file_does_not_exist.fq should run."
 
 proc writeNanoHelp() =
+  ##
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
@@ -149,7 +153,8 @@ proc writeNanoHelp() =
   echo "        Number of threads to run in parallel (used for both Bowtie2 and"
   echo "        Partial Order Graph correction)"
 
-proc writeHybridHelp() = 
+proc writeHybridHelp() =
+  ##
   echo "CONDUIT - CONsensus Decomposition Utility In Transcriptome-assembly:"
   echo conduitVersion()
   echo "Usage:"
@@ -308,22 +313,26 @@ proc writeHybridHelp() =
   # echo "              If CPU number cannot be detected, the default of 4"
   # echo "              threads will be used. # TODO
 
-proc removeFiles(files : openArray[string]) =
+proc removeFiles(files: openArray[string]) =
+  ## Removes multiple files
   for file in files:
     removeFile(file)
 
-proc createDirs(dirs : openArray[string]) = 
+proc createDirs(dirs: openArray[string]) =
+  ##
   for dir in dirs:
     createDir(dir)
 
-proc returnFalse() : bool {.thread.} = 
+proc returnFalse(): bool {.thread.} =
+  ##
   return false
 
-proc outputTiming(outfilepath : string,
-                  time_seq : seq[Time],
-                  opts : ConduitOptions) =
-  var outfile : File
-  discard open(outfile,outfilepath,fmWrite)
+proc outputTiming(outfilepath: string,
+                  time_seq: seq[Time],
+                  opts: ConduitOptions) =
+  ##
+  var outfile: File
+  discard open(outfile, outfilepath, fmWrite)
   outfile.write("CONDUIT Timing Log:\n")
   for i in 0..<time_seq.len - 2:
     let time = (time_seq[i + 1] -
@@ -338,10 +347,11 @@ proc outputTiming(outfilepath : string,
   outfile.write(&"Total: {time} s\n")
   outfile.close()
 
-proc outputSettings(outfilepath : string,
-                    opts : ConduitOptions) = 
-  var outfile : File
-  discard open(outfile,outfilepath,fmWrite)
+proc outputSettings(outfilepath: string,
+                    opts: ConduitOptions) =
+  ##
+  var outfile: File
+  discard open(outfile, outfilepath, fmWrite)
   outfile.write("CONDUIT Command Log:\n")
   outfile.write("Working directory:\n")
   outfile.write(&"    {getCurrentDir()}\n")
@@ -366,7 +376,7 @@ proc outputSettings(outfilepath : string,
   outfile.write(&"    Illumina weight : {opts.illuminaWeight}\n")
   outfile.write(&"    threads : {opts.threadNum}\n")
   if opts.scoreMatrixPath == "":
-    outfile.write( "    score matrix : default\n")
+    outfile.write("    score matrix : default\n")
   else:
     outfile.write(&"    score matrix : {opts.scoreMatrixPath}\n")
   outfile.write(&"    output directory : {opts.outputDir}\n")
@@ -381,14 +391,15 @@ proc outputSettings(outfilepath : string,
   outfile.close()
 
 
-proc mergeFiles(infilepaths : openArray[string],
-                outfilepath : string,
-                delete_old_files : bool = false) = 
-  var outfile : File
-  discard open(outfile,outfilepath,fmWrite)
+proc mergeFiles(infilepaths: openArray[string],
+                outfilepath: string,
+                delete_old_files: bool = false) =
+  ##
+  var outfile: File
+  discard open(outfile, outfilepath, fmWrite)
   for infilepath in infilepaths:
-    var infile : File
-    discard open(infile,infilepath,fmRead)
+    var infile: File
+    discard open(infile, infilepath, fmRead)
     outfile.write(infile.readAll)
     infile.close()
   if delete_old_files:
@@ -396,13 +407,14 @@ proc mergeFiles(infilepaths : openArray[string],
   outfile.close()
 
 
-proc runPOAandCollapsePOGraph(intuple : (string,
+proc runPOAandCollapsePOGraph(intuple: (string,
                                          string,
                                          string,
                                          string,
                                          uint16,
                                          uint16,
                                          bool)) {.thread.} =
+  ##
   let (infilepath,
        outdir,
        matrixFilepath,
@@ -411,18 +423,18 @@ proc runPOAandCollapsePOGraph(intuple : (string,
        endsDelta,
        u2t) = intuple
   let trim = infilepath.split(os.DirSep)[^1].split(".")[0]
-  var fastaFile : string
+  var fastaFile: string
   if format == "fasta":
     if u2t:
       fastaFile = &"{outdir}{trim}.tmp.fa"
-      convertUtoTinFASTA(infilepath,fastaFile)
+      convertUtoTinFASTA(infilepath, fastaFile)
     else:
       fastaFile = infilepath
   elif format == "fastq":
     fastaFile = &"{outdir}{trim}.tmp.fa"
-    convertFASTQfileToFASTAfile(infilepath,fastaFile)
+    convertFASTQfileToFASTAfile(infilepath, fastaFile)
   var splitNum = 200
-  var (numFastas,_) = splitFASTA2(fastaFile,
+  var (numFastas, _) = splitFASTA2(fastaFile,
                                   &"{outdir}{trim}.tmp",
                                   splitNum = splitNum)
   var totalFastas = numFastas
@@ -433,20 +445,20 @@ proc runPOAandCollapsePOGraph(intuple : (string,
     removeFile(fastaFile)
     # Cacluate representative reads for each subfasta
     # store each in separate consensus fasta file
-    var mergeQueue : HeapQueue[(int, int)]
+    var mergeQueue: HeapQueue[(int, int)]
     for i in 0..<numFastas:
       let outFASTAfilepath = &"{outdir}{trim}.tmp_consensus{i}.fa"
-      var outFASTAfile : File
-      discard open(outFASTAfile,outFASTAfilepath,fmWrite)
+      var outFASTAfile: File
+      discard open(outFASTAfile, outFASTAfilepath, fmWrite)
       let tmpFasta = &"{outdir}{trim}.tmp_subfasta{i}.fa"
-      var seqFile : PFile = fopen(cstring(tmpFasta))
+      var seqFile: PFile = fopen(cstring(tmpFasta))
       var po = getPOGraphFromFasta(seqFile,
                                    cstring(matrixFilepath),
                                    cint(1),
                                    matrix_scoring_function)
       removeFile(tmpFasta)
       var trimPo = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var (representativePaths,readSupports) =
+      var (representativePaths, readSupports) =
         poGraphUtils.getRepresentativePaths3(addr trimPo,
                                              psi = isoformDelta,
                                              endsDelta = endsDelta)
@@ -454,24 +466,24 @@ proc runPOAandCollapsePOGraph(intuple : (string,
                                                       representativePaths,
                                                       readSupports,
                                                       &"{trim}.tmp_subfasta{i}")
-      poGraphUtils.writeCorrectedReads(consensusPo,outFASTAfile)
+      poGraphUtils.writeCorrectedReads(consensusPo, outFASTAfile)
       outFASTAfile.close()
-      mergeQueue.push((consensusPo.reads.len,i))
-    var (_,fileIdx1) = mergeQueue.pop()
-    var (_,fileIdx2) = mergeQueue.pop()
-    
+      mergeQueue.push((consensusPo.reads.len, i))
+    var (_, fileIdx1) = mergeQueue.pop()
+    var (_, fileIdx2) = mergeQueue.pop()
+
     var newFilepath = ""
     while true:
       # Figure out which 2 files we're merging
       let filepath1 = &"{outdir}{trim}.tmp_consensus{fileIdx1}.fa"
       let filepath2 = &"{outdir}{trim}.tmp_consensus{fileIdx2}.fa"
-      
+
       # Merge the files
       let newTmpFilepath = &"{outdir}{trim}.tmp_subfasta{totalFastas}.fa"
-      mergeFiles([filepath1,filepath2], newTmpFilepath, delete_old_files=true)
+      mergeFiles([filepath1, filepath2], newTmpFilepath, delete_old_files = true)
 
       # Decompose the new temp file
-      var seqFile : PFile = fopen(cstring(newTmpFilepath))
+      var seqFile: PFile = fopen(cstring(newTmpFilepath))
       var po = getPOGraphFromFasta(seqFile,
                                    cstring(matrixFilepath),
                                    cint(1),
@@ -479,7 +491,7 @@ proc runPOAandCollapsePOGraph(intuple : (string,
                                    weight_support = true)
       removeFile(newTmpFilepath)
       var trimPo = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po)
-      var (representativePaths,readSupports) =
+      var (representativePaths, readSupports) =
         poGraphUtils.getRepresentativePaths3(addr trimPo,
                                              psi = isoformDelta,
                                              endsDelta = endsDelta)
@@ -488,25 +500,25 @@ proc runPOAandCollapsePOGraph(intuple : (string,
                                       representativePaths,
                                       readSupports,
                                       &"{trim}.tmp_subfasta{totalFastas}")
-      
+
       # Write the decomposition to a new consensus file
       newFilepath = &"{outdir}{trim}.tmp_consensus{totalFastas}.fa"
-      var newFile : File
-      discard open(newFile,newFilepath,fmWrite)
-      poGraphUtils.writeCorrectedReads(consensusPo,newFile)
+      var newFile: File
+      discard open(newFile, newFilepath, fmWrite)
+      poGraphUtils.writeCorrectedReads(consensusPo, newFile)
       newFile.close()
-      
+
       if mergeQueue.len > 0:
-        var tmp : int
-        mergeQueue.push((consensusPo.reads.len,totalFastas))
-        (tmp,fileIdx1) = mergeQueue.pop()
-        (tmp,fileIdx2) = mergeQueue.pop()
+        var tmp: int
+        mergeQueue.push((consensusPo.reads.len, totalFastas))
+        (tmp, fileIdx1) = mergeQueue.pop()
+        (tmp, fileIdx2) = mergeQueue.pop()
         totalFastas += 1
       else:
         break
     moveFile(newFilepath, &"{outdir}fasta{os.DirSep}{trim}.consensus.fa")
   else:
-    var seqFile : PFile = fopen(cstring(fastaFile), "r")
+    var seqFile: PFile = fopen(cstring(fastaFile), "r")
     var po2 = getPOGraphFromFasta(seqFile,
                                   cstring(matrixFilepath),
                                   cint(1),
@@ -514,7 +526,7 @@ proc runPOAandCollapsePOGraph(intuple : (string,
     if deleteFastaFlag:
       removeFile(fastaFile)
     var trimPo2 = poGraphUtils.convertPOGraphtoTrimmedPOGraph(po2)
-    var (representativePaths,readSupports) =
+    var (representativePaths, readSupports) =
       poGraphUtils.getRepresentativePaths3(addr trimPo2,
                                            psi = isoformDelta,
                                            endsDelta = endsDelta)
@@ -523,24 +535,25 @@ proc runPOAandCollapsePOGraph(intuple : (string,
                                                     readSupports,
                                                     trim)
     let outFASTAfilepath = &"{outdir}fasta{os.DirSep}{trim}.consensus.fa"
-    var outFASTAfile : File
-    discard open(outFASTAfile,outFASTAfilepath,fmWrite)
-    poGraphUtils.writeCorrectedReads(consensusPo,outFASTAfile)
+    var outFASTAfile: File
+    discard open(outFASTAfile, outFASTAfilepath, fmWrite)
+    poGraphUtils.writeCorrectedReads(consensusPo, outFASTAfile)
     outFASTAfile.close()
 
 
-proc runGraphBasedIlluminaCorrection(intuple : (string,
+proc runGraphBasedIlluminaCorrection(intuple: (string,
                                                 string,
                                                 string,
                                                 uint64,
                                                 uint16,
-                                                uint16)) : bool {.thread.} =
-  let (tmpDir, trim, matrixFilepath, iter,isoformDelta,endsDelta) = intuple
+                                                uint16)): bool {.thread.} =
+  ##
+  let (tmpDir, trim, matrixFilepath, iter, isoformDelta, endsDelta) = intuple
   let lastFastaDir = &"{tmpDir}{iter-1}{os.DirSep}fasta{os.DirSep}"
   let thisFastaDir = &"{tmpDir}{iter}{os.DirSep}fasta{os.DirSep}"
 
   let lastFastaFilepath = &"{lastFastaDir}{trim}.consensus.fa"
-  var seqFile : PFile = fopen(cstring(lastFastaFilepath), "r")
+  var seqFile: PFile = fopen(cstring(lastFastaFilepath), "r")
   var po = getPOGraphFromFasta(seqFile,
                                matrixFilepath,
                                cint(1),
@@ -551,11 +564,11 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,
 
   let bamfilepath = &"{tmpDir}{iter-1}{os.DirSep}alignments.bam"
 
-  var bam : Bam
+  var bam: Bam
   var trimPo = convertPOGraphtoTrimmedPOGraph(po)
-  discard open(bam,bamfilepath,index=true)
+  discard open(bam, bamfilepath, index = true)
   illuminaPolishPOGraph(addr trimPo, bam)
-  var (representativePaths,readSupports) =
+  var (representativePaths, readSupports) =
     getRepresentativePaths3(addr trimPo,
                             psi = isoformDelta,
                             endsDelta = endsDelta)
@@ -563,21 +576,22 @@ proc runGraphBasedIlluminaCorrection(intuple : (string,
                                                   representativePaths,
                                                   readSupports,
                                                   trim)
-  var outfile : File
-  discard open(outfile,thisFastaFilepath,fmWrite)
-  writeFASTArecordsToFile(outfile,records)
+  var outfile: File
+  discard open(outfile, thisFastaFilepath, fmWrite)
+  writeFASTArecordsToFile(outfile, records)
   # writeCorrectedReads(records,outfile)
   outfile.close()
-  result = sameFileContent(lastFastaFilepath,thisFastaFilepath)
+  result = sameFileContent(lastFastaFilepath, thisFastaFilepath)
   removeFile(lastFastaFilepath)
 
-proc runLinearBasedIlluminaCorrection(intuple : (string,
+proc runLinearBasedIlluminaCorrection(intuple: (string,
                                                  string,
                                                  uint64,
                                                  uint64,
                                                  uint16,
                                                  bool,
-                                                 int)) {.thread.} = 
+                                                 int)) {.thread.} =
+  ##
   let (tmpDir,
        trim,
        convergedIter,
@@ -593,16 +607,16 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,
 
   let bamfilepath = &"{tmpDir}{iter-1}{os.DirSep}alignments.bam"
 
-  var infile : File
-  var bam : Bam
-  discard open(infile,lastFastaFilepath)
+  var infile: File
+  var bam: Bam
+  discard open(infile, lastFastaFilepath)
   var reads = parseFasta(infile)
   infile.close()
-  var corrected : seq[FastaRecord]
-  discard open(bam,bamfilepath,index=true)
+  var corrected: seq[FastaRecord]
+  discard open(bam, bamfilepath, index = true)
   for read in reads:
     var trimPo = getTrimmedGraphFromFastaRecord(read)
-    illuminaPolishPOGraph(addr trimPo, bam,debug=true)
+    illuminaPolishPOGraph(addr trimPo, bam, debug = true)
     discard getRepresentativePaths3(addr trimPo, psi = isoformDelta)
     if (not stringent) or
        stringencyCheck(addr trimPo,
@@ -610,79 +624,85 @@ proc runLinearBasedIlluminaCorrection(intuple : (string,
                        stringentTolerance = stringentTolerance):
       let sequence = getSequenceFromPath(trimPo,
                                         trimPo.reads[0].correctedPath)
-      corrected.add(FastaRecord(readId : read.readId,
-                                sequence : sequence))
-  var outfile : File
-  discard open(outfile,thisFastaFilepath,fmWrite)
-  writeFASTArecordsToFile(outfile,corrected)
+      corrected.add(FastaRecord(readId: read.readId,
+                                sequence: sequence))
+  var outfile: File
+  discard open(outfile, thisFastaFilepath, fmWrite)
+  writeFASTArecordsToFile(outfile, corrected)
   # writeCorrectedReads(corrected,outfile)
   outfile.close()
 
 
-proc combineFiles(indirectory : string,
-                  intrims : openArray[string],
-                  outfilepath : string) = 
-  var outfile : File
-  discard open(outfile,outfilepath,fmWrite)
-  for i,trim in intrims:
+
+# Why do I have three of these functions again?
+proc combineFiles(indirectory: string,
+                  intrims: openArray[string],
+                  outfilepath: string) =
+  ##
+  var outfile: File
+  discard open(outfile, outfilepath, fmWrite)
+  for i, trim in intrims:
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if fileExists(filepath):
-      var file : File
+      var file: File
       echo &"appending {filepath}"
-      discard open(file,filepath,fmRead)
+      discard open(file, filepath, fmRead)
       outfile.write(file.readAll)
       file.close()
     else:
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster"
   outfile.close()
 
-proc combineFilesIntermediate(indirectory : string,
-                              intrims : openArray[string],
-                              outfilepath : string,
-                              lastCorrection : Table[int,int]) = 
-  var outfile : File
-  discard open(outfile,outfilepath,fmWrite)
-  for i,trim in intrims:
+proc combineFilesIntermediate(indirectory: string,
+                              intrims: openArray[string],
+                              outfilepath: string,
+                              lastCorrection: Table[int, int]) =
+  ## Combines individual FASTA files into a single larger file.
+  var outfile: File
+  discard open(outfile, outfilepath, fmWrite)
+  for i, trim in intrims:
     if i in lastCorrection:
       continue
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if fileExists(filepath):
-      var file : File
+      var file: File
       echo &"appending {filepath}"
-      discard open(file,filepath,fmRead)
+      discard open(file, filepath, fmRead)
       outfile.write(file.readAll)
       file.close()
     else:
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc combineFilesFinal(tmp_directory : string,
-                       last_num : uint64,
-                       intrims : openArray[string],
-                       outfilepath : string,
-                       lastCorrection : Table[int,int]) = 
-  var outfile : File
-  discard open(outfile,outfilepath,fmWrite)
-  for i,trim in intrims:
+proc combineFilesFinal(tmp_directory: string,
+                       last_num: uint64,
+                       intrims: openArray[string],
+                       outfilepath: string,
+                       lastCorrection: Table[int, int]) =
+  ## Combines individual FASTA files into a single larger file
+  var outfile: File
+  discard open(outfile, outfilepath, fmWrite)
+  for i, trim in intrims:
     var last = last_num
     if i in lastCorrection:
       last = uint64(lastCorrection[i])
     let indirectory = &"{tmp_directory}{last}{os.DirSep}fasta{os.DirSep}"
     let filepath = &"{indirectory}{trim}.consensus.fa"
     if fileExists(filepath):
-      var file : File
+      var file: File
       echo &"appending {filepath}"
-      discard open(file,filepath,fmRead)
+      discard open(file, filepath, fmRead)
       outfile.write(file.readAll)
       file.close()
     else:
       echo &"{filepath} doesn't exist, poaV2 went wrong with that cluster..."
   outfile.close()
 
-proc getBowtie2options(opt : ConduitOptions,
-                       indexPrefix, sam : string,
-                       finalPolish : bool = false) : seq[string] = 
-  var arguments : seq[string]
+proc getBowtie2options(opt: ConduitOptions,
+                       indexPrefix, sam: string,
+                       finalPolish: bool = false): seq[string] =
+  ## Gets a list of arguments to run Bowtie2 with
+  var arguments: seq[string]
   arguments.add("--xeq")
   arguments.add("--no-unal")
   arguments.add("-p")
@@ -702,29 +722,32 @@ proc getBowtie2options(opt : ConduitOptions,
   arguments.add(sam)
   return arguments
 
-proc parseOptions() : ConduitOptions = 
+proc parseOptions(): ConduitOptions =
+  ## Parses options from command line for Conduit main function.
+  ##
+  ## DevNote - this should be deprecated in favor of docopt in future
   var clustersDirectory = ""
   var clustersDirectoryFlag = false
 
-  var mate1s : seq[string]
-  var mate2s : seq[string]
-  var unpaireds : seq[string]
-  var interleaved : seq[string]
-  var bams : seq[string]
+  var mate1s: seq[string]
+  var mate2s: seq[string]
+  var unpaireds: seq[string]
+  var interleaved: seq[string]
+  var bams: seq[string]
 
-  var illuminaStrand="reverse"
+  var illuminaStrand = "reverse"
   var illuminaStrandFlag = false
 
-  var illuminaFormat="fastq"
+  var illuminaFormat = "fastq"
   var illuminaFormatFlag = false
 
-  var nanoporeType="drna"
+  var nanoporeType = "drna"
   var nanoporeTypeFlag = false
 
-  var nanoporeStrand="forward"
+  var nanoporeStrand = "forward"
   # var nanopore_strand_flag = false
 
-  var nanoporeFormat="fastq"
+  var nanoporeFormat = "fastq"
   var nanoporeFormatFlag = false
 
   var u2t = true
@@ -1115,7 +1138,7 @@ proc parseOptions() : ConduitOptions =
                     echo "ERROR - Conflicting flags:"
                     echo "  --local and --end-to-end both specified"
                     break
-              of "k","bowtie2-max-alignments":
+              of "k", "bowtie2-max-alignments":
                 if not maxAlignmentsFlag:
                   maxAlignmentsFlag = true
                   if val == "":
@@ -1250,10 +1273,10 @@ proc parseOptions() : ConduitOptions =
         writeDefaultHelp()
   if versionFlag:
     echo conduitVersion()
-  var files : seq[string]
-  var bowtieStrandConstraint : string
-  var bowtieAlignmentMode : string
-  var bowtieReadInputs : string
+  var files: seq[string]
+  var bowtieStrandConstraint: string
+  var bowtieAlignmentMode: string
+  var bowtieReadInputs: string
   if runFlag and mode == "hybrid":
     # Determine strand relationship between nanopore and illumina reads:
     if (nanoporeStrand == "forward" and illuminaStrand == "reverse") or
@@ -1262,7 +1285,7 @@ proc parseOptions() : ConduitOptions =
     elif (nanoporeStrand == "forward" and illuminaStrand == "forward") or
          (nanoporeStrand == "reverse" and illuminaStrand == "reverse"):
       bowtieStrandConstraint = "--norc"
-    
+
     # Format illumina inputs in a manner readable by Bowtie2
     var bowtieMate1Inputs = ""
     var bowtieMate2Inputs = ""
@@ -1284,12 +1307,12 @@ proc parseOptions() : ConduitOptions =
     if bowtieReadInputs == "":
       echo "ERROR - No Illumina data provided"
       runFlag = false
-    
+
     if local:
       bowtieAlignmentMode = "--very-sensitive-local"
     else:
       bowtieAlignmentMode = "--very-sensitive"
-    
+
     if nanoporeFormat == "fasta":
       for file in walkFiles(&"{clustersDirectory}*.fa"):
         files.add(file)
@@ -1297,7 +1320,7 @@ proc parseOptions() : ConduitOptions =
         files.add(file)
       if files.len == 0:
         runFlag = false
-        echo  "ERROR - No files of type .fa or .fasta found in " &
+        echo "ERROR - No files of type .fa or .fasta found in " &
           "<clusters directory>"
         echo &"  {clustersDirectory}"
         echo "NOTE: We don't currently support .gzip'd or bzip'd scaffold files"
@@ -1309,7 +1332,7 @@ proc parseOptions() : ConduitOptions =
         files.add(file)
       if files.len == 0:
         runFlag = false
-        echo  "ERROR - No files of type .fq or .fastq found in " &
+        echo "ERROR - No files of type .fq or .fastq found in " &
           "<clusters directory>"
         echo &"{clustersDirectory}"
         echo "NOTE: We don't currently support .gzip'd or bzip'd scaffold files"
@@ -1339,41 +1362,42 @@ proc parseOptions() : ConduitOptions =
     elif stringentTolerance < 25:
       echo "WARNING - Reads map poorly to the ends of long read scaffolds, we"
       echo "          reccomend a stringency tolerance of at least 25"
-    
+
   var trims = newSeq[string](files.len)
-  for i,infilepath in files:
+  for i, infilepath in files:
     trims[i] = infilepath.split(os.DirSep)[^1].split(".")[0]
-  return ConduitOptions(runFlag : runFlag,
-                        finalPolish : finalPolish,
-                        intermediates : intermediates,
-                        mode : mode,
-                        clustersDirectory : clustersDirectory,
-                        nanoporeFormat : nanoporeFormat,
-                        illuminaFormat : illuminaFormat,
-                        u2t : u2t,
-                        bowtieStrandConstraint : bowtieStrandConstraint,
-                        bowtieAlignmentMode : bowtieAlignmentMode,
-                        bowtieReadInputs : bowtieReadInputs,
-                        scoreMatrixPath : scoreMatrixPath,
-                        outputDir : &"{outputDir}{os.DirSep}",
-                        tmpDir : &"{tmpDir}{os.DirSep}",
-                        files : files,
-                        trims : trims,
-                        isoformDelta : isoformDelta,
-                        endsDelta : endsDelta,
-                        maxIterations : maxIterations,
-                        illuminaWeight : illuminaWeight,
-                        threadNum : threadNum,
-                        stringent : stringent,
-                        stringentTolerance : stringentTolerance,
-                        samtoolsMemory : samtoolsMemory,
-                        maxAlignments : maxAlignments)
+  return ConduitOptions(runFlag: runFlag,
+                        finalPolish: finalPolish,
+                        intermediates: intermediates,
+                        mode: mode,
+                        clustersDirectory: clustersDirectory,
+                        nanoporeFormat: nanoporeFormat,
+                        illuminaFormat: illuminaFormat,
+                        u2t: u2t,
+                        bowtieStrandConstraint: bowtieStrandConstraint,
+                        bowtieAlignmentMode: bowtieAlignmentMode,
+                        bowtieReadInputs: bowtieReadInputs,
+                        scoreMatrixPath: scoreMatrixPath,
+                        outputDir: &"{outputDir}{os.DirSep}",
+                        tmpDir: &"{tmpDir}{os.DirSep}",
+                        files: files,
+                        trims: trims,
+                        isoformDelta: isoformDelta,
+                        endsDelta: endsDelta,
+                        maxIterations: maxIterations,
+                        illuminaWeight: illuminaWeight,
+                        threadNum: threadNum,
+                        stringent: stringent,
+                        stringentTolerance: stringentTolerance,
+                        samtoolsMemory: samtoolsMemory,
+                        maxAlignments: maxAlignments)
 
 proc main() =
+  ## Main function of CONDUIT
   let opt = parseOptions()
   if opt.mode == "hybrid" and opt.runFlag:
-    
-    var iterTimes : seq[Time]
+
+    var iterTimes: seq[Time]
     iterTimes.add(getTime())
 
     if not dirExists(opt.outputDir):
@@ -1398,17 +1422,17 @@ proc main() =
          opt.scoreMatrixPath,
          opt.nanoporeFormat,
          uint16(opt.isoformDelta),
-         uint16(opt.endsDelta),opt.u2t))
+         uint16(opt.endsDelta), opt.u2t))
     p.sync()
     iterTimes.add(getTime())
-    var lastCorrection : Table[int,int]
+    var lastCorrection: Table[int, int]
     for iter in 1..opt.maxIterations:
       let lastDir = &"{opt.tmpDir}{iter-1}{os.DirSep}"
       let lastFastaDir = &"{lastDir}fasta{os.DirSep}"
 
       # let cur_dir = &"{opt.tmpDir}{iter}/"
 
-      var lastConsensus : string
+      var lastConsensus: string
       if opt.intermediates:
         lastConsensus = &"{opt.outputDir}conduit_consensuses_iter{iter-1}.fa"
       else:
@@ -1422,12 +1446,12 @@ proc main() =
 
       let indexPrefix = &"{lastDir}bowtie2_index"
       echo execProcess("bowtie2-build",
-                       args =["--threads",
+                       args = ["--threads",
                               &"{opt.threadNum}",
                               lastConsensus,
                               indexPrefix],
-                       options={poUsePath})
-      
+                       options = {poUsePath})
+
       removeFile(lastConsensus)
       if opt.intermediates:
         combineFilesFinal(opt.tmpDir,
@@ -1435,21 +1459,21 @@ proc main() =
                           opt.trims,
                           lastConsensus,
                           lastCorrection)
-      
+
       let sam = &"{lastDir}alignments.sam"
       let arguments = getBowtie2options(opt,
                                         indexPrefix,
                                         sam)
       echo execProcess("bowtie2",
                        args = arguments,
-                       options={poUsePath,
+                       options = {poUsePath,
                                 poStdErrToStdOut})
-      
+
       let bam = &"{lastDir}alignments.bam"
       # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}",
       #                  options={poEvalCommand,poUsePath})
       echo execProcess("samtools",
-                       args=["sort",
+                       args = ["sort",
                              "-@",
                              &"{opt.threadNum}",
                              "-o",
@@ -1457,11 +1481,11 @@ proc main() =
                              "-m",
                              opt.samtoolsMemory,
                              sam],
-                       options={poUsePath,
+                       options = {poUsePath,
                                 poStdErrToStdOut})
       echo execProcess("samtools",
-                       args=["index", bam],options={poUsePath,poStdErrToStdOut})
-      
+                       args = ["index", bam], options = {poUsePath, poStdErrToStdOut})
+
       removeFiles([sam,
                    &"{indexPrefix}.1.bt2",
                    &"{indexPrefix}.2.bt2",
@@ -1472,7 +1496,7 @@ proc main() =
 
       let p = tps.newThreadPool(int(opt.threadNum))
       var converged = newSeq[tps.FlowVar[bool]](opt.trims.len)
-      for i,trim in opt.trims:
+      for i, trim in opt.trims:
         if i in lastCorrection:
           converged[i] = p.spawn returnFalse()
           continue
@@ -1485,7 +1509,7 @@ proc main() =
         converged[i] = p.spawn runGraphBasedIlluminaCorrection(inputTuple)
       p.sync()
 
-      for i,converge in converged:
+      for i, converge in converged:
         if converge.read():
           lastCorrection[i] = int(iter)
 
@@ -1495,7 +1519,7 @@ proc main() =
       let iter = opt.maxIterations + 1
       let lastDir = &"{opt.tmpDir}{iter-1}{os.DirSep}"
       # let lastFastaDir = &"{lastDir}fasta{os.DirSep}"
-      
+
       var lastConsensus = ""
       if opt.intermediates:
         lastConsensus = &"{opt.outputDir}conduit_consensuses_iter{iter-1}.fa"
@@ -1510,12 +1534,12 @@ proc main() =
 
       let indexPrefix = &"{lastDir}bowtie2_index"
       echo execProcess("bowtie2-build",
-                       args =["--threads",
+                       args = ["--threads",
                               &"{opt.threadNum}",
                               lastConsensus,
                               indexPrefix],
-                       options={poUsePath})
-      
+                       options = {poUsePath})
+
       if not opt.intermediates:
         removeFile(lastConsensus)
 
@@ -1526,14 +1550,14 @@ proc main() =
                                         finalPolish = true)
       echo execProcess("bowtie2",
                        args = arguments,
-                       options={poUsePath,
+                       options = {poUsePath,
                                 poStdErrToStdOut})
-      
+
       let bam = &"{lastDir}alignments.bam"
       # echo execProcess(&"samtools sort -@ {opt.threadNum} {sam} > {bam}",
       #                  options={poEvalCommand,poUsePath})
       echo execProcess("samtools",
-                        args=["sort",
+                        args = ["sort",
                               "-@",
                               &"{opt.threadNum}",
                               "-o",
@@ -1541,14 +1565,14 @@ proc main() =
                               "-m",
                               opt.samtoolsMemory,
                               sam],
-                              options={poUsePath,
+                              options = {poUsePath,
                                        poStdErrToStdOut})
       echo execProcess("samtools",
-                       args=["index",
+                       args = ["index",
                              bam],
-                       options={poUsePath,
+                       options = {poUsePath,
                                 poStdErrToStdOut})
-      
+
       removeFiles([sam,
                    &"{indexPrefix}.1.bt2",
                    &"{indexPrefix}.2.bt2",
@@ -1558,7 +1582,7 @@ proc main() =
                    &"{indexPrefix}.rev.2.bt2"])
 
       let p = tps.newThreadPool(int(opt.threadNum))
-      for i,trim in opt.trims:
+      for i, trim in opt.trims:
         var convergedIter = iter - 1
         if i in lastCorrection:
           convergedIter = uint64(lastCorrection[i])
@@ -1574,7 +1598,7 @@ proc main() =
 
       removeFiles([bam, &"{bam}.bai"])
       # removeDir(lastFastaDir)
-    
+
       let finalConsensusPath = &"{opt.outputDir}conduit_final_consensuses.fa"
       if fileExists(finalConsensusPath):
         removeFile(finalConsensusPath)
@@ -1597,5 +1621,5 @@ proc main() =
       removeDir(opt.tmpDir)
     iterTimes.add(getTime())
     outputTiming(&"{opt.outputDir}CONDUIT.timing", iterTimes, opt)
-  
+
 main()

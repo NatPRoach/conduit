@@ -2,7 +2,8 @@ import math
 import sequtils
 
 
-proc findLocalMinima(region : seq[float]) : seq[uint32] =
+proc findLocalMinima(region: seq[float]): seq[uint32] =
+  ##
   for i in 0..<region.len:
     var previous, next = 0.0
     if i > 0:
@@ -13,9 +14,10 @@ proc findLocalMinima(region : seq[float]) : seq[uint32] =
       result.add(uint32(i))
 
 
-proc calculateKDEmaxima(weighted_positions : seq[(uint32,uint32)],
-                        calculation_window : uint16 = 30'u16,
-                        stddev : float = 10.0 ) : seq[uint32] =
+proc calculateKDEmaxima(weighted_positions: seq[(uint32, uint32)],
+                        calculation_window: uint16 = 30'u16,
+                        stddev: float = 10.0): seq[uint32] =
+  ##
   let startPos = weighted_positions[0][0]
   let endPos = weighted_positions[^1][0]
   let delta = endPos - startPos
@@ -41,12 +43,12 @@ proc calculateKDEmaxima(weighted_positions : seq[(uint32,uint32)],
   for maxima in offsetMaxima:
     result.add(startPos + maxima)
 
-proc getKDEmaxima*(weighted_positions : seq[(uint32,uint32)],
-                   grouping_window : uint16 = 15'u16,
-                   calculation_window : uint16 = 30'u16,
-                   stddev : float = 10.0 ) : seq[uint32] = 
-  # For an array of genome positions and weights,
-  # find local maxima of potential splice junctions based on weighted KDE
+proc getKDEmaxima*(weighted_positions: seq[(uint32, uint32)],
+                   grouping_window: uint16 = 15'u16,
+                   calculation_window: uint16 = 30'u16,
+                   stddev: float = 10.0): seq[uint32] =
+  ## For an array of genome positions and weights,
+  ## find local maxima of potential splice junctions based on weighted KDE
   var startIdx, endIdx = 0
   var lastPosition = weighted_positions[0][0]
   for i in 1..<weighted_positions.len:

@@ -1,1 +1,0 @@
-const ConduitVersion* = "0.1.2"
